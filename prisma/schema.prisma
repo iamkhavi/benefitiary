@@ -11,42 +11,52 @@ datasource db {
 }
 
 // BetterAuth User model
+
 model User {
-  id                   String    @id @default(cuid())
-  email                String    @unique
-  emailVerified        Boolean   @default(false)
-  name                 String
-  image                String?
-  role                 UserRole  @default(SEEKER)
-  onboardingCompleted  Boolean   @default(false)
-  onboardingStep       Int       @default(0)
-  createdAt            DateTime  @default(now())
-  updatedAt            DateTime  @updatedAt
+  id                  String   @id @default(cuid())
+  email               String   @unique
+  emailVerified       Boolean  @default(false)
+  name                String
+  image               String?
+  role                UserRole @default(SEEKER)
+  onboardingCompleted Boolean  @default(false)
+  onboardingStep      Int      @default(0)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
 
   // Relations
-  organization         Organization?
-  preferences          UserPreferences?
-  accounts             Account[]
-  sessions             Session[]
+  organization Organization?
+  preferences  UserPreferences?
+  accounts     Account[]
+  sessions     Session[]
+  grantMatches GrantMatch[]
+  submissions  Submission[]
+  payments     Payment[]
+  aiUsage      AIUsage[]
+
+  lastLoginAt   DateTime?
+  loginAttempts Int?
+  lockedUntil   DateTime?
 
   @@map("user")
 }
 
 // BetterAuth Account model
+
 model Account {
-  id                String  @id @default(cuid())
-  accountId         String
-  providerId        String
-  userId            String
-  accessToken       String?
-  refreshToken      String?
-  idToken           String?
-  accessTokenExpiresAt DateTime?
+  id                    String    @id @default(cuid())
+  accountId             String
+  providerId            String
+  userId                String
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
   refreshTokenExpiresAt DateTime?
-  scope             String?
-  password          String?
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -55,6 +65,7 @@ model Account {
 }
 
 // BetterAuth Session model
+
 model Session {
   id        String   @id @default(cuid())
   expiresAt DateTime
@@ -70,6 +81,7 @@ model Session {
 }
 
 // BetterAuth Verification model
+
 model Verification {
   id         String   @id @default(cuid())
   identifier String
@@ -83,6 +95,7 @@ model Verification {
 }
 
 // Organization model
+
 model Organization {
   id        String           @id @default(cuid())
   userId    String           @unique
@@ -101,12 +114,13 @@ model Organization {
 }
 
 // User preferences model
+
 model UserPreferences {
-  id         String           @id @default(cuid())
-  userId     String           @unique
+  id         String          @id @default(cuid())
+  userId     String          @unique
   categories GrantCategory[]
-  createdAt  DateTime         @default(now())
-  updatedAt  DateTime         @updatedAt
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
 
   // Relations
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -115,6 +129,7 @@ model UserPreferences {
 }
 
 // Enums
+
 enum UserRole {
   SEEKER
   WRITER
@@ -148,4 +163,190 @@ enum GrantCategory {
   COMMUNITY_DEVELOPMENT
   HUMAN_RIGHTS_GOVERNANCE
   SME_BUSINESS_GROWTH
+}
+
+// Business Logic Tables
+
+// Funders model
+model Funder {
+  id           String      @id @default(cuid())
+  name         String
+  type         FunderType
+  website      String?
+  contactEmail String?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  // Relations
+  grants Grant[]
+
+  @@map("funders")
+}
+
+// Grants model
+model Grant {
+  id                  String        @id @default(cuid())
+  funderId            String?
+  title               String
+  description         String?
+  eligibilityCriteria String?
+  deadline            DateTime?
+  fundingAmountMin    Decimal?
+  fundingAmountMax    Decimal?
+  source              String?
+  category            GrantCategory
+  scrapedFrom         String?
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+
+  // Relations
+  funder      Funder?      @relation(fields: [funderId], references: [id], onDelete: SetNull)
+  matches     GrantMatch[]
+  submissions Submission[]
+
+  @@map("grants")
+}
+
+// Grant matches (recommendations)
+model GrantMatch {
+  id         String           @id @default(cuid())
+  userId     String
+  grantId    String
+  matchScore Int?             @default(0)
+  status     GrantMatchStatus @default(SAVED)
+  createdAt  DateTime         @default(now())
+
+  // Relations
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  grant Grant @relation(fields: [grantId], references: [id], onDelete: Cascade)
+
+  @@map("grant_matches")
+}
+
+// Submissions (tracking proposals)
+model Submission {
+  id           String           @id @default(cuid())
+  userId       String
+  grantId      String
+  proposalText String?
+  status       SubmissionStatus @default(DRAFT)
+  submittedAt  DateTime?
+  resultDate   DateTime?
+  createdAt    DateTime         @default(now())
+
+  // Relations
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  grant Grant @relation(fields: [grantId], references: [id], onDelete: Cascade)
+
+  @@map("submissions")
+}
+
+// Scraped sources
+model ScrapedSource {
+  id             String              @id @default(cuid())
+  url            String
+  type           ScrapedSourceType
+  lastScrapedAt  DateTime?
+  frequency      ScrapingFrequency   @default(WEEKLY)
+  status         ScrapedSourceStatus @default(ACTIVE)
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+
+  @@map("scraped_sources")
+}
+
+// Payments (DodoPayments synced)
+model Payment {
+  id               String            @id @default(cuid())
+  userId           String
+  amount           Decimal
+  currency         String            @default("USD")
+  provider         PaymentProvider
+  subscriptionPlan SubscriptionPlan
+  status           PaymentStatus     @default(PAID)
+  lastPaymentDate  DateTime?
+  createdAt        DateTime          @default(now())
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("payments")
+}
+
+// AI usage tracking
+model AIUsage {
+  id         String     @id @default(cuid())
+  userId     String
+  taskType   AITaskType
+  tokensUsed Int
+  costUsd    Decimal
+  createdAt  DateTime   @default(now())
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("ai_usage")
+}
+
+// Additional Enums
+enum FunderType {
+  PRIVATE_FOUNDATION
+  GOVERNMENT
+  NGO
+  CORPORATE
+}
+
+enum GrantMatchStatus {
+  SAVED
+  APPLIED
+  REJECTED
+}
+
+enum SubmissionStatus {
+  DRAFT
+  SUBMITTED
+  WON
+  LOST
+}
+
+enum ScrapedSourceType {
+  GOV
+  FOUNDATION
+  BUSINESS
+  NGO
+  OTHER
+}
+
+enum ScrapingFrequency {
+  DAILY
+  WEEKLY
+  MONTHLY
+}
+
+enum ScrapedSourceStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum PaymentProvider {
+  POLAR
+  DODOPAYMENTS
+}
+
+enum SubscriptionPlan {
+  BASIC
+  PRO
+  ENTERPRISE
+}
+
+enum PaymentStatus {
+  PAID
+  FAILED
+  REFUNDED
+}
+
+enum AITaskType {
+  PROPOSAL_GENERATION
+  EDITING
+  SUMMARIZATION
 }
