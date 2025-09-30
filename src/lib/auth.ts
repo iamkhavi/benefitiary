@@ -62,39 +62,8 @@ export const auth = betterAuth({
     window: 15 * 60, // 15 minutes
     max: 5, // 5 attempts per window
   },
-  user: {
-    additionalFields: {
-      role: {
-        type: "string",
-        defaultValue: "SEEKER",
-        input: false, // Don't allow direct input, will be set during onboarding
-      },
-      onboardingCompleted: {
-        type: "boolean",
-        defaultValue: false,
-        input: false,
-      },
-      onboardingStep: {
-        type: "number",
-        defaultValue: 0,
-        input: false,
-      },
-      lastLoginAt: {
-        type: "date",
-        input: false,
-      },
-      loginAttempts: {
-        type: "number",
-        defaultValue: 0,
-        input: false,
-      },
-      lockedUntil: {
-        type: "date",
-        input: false,
-        required: false,
-      },
-    },
-  },
+  // Removed custom user fields to fix user creation issues
+  // Will handle role and onboarding through separate database operations
   advanced: {
     crossSubDomainCookies: {
       enabled: false, // Disable for security
