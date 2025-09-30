@@ -1,9 +1,22 @@
 import DodoPayments from "dodopayments";
 
-export const dodoClient = new DodoPayments({
-  bearerToken: process.env.DODO_PAYMENTS_API_KEY!,
-  environment: process.env.NODE_ENV === "production" ? "live_mode" : "test_mode",
-});
+let dodoClient: DodoPayments | null = null;
+
+function getDodoClient(): DodoPayments {
+  if (!dodoClient) {
+    const apiKey = process.env.DODO_PAYMENTS_API_KEY;
+    if (!apiKey) {
+      throw new Error("DODO_PAYMENTS_API_KEY environment variable is required");
+    }
+    
+    dodoClient = new DodoPayments({
+      bearerToken: apiKey,
+      environment: process.env.NODE_ENV === "production" ? "live_mode" : "test_mode",
+    });
+  }
+  
+  return dodoClient;
+}
 
 export interface CheckoutOptions {
   productId: string;
@@ -88,9 +101,10 @@ export const subscriptionPlans: SubscriptionPlan[] = [
  */
 export async function createCheckoutSession(options: CheckoutOptions): Promise<DodoCheckout> {
   try {
+    const client = getDodoClient();
     // Note: This is a placeholder implementation
     // The actual DodoPayments API structure may differ
-    const checkout = await (dodoClient as any).checkout?.create({
+    const checkout = await (client as any).checkout?.create({
       product_id: options.productId,
       success_url: options.successUrl || `${process.env.BETTER_AUTH_URL}/dashboard/success`,
       cancel_url: options.cancelUrl || `${process.env.BETTER_AUTH_URL}/billing`,
@@ -109,9 +123,10 @@ export async function createCheckoutSession(options: CheckoutOptions): Promise<D
  */
 export async function createPortalSession(customerId: string): Promise<DodoPortal> {
   try {
+    const client = getDodoClient();
     // Note: This is a placeholder implementation
     // The actual DodoPayments API structure may differ
-    const portal = await (dodoClient.customers as any).portal?.({
+    const portal = await (client.customers as any).portal?.({
       customer_id: customerId,
       return_url: `${process.env.BETTER_AUTH_URL}/dashboard/billing`,
     });
@@ -128,12 +143,13 @@ export async function createPortalSession(customerId: string): Promise<DodoPorta
  */
 export async function createCustomer(email: string, name?: string): Promise<DodoCustomer> {
   try {
+    const client = getDodoClient();
     const customerData: any = { email };
     if (name) {
       customerData.name = name;
     }
 
-    const customer = await dodoClient.customers.create(customerData);
+    const customer = await client.customers.create(customerData);
 
     return customer as unknown as DodoCustomer;
   } catch (error) {
@@ -147,9 +163,10 @@ export async function createCustomer(email: string, name?: string): Promise<Dodo
  */
 export async function getCustomerSubscriptions(customerId: string) {
   try {
+    const client = getDodoClient();
     // Note: This is a placeholder implementation
     // The actual DodoPayments API structure may differ
-    const subscriptions = await (dodoClient as any).subscriptions?.list({
+    const subscriptions = await (client as any).subscriptions?.list({
       customer_id: customerId,
     });
 

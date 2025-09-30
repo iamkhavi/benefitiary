@@ -41,11 +41,11 @@ export const auth = betterAuth({
       maxAge: 60 * 5, // 5 minutes
     },
   },
-  secret: process.env.BETTER_AUTH_SECRET!,
-  baseURL: process.env.BETTER_AUTH_URL!,
+  secret: process.env.BETTER_AUTH_SECRET || 'dev-secret-for-build',
+  baseURL: process.env.BETTER_AUTH_URL || 'http://localhost:3000',
   trustedOrigins: process.env.NODE_ENV === 'production' 
-    ? [process.env.BETTER_AUTH_URL!]
-    : [process.env.BETTER_AUTH_URL!, 'http://localhost:3000'],
+    ? [process.env.BETTER_AUTH_URL || 'http://localhost:3000']
+    : [process.env.BETTER_AUTH_URL || 'http://localhost:3000', 'http://localhost:3000'],
   rateLimit: {
     enabled: true,
     window: 15 * 60, // 15 minutes
