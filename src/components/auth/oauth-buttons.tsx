@@ -16,10 +16,16 @@ export function OAuthButtons({ mode, callbackUrl }: OAuthButtonsProps) {
   const handleGoogleSignIn = async () => {
     setLoadingProvider("google");
     try {
-      await authClient.signIn.social({
+      // Use the correct BetterAuth social sign-in method
+      const result = await authClient.signIn.social({
         provider: "google",
         callbackURL: callbackUrl || "/onboarding/organization",
       });
+      
+      if (result.error) {
+        console.error("Google OAuth error:", result.error);
+        setLoadingProvider(null);
+      }
     } catch (error) {
       console.error("Google sign in error:", error);
       setLoadingProvider(null);
