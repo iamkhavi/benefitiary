@@ -84,24 +84,104 @@ const avatarColors = [
 export function VerticalTestimonials() {
   const [currentIndex, setCurrentIndex] = useState(0);
 
-  // Create three columns of testimonials
+  // Create columns based on screen size
+  // Mobile: 1 column, Tablet: 2 columns, Desktop: 3 columns
   const column1 = testimonials.filter((_, index) => index % 3 === 0);
   const column2 = testimonials.filter((_, index) => index % 3 === 1);
   const column3 = testimonials.filter((_, index) => index % 3 === 2);
+
+  // For mobile, show all testimonials in one column
+  const mobileColumn = testimonials.slice(0, 4); // Show first 4 on mobile
 
   // Duplicate testimonials for seamless loop
   const duplicatedColumn1 = [...column1, ...column1];
   const duplicatedColumn2 = [...column2, ...column2];
   const duplicatedColumn3 = [...column3, ...column3];
+  const duplicatedMobileColumn = [...mobileColumn, ...mobileColumn];
 
   return (
-    <div className="relative h-96 overflow-hidden">
+    <div className="relative h-80 sm:h-96 overflow-hidden">
       {/* Gradient overlays for smooth edges */}
-      <div className="absolute inset-x-0 top-0 h-20 bg-gradient-to-b from-gray-50 to-transparent z-10 pointer-events-none" />
-      <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-gray-50 to-transparent z-10 pointer-events-none" />
+      <div className="absolute inset-x-0 top-0 h-16 sm:h-20 bg-gradient-to-b from-gray-50 to-transparent z-10 pointer-events-none" />
+      <div className="absolute inset-x-0 bottom-0 h-16 sm:h-20 bg-gradient-to-t from-gray-50 to-transparent z-10 pointer-events-none" />
       
-      <div className="flex space-x-6 h-full">
-        {/* Column 1 */}
+      {/* Mobile Layout - Single Column */}
+      <div className="block sm:hidden h-full">
+        <motion.div
+          className="flex flex-col space-y-4 w-full px-4"
+          animate={{
+            y: [0, -120 * mobileColumn.length]
+          }}
+          transition={{
+            y: {
+              repeat: Infinity,
+              repeatType: "loop",
+              duration: 15,
+              ease: "linear"
+            }
+          }}
+        >
+          {duplicatedMobileColumn.map((testimonial, index) => (
+            <TestimonialCard 
+              key={`mobile-${testimonial.id}-${index}`} 
+              testimonial={testimonial}
+              isMobile={true}
+            />
+          ))}
+        </motion.div>
+      </div>
+
+      {/* Tablet Layout - Two Columns */}
+      <div className="hidden sm:block md:hidden h-full">
+        <div className="flex space-x-4 h-full">
+          <motion.div
+            className="flex flex-col space-y-4 w-1/2"
+            animate={{
+              y: [0, -120 * column1.length]
+            }}
+            transition={{
+              y: {
+                repeat: Infinity,
+                repeatType: "loop",
+                duration: 20,
+                ease: "linear"
+              }
+            }}
+          >
+            {duplicatedColumn1.map((testimonial, index) => (
+              <TestimonialCard 
+                key={`tablet1-${testimonial.id}-${index}`} 
+                testimonial={testimonial}
+              />
+            ))}
+          </motion.div>
+
+          <motion.div
+            className="flex flex-col space-y-4 w-1/2"
+            animate={{
+              y: [0, -120 * column2.length]
+            }}
+            transition={{
+              y: {
+                repeat: Infinity,
+                repeatType: "loop",
+                duration: 25,
+                ease: "linear"
+              }
+            }}
+          >
+            {duplicatedColumn2.map((testimonial, index) => (
+              <TestimonialCard 
+                key={`tablet2-${testimonial.id}-${index}`} 
+                testimonial={testimonial}
+              />
+            ))}
+          </motion.div>
+        </div>
+      </div>
+
+      {/* Desktop Layout - Three Columns */}
+      <div className="hidden md:flex space-x-6 h-full">
         <motion.div
           className="flex flex-col space-y-6 w-1/3"
           animate={{
@@ -124,7 +204,6 @@ export function VerticalTestimonials() {
           ))}
         </motion.div>
 
-        {/* Column 2 - Slower animation */}
         <motion.div
           className="flex flex-col space-y-6 w-1/3"
           animate={{
@@ -147,7 +226,6 @@ export function VerticalTestimonials() {
           ))}
         </motion.div>
 
-        {/* Column 3 - Different speed */}
         <motion.div
           className="flex flex-col space-y-6 w-1/3"
           animate={{
@@ -174,25 +252,28 @@ export function VerticalTestimonials() {
   );
 }
 
-function TestimonialCard({ testimonial }: { 
-  testimonial: typeof testimonials[0]
+function TestimonialCard({ testimonial, isMobile = false }: { 
+  testimonial: typeof testimonials[0];
+  isMobile?: boolean;
 }) {
   return (
     <motion.div
-      className="bg-white rounded-2xl p-6 shadow-sm hover:shadow-md transition-shadow duration-300 min-h-[200px] flex flex-col justify-between"
+      className={`bg-white rounded-2xl p-4 sm:p-6 shadow-sm hover:shadow-md transition-shadow duration-300 ${
+        isMobile ? 'min-h-[160px]' : 'min-h-[180px] sm:min-h-[200px]'
+      } flex flex-col justify-between`}
       whileHover={{ scale: 1.02 }}
     >
-      <p className="text-gray-700 text-sm leading-relaxed mb-4 flex-1">
+      <p className={`text-gray-700 ${isMobile ? 'text-sm' : 'text-sm sm:text-base'} leading-relaxed mb-3 sm:mb-4 flex-1 line-clamp-4`}>
         "{testimonial.message}"
       </p>
       
       <div className="flex items-center space-x-3">
-        <div className={`w-10 h-10 rounded-full bg-gradient-to-br ${testimonial.gradient} flex items-center justify-center flex-shrink-0 shadow-md`}>
-          <span className="text-white font-semibold text-sm">{testimonial.avatar}</span>
+        <div className={`${isMobile ? 'w-8 h-8' : 'w-10 h-10'} rounded-full bg-gradient-to-br ${testimonial.gradient} flex items-center justify-center flex-shrink-0 shadow-md`}>
+          <span className={`text-white font-semibold ${isMobile ? 'text-xs' : 'text-sm'}`}>{testimonial.avatar}</span>
         </div>
         <div className="min-w-0 flex-1">
-          <div className="font-semibold text-gray-900 text-sm truncate">{testimonial.name}</div>
-          <div className="text-gray-600 text-xs truncate">{testimonial.position}</div>
+          <div className={`font-semibold text-gray-900 ${isMobile ? 'text-xs' : 'text-sm'} truncate`}>{testimonial.name}</div>
+          <div className={`text-gray-600 ${isMobile ? 'text-xs' : 'text-xs'} truncate`}>{testimonial.position}</div>
         </div>
       </div>
     </motion.div>

@@ -37,37 +37,36 @@ export default function Home() {
       
       <main>
         {/* Hero Section */}
-        <section className="relative pt-32 pb-20 px-4 sm:px-6 lg:px-8 overflow-hidden">
+        <section className="relative pt-20 sm:pt-32 pb-16 sm:pb-20 px-4 sm:px-6 lg:px-8 overflow-hidden">
           <div className="max-w-7xl mx-auto">
-            <div className="grid lg:grid-cols-2 gap-12 items-center">
+            <div className="grid lg:grid-cols-2 gap-8 lg:gap-12 items-center">
               {/* Left Content */}
-              <div className="text-left">
+              <div className="text-center lg:text-left order-1 lg:order-1">
                 {/* Badge */}
-                <div className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-primary/10 text-primary mb-6">
+                <div className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-primary/10 text-primary mb-4 sm:mb-6">
                   <Sparkles className="w-4 h-4 mr-2" />
                   Since 2024
                 </div>
                 
                 {/* Main Headline */}
-                <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-gray-900 mb-6 leading-tight">
+                <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold text-gray-900 mb-4 sm:mb-6 leading-tight">
                   Grant Discovery and
-                  <br />
-                  Application Helps
-                  <br />
+                  <br className="hidden sm:block" />
+                  <span className="sm:block">Application Helps</span>
+                  <br className="hidden sm:block" />
                   <span className="text-primary">Craft the Best Proposals</span>
                 </h1>
                 
                 {/* Subtitle */}
-                <p className="text-lg text-gray-600 mb-8 leading-relaxed max-w-xl">
+                <p className="text-base sm:text-lg text-gray-600 mb-6 sm:mb-8 leading-relaxed max-w-xl mx-auto lg:mx-0">
                   Elevate your funding success from Good to Great with AI-powered matching 
                   from top grant databases. We focus on discovery and application services 
-                  ensuring your proposals are polished and compelling. Make a first 
-                  memorable impression with Benefitiary.
+                  ensuring your proposals are polished and compelling.
                 </p>
                 
                 {/* CTA Button */}
-                <div className="mb-8">
-                  <Button size="lg" className="bg-primary hover:bg-primary/90 text-primary-foreground px-8 py-4 text-lg font-medium rounded-xl shadow-lg hover:shadow-xl transition-all" asChild>
+                <div className="mb-6 sm:mb-8">
+                  <Button size="lg" className="bg-primary hover:bg-primary/90 text-primary-foreground px-6 sm:px-8 py-3 sm:py-4 text-base sm:text-lg font-medium rounded-xl shadow-lg hover:shadow-xl transition-all w-full sm:w-auto" asChild>
                     <Link href="/auth/signup">
                       Start Now
                     </Link>
@@ -75,12 +74,12 @@ export default function Home() {
                 </div>
 
                 {/* Delivery Info */}
-                <p className="text-sm text-gray-500 mb-8">
+                <p className="text-sm text-gray-500 mb-6 sm:mb-8">
                   24/48 hours delivery
                 </p>
 
                 {/* Trust Indicators */}
-                <div className="flex items-center space-x-8">
+                <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start space-y-4 sm:space-y-0 sm:space-x-6 lg:space-x-8">
                   <div className="flex items-center space-x-2">
                     <div className="flex items-center">
                       <Star className="w-4 h-4 text-yellow-400 fill-current" />
@@ -90,9 +89,9 @@ export default function Home() {
                       <Star className="w-4 h-4 text-yellow-400 fill-current" />
                     </div>
                     <span className="text-sm font-medium text-gray-900">4.9</span>
-                  </div>
-                  <div className="text-sm text-gray-600">
-                    <span className="font-medium">GrantHub</span>
+                    <div className="text-sm text-gray-600">
+                      <span className="font-medium">GrantHub</span>
+                    </div>
                   </div>
                   
                   <div className="flex items-center space-x-2">
@@ -104,29 +103,29 @@ export default function Home() {
                       <Star className="w-4 h-4 text-yellow-400 fill-current" />
                     </div>
                     <span className="text-sm font-medium text-gray-900">4.9</span>
-                  </div>
-                  <div className="text-sm text-gray-600">
-                    <span className="font-medium">FundingDB</span>
+                    <div className="text-sm text-gray-600">
+                      <span className="font-medium">FundingDB</span>
+                    </div>
                   </div>
                 </div>
               </div>
 
               {/* Right Content - Interactive Widgets */}
-              <div className="relative flex justify-center">
+              <div className="relative flex justify-center order-2 lg:order-2">
                 {/* Main Widget Container */}
-                <div className="relative">
+                <div className="relative w-full max-w-md lg:max-w-none">
                   {/* Grant Matching Widget - Main focus */}
                   <div className="relative z-20">
                     <GrantMatchingWidget />
                   </div>
 
-                  {/* AI Writing Widget - Positioned below and slightly offset */}
-                  <div className="relative z-10 -mt-6 ml-12">
+                  {/* AI Writing Widget - Hidden on mobile, positioned below and slightly offset on desktop */}
+                  <div className="hidden lg:block relative z-10 -mt-6 ml-12">
                     <AIWritingWidget />
                   </div>
 
-                  {/* Floating Badge - Top left */}
-                  <div className="absolute -top-6 -left-8 bg-primary text-primary-foreground rounded-full p-3 shadow-lg z-40">
+                  {/* Floating Badge - Top left - Adjusted for mobile */}
+                  <div className="absolute -top-3 sm:-top-6 -left-4 sm:-left-8 bg-primary text-primary-foreground rounded-full p-2 sm:p-3 shadow-lg z-40">
                     <div className="text-center">
                       <div className="text-xs font-medium">More</div>
                       <div className="text-xs">than just</div>
@@ -141,8 +140,8 @@ export default function Home() {
                     </div>
                   </div>
 
-                  {/* Security Badge - Bottom left */}
-                  <div className="absolute bottom-8 -left-12 bg-white rounded-lg p-2 shadow-lg border z-30">
+                  {/* Security Badge - Bottom left - Adjusted for mobile */}
+                  <div className="absolute bottom-4 sm:bottom-8 -left-6 sm:-left-12 bg-white rounded-lg p-2 shadow-lg border z-30">
                     <div className="flex items-center space-x-2">
                       <div className="w-6 h-6 bg-primary/10 rounded-full flex items-center justify-center">
                         <Shield className="w-3 h-3 text-primary" />
@@ -244,13 +243,13 @@ export default function Home() {
         </section>
 
         {/* Testimonials Section */}
-        <section className="py-20 px-4 sm:px-6 lg:px-8 bg-gray-50">
+        <section className="py-16 sm:py-20 px-4 sm:px-6 lg:px-8 bg-gray-50">
           <div className="max-w-7xl mx-auto">
-            <div className="text-center mb-16">
-              <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-4">
+            <div className="text-center mb-12 sm:mb-16">
+              <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 mb-3 sm:mb-4">
                 Loved by people all over the universe
               </h2>
-              <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+              <p className="text-base sm:text-lg text-gray-600 max-w-2xl mx-auto px-4 sm:px-0">
                 See what our customers are saying about their experience with Benefitiary
               </p>
             </div>
