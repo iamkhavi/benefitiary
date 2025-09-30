@@ -5,6 +5,17 @@ import { authRateLimit } from "./security/rate-limiting";
 
 const prisma = new PrismaClient();
 
+// Debug environment variables in production
+if (process.env.NODE_ENV === 'production') {
+  console.log('BetterAuth Config Debug:', {
+    hasGoogleClientId: !!process.env.GOOGLE_CLIENT_ID,
+    hasGoogleClientSecret: !!process.env.GOOGLE_CLIENT_SECRET,
+    hasAuthSecret: !!process.env.BETTER_AUTH_SECRET,
+    baseURL: process.env.BETTER_AUTH_URL,
+    nodeEnv: process.env.NODE_ENV
+  });
+}
+
 export const auth = betterAuth({
   database: prismaAdapter(prisma, {
     provider: "postgresql",
@@ -27,12 +38,12 @@ export const auth = betterAuth({
       },
     },
   },
-  socialProviders: {
+  socialProviders: process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET ? {
     google: {
-      clientId: process.env.GOOGLE_CLIENT_ID!,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+      clientId: process.env.GOOGLE_CLIENT_ID,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
     },
-  },
+  } : undefined,
   session: {
     expiresIn: 60 * 60 * 24 * 7, // 7 days
     updateAge: 60 * 60 * 24, // 1 day

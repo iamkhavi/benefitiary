@@ -21,7 +21,7 @@ export function OAuthButtons({ mode, callbackUrl }: OAuthButtonsProps) {
         provider: "google",
         callbackURL: callbackUrl || "/onboarding/organization",
       });
-      
+
       if (result.error) {
         console.error("Google OAuth error:", result.error);
         setLoadingProvider(null);
