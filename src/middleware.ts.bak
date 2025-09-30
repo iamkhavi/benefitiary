@@ -1,0 +1,80 @@
+import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/lib/auth";
+
+export async function middleware(request: NextRequest) {
+  const { pathname } = request.nextUrl;
+
+  // Skip middleware for API routes, static files, and auth routes
+  if (
+    pathname.startsWith("/api/") ||
+    pathname.startsWith("/_next/") ||
+    pathname.startsWith("/auth/") ||
+    pathname === "/favicon.ico" ||
+    pathname === "/"
+  ) {
+    return NextResponse.next();
+  }
+
+  try {
+    // Get session from the request
+    const session = await auth.api.getSession({
+      headers: request.headers,
+    });
+
+    // Protected routes that require authentication
+    const protectedRoutes = ["/dashboard", "/onboarding", "/billing"];
+    const isProtectedRoute = protectedRoutes.some(route => 
+      pathname.startsWith(route)
+    );
+
+    if (isProtectedRoute && !session) {
+      // Redirect to login if not authenticated
+      const loginUrl = new URL("/auth/login", request.url);
+      loginUrl.searchParams.set("callbackUrl", pathname);
+      return NextResponse.redirect(loginUrl);
+    }
+
+    // If user is authenticated but hasn't completed onboarding
+    if (session && !session.user.onboardingCompleted && !pathname.startsWith("/onboarding")) {
+      // Redirect to onboarding
+      return NextResponse.redirect(new URL("/onboarding/organization", request.url));
+    }
+
+    // If user has completed onboarding but is trying to access onboarding pages
+    if (session && session.user.onboardingCompleted && pathname.startsWith("/onboarding")) {
+      // Redirect to appropriate dashboard based on role
+      const dashboardPath = getDashboardPath(session.user.role);
+      return NextResponse.redirect(new URL(dashboardPath, request.url));
+    }
+
+    return NextResponse.next();
+  } catch (error) {
+    console.error("Middleware error:", error);
+    return NextResponse.next();
+  }
+}
+
+function getDashboardPath(role: string): string {
+  switch (role) {
+    case "WRITER":
+      return "/dashboard/writer";
+    case "FUNDER":
+      return "/dashboard/funder";
+    case "SEEKER":
+    default:
+      return "/dashboard/seeker";
+  }
+}
+
+export const config = {
+  matcher: [
+    /*
+     * Match all request paths except for the ones starting with:
+     * - api (API routes)
+     * - _next/static (static files)
+     * - _next/image (image optimization files)
+     * - favicon.ico (favicon file)
+     */
+    "/((?!api|_next/static|_next/image|favicon.ico).*)",
+  ],
+};

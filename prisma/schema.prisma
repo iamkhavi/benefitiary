@@ -1,0 +1,151 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// BetterAuth User model
+model User {
+  id                   String    @id @default(cuid())
+  email                String    @unique
+  emailVerified        Boolean   @default(false)
+  name                 String
+  image                String?
+  role                 UserRole  @default(SEEKER)
+  onboardingCompleted  Boolean   @default(false)
+  onboardingStep       Int       @default(0)
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  // Relations
+  organization         Organization?
+  preferences          UserPreferences?
+  accounts             Account[]
+  sessions             Session[]
+
+  @@map("user")
+}
+
+// BetterAuth Account model
+model Account {
+  id                String  @id @default(cuid())
+  accountId         String
+  providerId        String
+  userId            String
+  accessToken       String?
+  refreshToken      String?
+  idToken           String?
+  accessTokenExpiresAt DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope             String?
+  password          String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([providerId, accountId])
+  @@map("account")
+}
+
+// BetterAuth Session model
+model Session {
+  id        String   @id @default(cuid())
+  expiresAt DateTime
+  token     String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("session")
+}
+
+// BetterAuth Verification model
+model Verification {
+  id         String   @id @default(cuid())
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([identifier, value])
+  @@map("verification")
+}
+
+// Organization model
+model Organization {
+  id        String           @id @default(cuid())
+  userId    String           @unique
+  name      String
+  orgType   OrganizationType
+  size      OrganizationSize
+  country   String
+  region    String?
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("organizations")
+}
+
+// User preferences model
+model UserPreferences {
+  id         String           @id @default(cuid())
+  userId     String           @unique
+  categories GrantCategory[]
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_preferences")
+}
+
+// Enums
+enum UserRole {
+  SEEKER
+  WRITER
+  FUNDER
+}
+
+enum OrganizationType {
+  SME
+  NONPROFIT
+  ACADEMIC
+  HEALTHCARE
+  OTHER
+}
+
+enum OrganizationSize {
+  SOLO
+  MICRO
+  SMALL
+  MEDIUM
+  LARGE
+}
+
+enum GrantCategory {
+  HEALTHCARE_PUBLIC_HEALTH
+  EDUCATION_TRAINING
+  AGRICULTURE_FOOD_SECURITY
+  CLIMATE_ENVIRONMENT
+  TECHNOLOGY_INNOVATION
+  WOMEN_YOUTH_EMPOWERMENT
+  ARTS_CULTURE
+  COMMUNITY_DEVELOPMENT
+  HUMAN_RIGHTS_GOVERNANCE
+  SME_BUSINESS_GROWTH
+}
