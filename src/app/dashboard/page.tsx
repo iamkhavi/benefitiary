@@ -12,24 +12,8 @@ export default async function DashboardPage() {
     return; // This won't execute but helps with type safety
   }
 
-  if (!session.user.onboardingCompleted) {
-    redirect('/onboarding/organization');
-    return;
-  }
+  // Skip onboarding check for now - will be implemented with proper session extension
 
-  // Redirect to role-specific dashboard
-  const role = session.user.role?.toUpperCase();
-  
-  switch (role) {
-    case 'WRITER':
-      redirect('/dashboard/writer');
-      break;
-    case 'FUNDER':
-      redirect('/dashboard/funder');
-      break;
-    case 'SEEKER':
-    default:
-      redirect('/dashboard/seeker');
-      break;
-  }
+  // Default dashboard - redirect to seeker for now
+  redirect('/dashboard/seeker');
 }

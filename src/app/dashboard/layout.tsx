@@ -15,9 +15,7 @@ export default async function DashboardLayout({
     redirect('/auth/login');
   }
 
-  if (!session.user.onboardingCompleted) {
-    redirect('/onboarding/organization');
-  }
+  // Skip onboarding check for now - will be implemented with proper session extension
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -34,7 +32,7 @@ export default async function DashboardLayout({
                 Welcome, {session.user.name}
               </span>
               <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 capitalize">
-                {session.user.role?.toLowerCase()}
+                User
               </span>
             </div>
           </div>

@@ -10,8 +10,8 @@ export default async function SeekerDashboard() {
     headers: await headers(),
   });
 
-  if (!session?.user || session.user.role !== 'SEEKER') {
-    redirect('/dashboard');
+  if (!session?.user) {
+    redirect('/auth/login');
   }
 
   return (

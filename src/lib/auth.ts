@@ -21,18 +21,18 @@ export const auth = betterAuth({
         const saltRounds = process.env.NODE_ENV === 'production' ? 12 : 10;
         return await bcrypt.hash(password, saltRounds);
       },
-      verify: async (password: string, hash: string) => {
+      verify: async (data: { password: string; hash: string }) => {
         const bcrypt = require('bcryptjs');
-        return await bcrypt.compare(password, hash);
+        return await bcrypt.compare(data.password, data.hash);
       },
     },
   },
-  socialProviders: {
+  socialProviders: process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET ? {
     google: {
-      clientId: process.env.GOOGLE_CLIENT_ID!,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+      clientId: process.env.GOOGLE_CLIENT_ID,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET,
     },
-  },
+  } : {},
   session: {
     expiresIn: 60 * 60 * 24 * 7, // 7 days
     updateAge: 60 * 60 * 24, // 1 day

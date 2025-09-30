@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
     console.log('Analytics Event:', {
       ...metric,
       userAgent: request.headers.get('user-agent'),
-      ip: request.ip || request.headers.get('x-forwarded-for'),
+      ip: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown',
       timestamp: new Date(metric.timestamp).toISOString(),
     })
 

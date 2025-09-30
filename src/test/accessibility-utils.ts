@@ -1,6 +1,7 @@
 import { axe, toHaveNoViolations } from 'jest-axe'
 import { render, RenderResult } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import '@testing-library/jest-dom'
 
 // Extend Jest matchers
 expect.extend(toHaveNoViolations)

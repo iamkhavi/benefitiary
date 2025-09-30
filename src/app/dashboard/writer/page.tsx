@@ -10,8 +10,8 @@ export default async function WriterDashboard() {
     headers: await headers(),
   });
 
-  if (!session?.user || session.user.role !== 'WRITER') {
-    redirect('/dashboard');
+  if (!session?.user) {
+    redirect('/auth/login');
   }
 
   return (

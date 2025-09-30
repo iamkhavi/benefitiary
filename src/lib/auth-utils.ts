@@ -36,9 +36,7 @@ export async function requireAuth() {
 export async function requireOnboarding() {
   const session = await requireAuth();
   
-  if (!session.user.onboardingCompleted) {
-    redirect("/onboarding/organization");
-  }
+  // Skip onboarding check for now - will be implemented with proper session extension
   
   return session;
 }

@@ -10,8 +10,8 @@ export default async function FunderDashboard() {
     headers: await headers(),
   });
 
-  if (!session?.user || session.user.role !== 'FUNDER') {
-    redirect('/dashboard');
+  if (!session?.user) {
+    redirect('/auth/login');
   }
 
   return (

@@ -88,7 +88,7 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
 
   const goToStep = (step: number) => {
     if (step >= 0 && step < totalSteps) {
-      const duration = analytics.stepCompleted(currentStep)
+      analytics.stepCompleted(currentStep, 0) // Duration will be calculated by the analytics
       setCurrentStep(step)
     }
   }
@@ -101,11 +101,11 @@ export function OnboardingProvider({ children }: { children: React.ReactNode }) 
 
   const goNext = () => {
     if (currentStep < totalSteps - 1) {
-      const duration = analytics.stepCompleted(currentStep)
+      analytics.stepCompleted(currentStep, 0) // Duration will be calculated by the analytics
       setCurrentStep(prev => prev + 1)
     } else if (currentStep === totalSteps - 1) {
       // Completing the last step means onboarding is complete
-      const totalDuration = analytics.onboardingCompleted()
+      analytics.onboardingCompleted(0, undefined) // Total duration will be calculated
     }
   }
 

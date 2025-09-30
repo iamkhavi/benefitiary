@@ -47,8 +47,8 @@ export function getClientIP(request: NextRequest): string {
     return cfConnectingIP;
   }
   
-  // Fallback to connection remote address
-  return request.ip || 'unknown';
+  // Fallback if no IP headers are available
+  return 'unknown';
 }
 
 export function createRateLimiter(config: RateLimitConfig) {

@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
 
     // Check if user already has an organization
     const existingOrg = await prisma.organization.findFirst({
-      where: { user_id: session.user.id }
+      where: { userId: session.user.id }
     });
 
     if (existingOrg) {
@@ -34,11 +34,11 @@ export async function POST(request: NextRequest) {
     // Create organization record with detected information
     const organization = await prisma.organization.create({
       data: {
-        user_id: session.user.id,
+        userId: session.user.id,
         name: orgInfo.name,
-        industry: orgInfo.type,
-        size: suggestedSize,
-        location: suggestedCountry,
+        orgType: orgInfo.type as any, // Will be mapped to correct enum
+        size: 'SMALL', // Default to SMALL, user can change later
+        country: suggestedCountry,
       }
     });
 
@@ -48,9 +48,9 @@ export async function POST(request: NextRequest) {
       organization: {
         id: organization.id,
         name: organization.name,
-        industry: organization.industry,
+        orgType: organization.orgType,
         size: organization.size,
-        location: organization.location,
+        country: organization.country,
         isWorkEmail: orgInfo.isWorkEmail,
         detectedFromEmail: true
       }

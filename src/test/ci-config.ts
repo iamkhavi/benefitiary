@@ -11,7 +11,7 @@ export const ciConfig = defineConfig({
     globals: true,
     
     // CI-specific settings
-    reporter: ['verbose', 'junit', 'json'],
+    reporters: ['verbose', 'junit', 'json'],
     outputFile: {
       junit: './test-results/junit.xml',
       json: './test-results/results.json'
