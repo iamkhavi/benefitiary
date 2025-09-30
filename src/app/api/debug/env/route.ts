@@ -1,10 +1,8 @@
 import { NextResponse } from "next/server";
 
 export async function GET() {
-  // Only allow in development or with a debug key
-  if (process.env.NODE_ENV === 'production' && !process.env.DEBUG_KEY) {
-    return NextResponse.json({ error: "Not allowed" }, { status: 403 });
-  }
+  // Temporarily allow in production for debugging OAuth issues
+  // TODO: Remove this after fixing OAuth
 
   return NextResponse.json({
     nodeEnv: process.env.NODE_ENV,
