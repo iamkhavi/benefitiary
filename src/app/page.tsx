@@ -67,7 +67,7 @@ export default function Home() {
                 {/* CTA Button */}
                 <div className="mb-6 sm:mb-8">
                   <Button size="lg" className="bg-primary hover:bg-primary/90 text-primary-foreground px-6 sm:px-8 py-3 sm:py-4 text-base sm:text-lg font-medium rounded-xl shadow-lg hover:shadow-xl transition-all w-full sm:w-auto" asChild>
-                    <Link href="/auth/signup">
+                    <Link href={`${process.env.NEXT_PUBLIC_APP_URL || 'https://app.benefitiary.com'}/auth/signup`}>
                       Start Now
                     </Link>
                   </Button>
@@ -352,7 +352,7 @@ export default function Home() {
             
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-8">
               <Button size="lg" className="bg-red-600 hover:bg-red-700 text-white px-8 py-3 text-base font-medium rounded-lg" asChild>
-                <Link href="/auth/signup">
+                <Link href={`${process.env.NEXT_PUBLIC_APP_URL || 'https://app.benefitiary.com'}/auth/signup`}>
                   Get Started Free
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Link>

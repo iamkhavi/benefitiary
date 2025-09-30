@@ -124,14 +124,14 @@ export function BenefitiaryNavbar() {
             <>
               <NavbarButton 
                 variant="secondary" 
-                href="/auth/login"
+                href={`${process.env.NEXT_PUBLIC_APP_URL || 'https://app.benefitiary.com'}/auth/login`}
                 className="text-gray-600 hover:text-primary transition-colors"
               >
                 Sign In
               </NavbarButton>
               <NavbarButton 
                 variant="primary" 
-                href="/auth/signup"
+                href={`${process.env.NEXT_PUBLIC_APP_URL || 'https://app.benefitiary.com'}/auth/signup`}
                 className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-lg"
               >
                 Get Started
@@ -213,7 +213,7 @@ export function BenefitiaryNavbar() {
                   onClick={() => setIsMobileMenuOpen(false)}
                   variant="secondary"
                   className="w-full text-gray-600 hover:text-primary"
-                  href="/auth/login"
+                  href={`${process.env.NEXT_PUBLIC_APP_URL || 'https://app.benefitiary.com'}/auth/login`}
                 >
                   Sign In
                 </NavbarButton>
@@ -221,7 +221,7 @@ export function BenefitiaryNavbar() {
                   onClick={() => setIsMobileMenuOpen(false)}
                   variant="primary"
                   className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
-                  href="/auth/signup"
+                  href={`${process.env.NEXT_PUBLIC_APP_URL || 'https://app.benefitiary.com'}/auth/signup`}
                 >
                   Get Started
                 </NavbarButton>
