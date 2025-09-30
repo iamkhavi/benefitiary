@@ -36,22 +36,29 @@ export function SmartCTAButton({
     );
   }
 
-  // If user is logged in, take them to dashboard
-  // The dashboard will handle redirecting to onboarding if needed
+  // If user is logged in, take them to dashboard on app subdomain
   if (session?.user) {
     return (
       <Button size={size} variant={variant} className={className} asChild>
-        <Link href="/dashboard">
+        <Link 
+          href={`${process.env.NEXT_PUBLIC_APP_URL || 'https://app.benefitiary.com'}/dashboard`}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
           {children}
         </Link>
       </Button>
     );
   }
 
-  // User is not logged in, take them to signup
+  // User is not logged in, take them to signup on app subdomain
   return (
     <Button size={size} variant={variant} className={className} asChild>
-      <Link href={`${process.env.NEXT_PUBLIC_APP_URL || 'https://app.benefitiary.com'}/auth/signup`}>
+      <Link 
+        href={`${process.env.NEXT_PUBLIC_APP_URL || 'https://app.benefitiary.com'}/auth/signup`}
+        target="_blank"
+        rel="noopener noreferrer"
+      >
         {children}
       </Link>
     </Button>
