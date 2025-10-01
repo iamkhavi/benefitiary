@@ -222,11 +222,22 @@ export default function OrganizationPage() {
       // Update local state and proceed to next step
       updateData({ organization: formData })
       console.log('Updated local data, calling goNext()')
-      goNext()
+      
+      try {
+        goNext()
+        console.log('goNext() completed successfully')
+      } catch (error) {
+        console.error('Error in goNext():', error)
+      }
       
       // Navigate to the next page
-      console.log('Navigating to role page')
-      router.push('/onboarding/role')
+      console.log('About to navigate to role page')
+      try {
+        router.push('/onboarding/role')
+        console.log('Navigation initiated successfully')
+      } catch (error) {
+        console.error('Navigation error:', error)
+      }
 
     } catch (error) {
       console.error('Organization submission error:', error)
@@ -242,13 +253,13 @@ export default function OrganizationPage() {
               })
             }
           })
+          setIsSubmitting(false)
           return
         }
         setApiError(error.message)
       } else {
         setApiError(error instanceof Error ? error.message : 'An unexpected error occurred')
       }
-    } finally {
       setIsSubmitting(false)
     }
   }
