@@ -74,6 +74,7 @@ class APIClient {
         const response = await fetch(url, {
           ...fetchOptions,
           headers,
+          credentials: 'include', // Include cookies for authentication
           signal: controller.signal
         })
 

@@ -212,6 +212,8 @@ export default function OrganizationPage() {
 
   const onSubmit = async (formData: OrganizationFormData) => {
     console.log('Form submission started with data:', formData)
+    console.log('Current session:', session)
+    console.log('User logged in:', !!session?.user)
     setIsSubmitting(true)
     setApiError(null)
 
