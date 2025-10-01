@@ -57,7 +57,8 @@ export function DashboardShell({ children, user }: DashboardShellProps) {
 
   // Get page title based on current path
   const getPageTitle = () => {
-    if (pathname === '/dashboard') return 'Dashboard';
+    if (!pathname) return 'Dashboard';
+    if (pathname === '/dashboard' || pathname === '/dashboard/seeker') return 'Dashboard';
     if (pathname === '/grants') return 'Grant Explorer';
     if (pathname === '/applications') return 'Applications';
     if (pathname === '/matches') return 'Grant Matches';
@@ -72,6 +73,7 @@ export function DashboardShell({ children, user }: DashboardShellProps) {
 
   // Get page badge based on current path
   const getPageBadge = () => {
+    if (!pathname) return undefined;
     if (pathname === '/grants') return 'New';
     if (pathname === '/applications') return '12 Active';
     if (pathname === '/matches') return '8 New';
@@ -102,7 +104,7 @@ export function DashboardShell({ children, user }: DashboardShellProps) {
             </h3>
             <nav className="space-y-1">
               {mainMenuItems.map((item) => {
-                const isActive = pathname === item.href;
+                const isActive = pathname === item.href || (pathname === '/dashboard/seeker' && item.href === '/dashboard');
                 return (
                   <Link
                     key={item.href}

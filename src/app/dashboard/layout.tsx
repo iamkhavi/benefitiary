@@ -4,7 +4,14 @@ import { headers } from 'next/headers';
 import { PrismaClient } from '@prisma/client';
 import { DashboardShell } from '@/components/layout/dashboard-shell';
 
-const prisma = new PrismaClient();
+// Use global prisma instance to avoid connection issues
+const globalForPrisma = globalThis as unknown as {
+  prisma: PrismaClient | undefined;
+};
+
+const prisma = globalForPrisma.prisma ?? new PrismaClient();
+
+if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
 
 export default async function DashboardLayout({
   children,
