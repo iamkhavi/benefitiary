@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  const hostname = request.headers.get('host') || '';
 
   // Skip middleware for static files and API routes
   if (
@@ -13,11 +14,15 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Simple redirect for root path to signup (app subdomain will handle smart routing)
-  if (pathname === '/') {
+  // Check if we're on the app subdomain
+  const isAppSubdomain = hostname.startsWith('app.');
+
+  // Only redirect to auth on app subdomain, not main domain
+  if (isAppSubdomain && pathname === '/') {
     return NextResponse.redirect(new URL('/auth/signup', request.url));
   }
 
+  // For main domain, let the homepage render normally
   return NextResponse.next();
 }
 
