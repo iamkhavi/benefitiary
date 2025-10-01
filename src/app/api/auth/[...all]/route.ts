@@ -4,15 +4,42 @@ import { NextRequest, NextResponse } from "next/server";
 
 const handlers = toNextJsHandler(auth);
 
+// Handle CORS for auth requests
+function handleCors(request: NextRequest, response: NextResponse) {
+  const origin = request.headers.get('origin');
+  const allowedOrigins = [
+    'https://app.benefitiary.com',
+    'https://benefitiary.com',
+    ...(process.env.NODE_ENV !== 'production' ? ['http://localhost:3000'] : [])
+  ];
+  
+  if (origin && allowedOrigins.includes(origin)) {
+    response.headers.set('Access-Control-Allow-Origin', origin);
+  }
+  
+  response.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+  response.headers.set('Access-Control-Allow-Credentials', 'true');
+  
+  return response;
+}
+
+export async function OPTIONS(request: NextRequest) {
+  const response = new NextResponse(null, { status: 200 });
+  return handleCors(request, response);
+}
+
 export async function GET(request: NextRequest) {
   try {
-    return await handlers.GET(request);
+    const response = await handlers.GET(request);
+    return handleCors(request, response);
   } catch (error) {
     console.error("BetterAuth GET Error:", error);
-    return NextResponse.json(
+    const errorResponse = NextResponse.json(
       { error: "Authentication error", details: error instanceof Error ? error.message : "Unknown error" },
       { status: 500 }
     );
+    return handleCors(request, errorResponse);
   }
 }
 
@@ -31,12 +58,14 @@ export async function POST(request: NextRequest) {
       pathname: request.nextUrl.pathname
     });
     
-    return await handlers.POST(request);
+    const response = await handlers.POST(request);
+    return handleCors(request, response);
   } catch (error) {
     console.error("BetterAuth POST Error:", error);
-    return NextResponse.json(
+    const errorResponse = NextResponse.json(
       { error: "Authentication error", details: error instanceof Error ? error.message : "Unknown error" },
       { status: 500 }
     );
+    return handleCors(request, errorResponse);
   }
 }
