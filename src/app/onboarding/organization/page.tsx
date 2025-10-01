@@ -483,8 +483,8 @@ export default function OrganizationPage() {
                                 <CommandItem
                                   key={country}
                                   value={country}
-                                  onSelect={(currentValue) => {
-                                    field.onChange(currentValue === field.value ? "" : currentValue)
+                                  onSelect={() => {
+                                    field.onChange(country)
                                     setCountryOpen(false)
                                   }}
                                 >
