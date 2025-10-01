@@ -1,7 +1,6 @@
 import { auth } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import { headers } from 'next/headers';
-import { DashboardHeader } from '@/components/layout/dashboard-header';
 import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
@@ -51,12 +50,10 @@ export default async function DashboardLayout({
     // Continue to dashboard if check fails
   }
 
+  // Return full-width layout - no containers or headers
   return (
-    <div className="min-h-screen bg-gray-50">
-      <DashboardHeader user={session.user} />
-      <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
-        {children}
-      </main>
+    <div className="h-screen bg-gray-50">
+      {children}
     </div>
   );
 }
