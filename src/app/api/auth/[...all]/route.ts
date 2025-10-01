@@ -5,7 +5,7 @@ import { NextRequest, NextResponse } from "next/server";
 const handlers = toNextJsHandler(auth);
 
 // Handle CORS for auth requests
-function handleCors(request: NextRequest, response: NextResponse) {
+function handleCors(request: NextRequest, response: Response): Response {
   const origin = request.headers.get('origin');
   const allowedOrigins = [
     'https://app.benefitiary.com',
@@ -13,19 +13,26 @@ function handleCors(request: NextRequest, response: NextResponse) {
     ...(process.env.NODE_ENV !== 'production' ? ['http://localhost:3000'] : [])
   ];
   
+  // Create a new response with CORS headers
+  const corsResponse = new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers: new Headers(response.headers)
+  });
+  
   if (origin && allowedOrigins.includes(origin)) {
-    response.headers.set('Access-Control-Allow-Origin', origin);
+    corsResponse.headers.set('Access-Control-Allow-Origin', origin);
   }
   
-  response.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
-  response.headers.set('Access-Control-Allow-Credentials', 'true');
+  corsResponse.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  corsResponse.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+  corsResponse.headers.set('Access-Control-Allow-Credentials', 'true');
   
-  return response;
+  return corsResponse;
 }
 
 export async function OPTIONS(request: NextRequest) {
-  const response = new NextResponse(null, { status: 200 });
+  const response = new Response(null, { status: 200 });
   return handleCors(request, response);
 }
 
