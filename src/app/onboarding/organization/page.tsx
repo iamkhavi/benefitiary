@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
+import { useRouter } from 'next/navigation'
 import { useOnboarding } from '@/components/onboarding/onboarding-context'
 import { organizationSchema, type OrganizationFormData } from '@/lib/validations/onboarding'
 import { Button } from '@/components/ui/button'
@@ -164,6 +165,7 @@ function generateOrgNameFromEmail(email: string): string {
 }
 
 export default function OrganizationPage() {
+  const router = useRouter()
   const { updateData, goNext, goBack, data } = useOnboarding()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [apiError, setApiError] = useState<string | null>(null)
@@ -176,6 +178,7 @@ export default function OrganizationPage() {
 
   const form = useForm<OrganizationFormData>({
     resolver: zodResolver(organizationSchema),
+    mode: 'onChange',
     defaultValues: {
       name: data.organization?.name || '',
       orgType: data.organization?.orgType as OrganizationFormData['orgType'] || undefined,
@@ -220,6 +223,10 @@ export default function OrganizationPage() {
       updateData({ organization: formData })
       console.log('Updated local data, calling goNext()')
       goNext()
+      
+      // Navigate to the next page
+      console.log('Navigating to role page')
+      router.push('/onboarding/role')
 
     } catch (error) {
       console.error('Organization submission error:', error)
