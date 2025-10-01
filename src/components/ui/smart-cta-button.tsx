@@ -1,61 +1,33 @@
 "use client";
 
-import { useSession } from "@/lib/auth-client";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { Loader2 } from "lucide-react";
 import { ReactNode } from "react";
 
-interface SmartCTAButtonProps {
+interface MarketingCTAButtonProps {
   children: ReactNode;
   className?: string;
   size?: "default" | "sm" | "lg" | "icon";
   variant?: "default" | "destructive" | "outline" | "secondary" | "ghost" | "link";
+  action?: "signup" | "login";
 }
 
-export function SmartCTAButton({ 
+export function MarketingCTAButton({ 
   children, 
   className = "", 
   size = "lg",
-  variant = "default"
-}: SmartCTAButtonProps) {
-  const { data: session, isPending } = useSession();
+  variant = "default",
+  action = "signup"
+}: MarketingCTAButtonProps) {
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.benefitiary.com';
+  const targetUrl = action === "login" 
+    ? `${appUrl}/auth/login` 
+    : `${appUrl}/auth/signup`;
 
-  // Show loading state while checking session
-  if (isPending) {
-    return (
-      <Button 
-        size={size} 
-        variant={variant}
-        className={className}
-        disabled
-      >
-        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-        Loading...
-      </Button>
-    );
-  }
-
-  // If user is logged in, take them to dashboard on app subdomain
-  if (session?.user) {
-    return (
-      <Button size={size} variant={variant} className={className} asChild>
-        <Link 
-          href={`${process.env.NEXT_PUBLIC_APP_URL || 'https://app.benefitiary.com'}/dashboard`}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          {children}
-        </Link>
-      </Button>
-    );
-  }
-
-  // User is not logged in, take them to signup on app subdomain
   return (
     <Button size={size} variant={variant} className={className} asChild>
       <Link 
-        href={`${process.env.NEXT_PUBLIC_APP_URL || 'https://app.benefitiary.com'}/auth/signup`}
+        href={targetUrl}
         target="_blank"
         rel="noopener noreferrer"
       >

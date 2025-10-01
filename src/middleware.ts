@@ -1,30 +1,24 @@
-import { NextRequest, NextResponse } from "next/server";
-import { getDashboardPath } from "@/lib/utils/dashboard-utils";
+import { NextRequest, NextResponse } from 'next/server';
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Skip middleware for API routes, static files, and auth routes
+  // Skip middleware for static files and API routes
   if (
-    pathname.startsWith("/api/") ||
-    pathname.startsWith("/_next/") ||
-    pathname.startsWith("/auth/") ||
-    pathname === "/favicon.ico" ||
-    pathname === "/" ||
-    pathname.startsWith("/privacy") ||
-    pathname.startsWith("/terms")
+    pathname.startsWith('/_next') ||
+    pathname.startsWith('/api') ||
+    pathname.includes('.') ||
+    pathname === '/favicon.ico'
   ) {
     return NextResponse.next();
   }
 
-  try {
-    // For now, let the individual pages handle authentication
-    // This avoids the Edge Runtime issue with BetterAuth
-    return NextResponse.next();
-  } catch (error) {
-    console.error("Middleware error:", error);
-    return NextResponse.next();
+  // Simple redirect for root path to signup (app subdomain will handle smart routing)
+  if (pathname === '/') {
+    return NextResponse.redirect(new URL('/auth/signup', request.url));
   }
+
+  return NextResponse.next();
 }
 
 export const config = {
@@ -36,6 +30,6 @@ export const config = {
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
      */
-    "/((?!api|_next/static|_next/image|favicon.ico).*)",
+    '/((?!api|_next/static|_next/image|favicon.ico).*)',
   ],
 };

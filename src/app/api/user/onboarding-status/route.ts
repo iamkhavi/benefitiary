@@ -36,10 +36,24 @@ export async function GET(request: NextRequest) {
       })
     ]);
 
+    const hasOrganization = !!organization;
+    const hasRole = !!(userWithRole?.role && userWithRole.role !== 'SEEKER'); // Default role is SEEKER
+    const hasPreferences = !!preferences;
+    
+    const isOnboardingComplete = hasOrganization && hasRole && hasPreferences;
+
     const onboardingStatus = {
-      hasOrganization: !!organization,
-      hasRole: !!(userWithRole?.role && userWithRole.role !== 'SEEKER'), // Default role is SEEKER, so check if it's been changed
-      hasPreferences: !!preferences
+      hasOrganization,
+      hasRole,
+      hasPreferences,
+      isComplete: isOnboardingComplete,
+      nextStep: !hasOrganization 
+        ? '/onboarding/organization'
+        : !hasRole 
+        ? '/onboarding/role'
+        : !hasPreferences 
+        ? '/onboarding/preferences'
+        : '/dashboard'
     };
 
     return NextResponse.json(onboardingStatus);

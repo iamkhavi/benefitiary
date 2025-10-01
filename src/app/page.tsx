@@ -1,6 +1,6 @@
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
-import { SmartCTAButton } from "@/components/ui/smart-cta-button"
+import { MarketingCTAButton } from "@/components/ui/smart-cta-button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Footer } from "@/components/layout/footer"
 import { Logo, LogoIcon } from "@/components/ui/logo"
@@ -67,12 +67,13 @@ export default function Home() {
                 
                 {/* CTA Button */}
                 <div className="mb-6 sm:mb-8">
-                  <SmartCTAButton 
+                  <MarketingCTAButton 
                     size="lg" 
+                    action="signup"
                     className="bg-primary hover:bg-primary/90 text-primary-foreground px-6 sm:px-8 py-3 sm:py-4 text-base sm:text-lg font-medium rounded-xl shadow-lg hover:shadow-xl transition-all w-full sm:w-auto"
                   >
                     Start Now
-                  </SmartCTAButton>
+                  </MarketingCTAButton>
                 </div>
 
                 {/* Delivery Info */}
@@ -353,13 +354,14 @@ export default function Home() {
             </p>
             
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4 mb-8">
-              <SmartCTAButton 
+              <MarketingCTAButton 
                 size="lg" 
+                action="signup"
                 className="bg-red-600 hover:bg-red-700 text-white px-8 py-3 text-base font-medium rounded-lg"
               >
                 Get Started Free
                 <ArrowRight className="ml-2 h-4 w-4" />
-              </SmartCTAButton>
+              </MarketingCTAButton>
               <Button variant="outline" size="lg" className="border-gray-600 text-gray-300 hover:bg-gray-800 px-8 py-3 text-base font-medium rounded-lg" asChild>
                 <Link href="#demo">
                   Learn More
