@@ -2,6 +2,7 @@ import { auth } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import { headers } from 'next/headers';
 import { PrismaClient } from '@prisma/client';
+import { DashboardShell } from '@/components/layout/dashboard-shell';
 
 const prisma = new PrismaClient();
 
@@ -50,10 +51,10 @@ export default async function DashboardLayout({
     // Continue to dashboard if check fails
   }
 
-  // Return full-width layout - no containers or headers
+  // Return shared dashboard shell with sidebar and header
   return (
-    <div className="h-screen bg-gray-50">
+    <DashboardShell user={session.user}>
       {children}
-    </div>
+    </DashboardShell>
   );
 }
