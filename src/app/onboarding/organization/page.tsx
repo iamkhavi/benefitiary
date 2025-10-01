@@ -16,7 +16,7 @@ import {
   FormMessage 
 } from '@/components/ui/form'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Building2, Users, Globe, MapPin, Loader2, Check, Search, Edit3, Sparkles } from 'lucide-react'
+import { Building2, Users, Globe, MapPin, Loader2, Check, Search } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useSession } from '@/lib/auth-client'
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
@@ -166,7 +166,6 @@ export default function OrganizationPage() {
   const [selectedType, setSelectedType] = useState<string>('')
   const [selectedSize, setSelectedSize] = useState<string>('')
   const [countryOpen, setCountryOpen] = useState(false)
-  const [isEditingName, setIsEditingName] = useState(false)
   
   const { data: session } = useSession()
 
@@ -429,32 +428,19 @@ export default function OrganizationPage() {
                     <FormLabel className="flex items-center gap-2">
                       <Building2 className="h-4 w-4" />
                       Organization Name *
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setIsEditingName(!isEditingName)}
-                        className="ml-auto h-6 px-2"
-                      >
-                        <Edit3 className="h-3 w-3" />
-                      </Button>
-                    </FormLabel>
-                    <div className="flex items-center gap-2">
-                      <FormControl>
-                        <Input 
-                          placeholder="Enter your organization name" 
-                          {...field}
-                          disabled={!isEditingName}
-                          className={!isEditingName ? "bg-gray-50" : ""}
-                        />
-                      </FormControl>
-                      {session?.user?.email && !isEditingName && (
-                        <div className="flex items-center gap-1 text-xs text-gray-500">
+                      {session?.user?.email && field.value && (
+                        <div className="ml-auto flex items-center gap-1 text-xs text-gray-500">
                           <Sparkles className="h-3 w-3" />
-                          Auto-generated
+                          Auto-suggested (editable)
                         </div>
                       )}
-                    </div>
+                    </FormLabel>
+                    <FormControl>
+                      <Input 
+                        placeholder={field.value ? "" : "Enter your organization name"}
+                        {...field}
+                      />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -475,28 +461,30 @@ export default function OrganizationPage() {
                           <Button
                             variant="outline"
                             role="combobox"
+                            aria-expanded={countryOpen}
                             className={cn(
-                              "w-full justify-between",
+                              "w-full justify-between text-left font-normal",
                               !field.value && "text-muted-foreground"
                             )}
+                            disabled={isSubmitting}
                           >
                             {field.value || "Select your country"}
                             <Search className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                           </Button>
                         </FormControl>
                       </PopoverTrigger>
-                      <PopoverContent className="w-full p-0">
+                      <PopoverContent className="w-[400px] p-0" align="start">
                         <Command>
-                          <CommandInput placeholder="Search countries..." />
+                          <CommandInput placeholder="Search countries..." className="h-9" />
                           <CommandEmpty>No country found.</CommandEmpty>
                           <CommandGroup>
-                            <CommandList className="max-h-[200px]">
+                            <CommandList className="max-h-[200px] overflow-y-auto">
                               {countries.map((country) => (
                                 <CommandItem
                                   key={country}
                                   value={country}
-                                  onSelect={() => {
-                                    form.setValue("country", country)
+                                  onSelect={(currentValue) => {
+                                    field.onChange(currentValue === field.value ? "" : currentValue)
                                     setCountryOpen(false)
                                   }}
                                 >
