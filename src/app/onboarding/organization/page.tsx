@@ -16,7 +16,7 @@ import {
   FormMessage 
 } from '@/components/ui/form'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Building2, Users, Globe, MapPin, Loader2, Check, Search } from 'lucide-react'
+import { Building2, Users, Globe, MapPin, Loader2, Check, Search, Sparkles } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useSession } from '@/lib/auth-client'
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
