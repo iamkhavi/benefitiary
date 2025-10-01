@@ -83,11 +83,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { name, orgType, size, country, region } = validationResult.data;
+    const { name, orgType, size, position, website, country, region } = validationResult.data;
 
     // Security: Encrypt sensitive organization data
     const encryptedData = await encryptOrganizationData({
       name,
+      website: website || undefined,
       country,
       region: region || undefined,
     });
@@ -107,6 +108,8 @@ export async function POST(request: NextRequest) {
           name: encryptedData.name,
           orgType: mapOrgTypeToEnum(orgType) as any,
           size: mapSizeToEnum(size) as any,
+          position: mapPositionToEnum(position) as any,
+          website: encryptedData.website || null,
           country: encryptedData.country,
           region: encryptedData.region || null,
           updatedAt: new Date(),
@@ -120,6 +123,8 @@ export async function POST(request: NextRequest) {
           name: encryptedData.name,
           orgType: mapOrgTypeToEnum(orgType) as any,
           size: mapSizeToEnum(size) as any,
+          position: mapPositionToEnum(position) as any,
+          website: encryptedData.website || null,
           country: encryptedData.country,
           region: encryptedData.region || null,
         }
@@ -143,6 +148,8 @@ export async function POST(request: NextRequest) {
         name, // Return original unencrypted name for UI
         orgType,
         size,
+        position,
+        website: website || null,
         country,
         region: region || null,
       }
@@ -183,4 +190,20 @@ function mapSizeToEnum(size: string): string {
     'Large': 'LARGE'
   };
   return mapping[size] || 'SMALL';
+}
+
+function mapPositionToEnum(position: string): string {
+  const mapping: Record<string, string> = {
+    'CEO': 'CEO',
+    'Founder': 'FOUNDER',
+    'Program Manager': 'PROGRAM_MANAGER',
+    'Development Manager': 'DEVELOPMENT_MANAGER',
+    'Grant Writer': 'GRANT_WRITER',
+    'Operations Manager': 'OPERATIONS_MANAGER',
+    'Project Coordinator': 'PROJECT_COORDINATOR',
+    'Research Director': 'RESEARCH_DIRECTOR',
+    'Finance Manager': 'FINANCE_MANAGER',
+    'Other': 'OTHER'
+  };
+  return mapping[position] || 'OTHER';
 }

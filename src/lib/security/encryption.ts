@@ -87,15 +87,18 @@ export function hashSensitiveData(data: string): string {
 // Encrypt organization data before storing
 export async function encryptOrganizationData(orgData: {
   name: string;
+  website?: string;
   country: string;
   region?: string;
 }): Promise<{
   name: string;
+  website?: string;
   country: string;
   region?: string;
 }> {
   return {
     name: await encryptSensitiveData(orgData.name),
+    website: orgData.website ? await encryptSensitiveData(orgData.website) : undefined,
     country: orgData.country, // Country can remain unencrypted for filtering
     region: orgData.region ? await encryptSensitiveData(orgData.region) : undefined,
   };
@@ -104,15 +107,18 @@ export async function encryptOrganizationData(orgData: {
 // Decrypt organization data after retrieval
 export async function decryptOrganizationData(encryptedOrgData: {
   name: string;
+  website?: string;
   country: string;
   region?: string;
 }): Promise<{
   name: string;
+  website?: string;
   country: string;
   region?: string;
 }> {
   return {
     name: await decryptSensitiveData(encryptedOrgData.name),
+    website: encryptedOrgData.website ? await decryptSensitiveData(encryptedOrgData.website) : undefined,
     country: encryptedOrgData.country,
     region: encryptedOrgData.region ? await decryptSensitiveData(encryptedOrgData.region) : undefined,
   };

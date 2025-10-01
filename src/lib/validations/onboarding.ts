@@ -13,6 +13,14 @@ export const organizationSchema = z.object({
   size: z.enum(['Solo', 'Micro', 'Small', 'Medium', 'Large'], {
     required_error: "Please select an organization size",
   }),
+  position: z.enum(['CEO', 'Founder', 'Program Manager', 'Development Manager', 'Grant Writer', 'Operations Manager', 'Project Coordinator', 'Research Director', 'Finance Manager', 'Other'], {
+    required_error: "Please select your position",
+  }),
+  website: z
+    .string()
+    .url("Please enter a valid URL")
+    .optional()
+    .or(z.literal("")),
   country: z
     .string()
     .trim()

@@ -45,6 +45,14 @@ export function sanitizeLocation(location: string): string {
     .slice(0, 50);
 }
 
+// Website URL sanitization
+export function sanitizeWebsiteUrl(url: string): string {
+  return url
+    .trim()
+    .slice(0, 255) // Reasonable URL length limit
+    .replace(/[<>'"]/g, ''); // Remove potentially dangerous characters
+}
+
 // Enhanced validation schemas with sanitization
 export const sanitizedOrganizationSchema = z.object({
   name: z
@@ -55,6 +63,13 @@ export const sanitizedOrganizationSchema = z.object({
     .refine((val) => !/^\s*$/.test(val), "Organization name cannot be empty or whitespace only"),
   orgType: z.enum(['SME', 'Nonprofit', 'Academic', 'Healthcare', 'Other']),
   size: z.enum(['Solo', 'Micro', 'Small', 'Medium', 'Large']),
+  position: z.enum(['CEO', 'Founder', 'Program Manager', 'Development Manager', 'Grant Writer', 'Operations Manager', 'Project Coordinator', 'Research Director', 'Finance Manager', 'Other']),
+  website: z
+    .string()
+    .transform(sanitizeWebsiteUrl)
+    .refine((val) => !val || val.startsWith('http'), "Website must be a valid URL starting with http:// or https://")
+    .optional()
+    .or(z.literal("")),
   country: z
     .string()
     .transform(sanitizeLocation)

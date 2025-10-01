@@ -102,6 +102,8 @@ model Organization {
   name      String
   orgType   OrganizationType
   size      OrganizationSize
+  position  UserPosition
+  website   String?
   country   String
   region    String?
   createdAt DateTime         @default(now())
@@ -150,6 +152,19 @@ enum OrganizationSize {
   SMALL
   MEDIUM
   LARGE
+}
+
+enum UserPosition {
+  CEO
+  FOUNDER
+  PROGRAM_MANAGER
+  DEVELOPMENT_MANAGER
+  GRANT_WRITER
+  OPERATIONS_MANAGER
+  PROJECT_COORDINATOR
+  RESEARCH_DIRECTOR
+  FINANCE_MANAGER
+  OTHER
 }
 
 enum GrantCategory {

@@ -50,12 +50,6 @@ const ONBOARDING_STEPS: OnboardingStep[] = [
     path: '/onboarding/organization'
   },
   {
-    id: 'role',
-    title: 'Select Your Role',
-    description: 'How will you use Benefitiary?',
-    path: '/onboarding/role'
-  },
-  {
     id: 'preferences',
     title: 'Grant Preferences',
     description: 'What types of grants interest you?',

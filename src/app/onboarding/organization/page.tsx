@@ -230,10 +230,10 @@ export default function OrganizationPage() {
         console.error('Error in goNext():', error)
       }
       
-      // Navigate to the next page
-      console.log('About to navigate to role page')
+      // Navigate directly to preferences (skip role selection)
+      console.log('About to navigate to preferences page')
       try {
-        router.push('/onboarding/role')
+        router.push('/onboarding/preferences')
         console.log('Navigation initiated successfully')
       } catch (error) {
         console.error('Navigation error:', error)
@@ -524,6 +524,60 @@ export default function OrganizationPage() {
 
               <FormField
                 control={form.control}
+                name="position"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="flex items-center gap-2">
+                      <Users className="h-4 w-4" />
+                      Your Position/Role *
+                    </FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select your position" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="CEO">CEO/Executive Director</SelectItem>
+                        <SelectItem value="Founder">Founder</SelectItem>
+                        <SelectItem value="Program Manager">Program Manager</SelectItem>
+                        <SelectItem value="Development Manager">Development Manager</SelectItem>
+                        <SelectItem value="Grant Writer">Grant Writer</SelectItem>
+                        <SelectItem value="Operations Manager">Operations Manager</SelectItem>
+                        <SelectItem value="Project Coordinator">Project Coordinator</SelectItem>
+                        <SelectItem value="Research Director">Research Director</SelectItem>
+                        <SelectItem value="Finance Manager">Finance Manager</SelectItem>
+                        <SelectItem value="Other">Other</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="website"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="flex items-center gap-2">
+                      <Globe className="h-4 w-4" />
+                      Organization Website (Optional)
+                    </FormLabel>
+                    <FormControl>
+                      <Input 
+                        placeholder="https://yourorganization.com" 
+                        {...field}
+                        type="url"
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
                 name="region"
                 render={({ field }) => (
                   <FormItem>
@@ -564,7 +618,7 @@ export default function OrganizationPage() {
                       Saving...
                     </>
                   ) : (
-                    'Continue to Role Selection'
+                    'Continue to Preferences'
                   )}
                 </Button>
               </div>
