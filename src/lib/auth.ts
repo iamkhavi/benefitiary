@@ -55,8 +55,8 @@ export const auth = betterAuth({
   secret: process.env.BETTER_AUTH_SECRET || 'dev-secret-for-build',
   baseURL: process.env.BETTER_AUTH_URL || 'https://app.benefitiary.com',
   trustedOrigins: process.env.NODE_ENV === 'production' 
-    ? [process.env.BETTER_AUTH_URL || 'https://app.benefitiary.com', 'https://benefitiary.com']
-    : [process.env.BETTER_AUTH_URL || 'https://app.benefitiary.com', 'http://localhost:3000'],
+    ? ['https://app.benefitiary.com', 'https://benefitiary.com']
+    : ['http://localhost:3000', 'https://app.benefitiary.com'],
   rateLimit: {
     enabled: true,
     window: 15 * 60, // 15 minutes
@@ -66,9 +66,10 @@ export const auth = betterAuth({
   // Will handle role and onboarding through separate database operations
   advanced: {
     crossSubDomainCookies: {
-      enabled: false, // Disable for security
+      enabled: false,
     },
     useSecureCookies: process.env.NODE_ENV === 'production',
+    generateId: false, // Let BetterAuth handle ID generation
   },
 });
 

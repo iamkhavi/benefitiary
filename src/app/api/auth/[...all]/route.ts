@@ -18,6 +18,19 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    // Debug logging for origin issues
+    const origin = request.headers.get('origin');
+    const referer = request.headers.get('referer');
+    const host = request.headers.get('host');
+    
+    console.log('BetterAuth POST Debug:', {
+      origin,
+      referer,
+      host,
+      url: request.url,
+      pathname: request.nextUrl.pathname
+    });
+    
     return await handlers.POST(request);
   } catch (error) {
     console.error("BetterAuth POST Error:", error);
