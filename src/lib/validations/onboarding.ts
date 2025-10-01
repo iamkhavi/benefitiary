@@ -36,14 +36,7 @@ export const organizationSchema = z.object({
 
 export type OrganizationFormData = z.infer<typeof organizationSchema>;
 
-// Role selection validation schema
-export const roleSchema = z.object({
-  role: z.enum(['seeker', 'writer', 'funder'], {
-    required_error: "Please select a role",
-  }),
-});
-
-export type RoleFormData = z.infer<typeof roleSchema>;
+// Everyone is a grant seeker by default
 
 // Preferences validation schema
 export const preferencesSchema = z.object({

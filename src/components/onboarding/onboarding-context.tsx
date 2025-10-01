@@ -15,10 +15,11 @@ export interface OnboardingData {
     name: string
     orgType: string
     size: string
+    position: string
+    website?: string
     country: string
     region?: string
   }
-  role?: string
   preferences?: string[]
 }
 

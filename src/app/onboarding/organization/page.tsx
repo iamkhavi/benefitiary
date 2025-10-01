@@ -183,6 +183,8 @@ export default function OrganizationPage() {
       name: data.organization?.name || '',
       orgType: data.organization?.orgType as OrganizationFormData['orgType'] || undefined,
       size: data.organization?.size as OrganizationFormData['size'] || undefined,
+      position: data.organization?.position as OrganizationFormData['position'] || undefined,
+      website: data.organization?.website || '',
       country: data.organization?.country || '',
       region: data.organization?.region || '',
     },
@@ -221,23 +223,10 @@ export default function OrganizationPage() {
 
       // Update local state and proceed to next step
       updateData({ organization: formData })
-      console.log('Updated local data, calling goNext()')
+      goNext()
       
-      try {
-        goNext()
-        console.log('goNext() completed successfully')
-      } catch (error) {
-        console.error('Error in goNext():', error)
-      }
-      
-      // Navigate directly to preferences (skip role selection)
-      console.log('About to navigate to preferences page')
-      try {
-        router.push('/onboarding/preferences')
-        console.log('Navigation initiated successfully')
-      } catch (error) {
-        console.error('Navigation error:', error)
-      }
+      // Navigate to preferences
+      router.push('/onboarding/preferences')
 
     } catch (error) {
       console.error('Organization submission error:', error)
@@ -465,6 +454,59 @@ export default function OrganizationPage() {
                     <FormControl>
                       <Input 
                         placeholder={field.value ? "" : "Enter your organization name"}
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="position"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="flex items-center gap-2">
+                      <Users className="h-4 w-4" />
+                      Your Position *
+                    </FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select your position" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="CEO">CEO</SelectItem>
+                        <SelectItem value="Founder">Founder</SelectItem>
+                        <SelectItem value="Program Manager">Program Manager</SelectItem>
+                        <SelectItem value="Development Manager">Development Manager</SelectItem>
+                        <SelectItem value="Grant Writer">Grant Writer</SelectItem>
+                        <SelectItem value="Operations Manager">Operations Manager</SelectItem>
+                        <SelectItem value="Project Coordinator">Project Coordinator</SelectItem>
+                        <SelectItem value="Research Director">Research Director</SelectItem>
+                        <SelectItem value="Finance Manager">Finance Manager</SelectItem>
+                        <SelectItem value="Other">Other</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="website"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="flex items-center gap-2">
+                      <Globe className="h-4 w-4" />
+                      Website (Optional)
+                    </FormLabel>
+                    <FormControl>
+                      <Input 
+                        placeholder="https://yourorganization.com"
                         {...field}
                       />
                     </FormControl>
