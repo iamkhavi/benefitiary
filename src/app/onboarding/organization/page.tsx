@@ -15,12 +15,17 @@ import {
   FormLabel, 
   FormMessage 
 } from '@/components/ui/form'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Building2, Users, Globe, MapPin, Loader2, Check, Search, Sparkles } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useSession } from '@/lib/auth-client'
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command'
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 
 // Comprehensive country list with search
 const countries = [
@@ -165,7 +170,7 @@ export default function OrganizationPage() {
   const [step, setStep] = useState<'type' | 'size' | 'details'>('type')
   const [selectedType, setSelectedType] = useState<string>('')
   const [selectedSize, setSelectedSize] = useState<string>('')
-  const [countryOpen, setCountryOpen] = useState(false)
+
   
   const { data: session } = useSession()
 
@@ -455,53 +460,41 @@ export default function OrganizationPage() {
                       <Globe className="h-4 w-4" />
                       Country *
                     </FormLabel>
-                    <Popover open={countryOpen} onOpenChange={setCountryOpen}>
-                      <PopoverTrigger asChild>
-                        <FormControl>
-                          <Button
-                            variant="outline"
-                            role="combobox"
-                            aria-expanded={countryOpen}
-                            className={cn(
-                              "w-full justify-between text-left font-normal",
-                              !field.value && "text-muted-foreground"
-                            )}
-                            disabled={isSubmitting}
-                          >
-                            {field.value || "Select your country"}
-                            <Search className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                          </Button>
-                        </FormControl>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-[400px] p-0" align="start">
-                        <Command>
-                          <CommandInput placeholder="Search countries..." className="h-9" />
-                          <CommandEmpty>No country found.</CommandEmpty>
-                          <CommandGroup>
-                            <CommandList className="max-h-[200px] overflow-y-auto">
-                              {countries.map((country) => (
-                                <CommandItem
-                                  key={country}
-                                  value={country}
-                                  onSelect={() => {
-                                    field.onChange(country)
-                                    setCountryOpen(false)
-                                  }}
-                                >
-                                  <Check
-                                    className={cn(
-                                      "mr-2 h-4 w-4",
-                                      field.value === country ? "opacity-100" : "opacity-0"
-                                    )}
-                                  />
-                                  {country}
-                                </CommandItem>
-                              ))}
-                            </CommandList>
-                          </CommandGroup>
-                        </Command>
-                      </PopoverContent>
-                    </Popover>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select your country" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent className="max-h-[300px]">
+                        <div className="sticky top-0 bg-background p-2 border-b">
+                          <div className="relative">
+                            <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                            <Input
+                              placeholder="Search countries..."
+                              className="pl-8"
+                              onChange={(e) => {
+                                const searchTerm = e.target.value.toLowerCase()
+                                const items = document.querySelectorAll('[data-country-item]')
+                                items.forEach((item) => {
+                                  const countryName = item.textContent?.toLowerCase() || ''
+                                  if (countryName.includes(searchTerm)) {
+                                    (item as HTMLElement).style.display = 'block'
+                                  } else {
+                                    (item as HTMLElement).style.display = 'none'
+                                  }
+                                })
+                              }}
+                            />
+                          </div>
+                        </div>
+                        {countries.map((country) => (
+                          <SelectItem key={country} value={country} data-country-item>
+                            {country}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                     <FormMessage />
                   </FormItem>
                 )}
