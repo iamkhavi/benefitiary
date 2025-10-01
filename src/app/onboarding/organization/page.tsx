@@ -206,15 +206,19 @@ export default function OrganizationPage() {
   }
 
   const onSubmit = async (formData: OrganizationFormData) => {
+    console.log('Form submission started with data:', formData)
     setIsSubmitting(true)
     setApiError(null)
 
     try {
       const { onboardingAPI } = await import('@/lib/api-client')
+      console.log('Calling API with data:', formData)
       const result = await onboardingAPI.createOrganization(formData)
+      console.log('API response:', result)
 
       // Update local state and proceed to next step
       updateData({ organization: formData })
+      console.log('Updated local data, calling goNext()')
       goNext()
 
     } catch (error) {
@@ -526,7 +530,16 @@ export default function OrganizationPage() {
                 >
                   Back
                 </Button>
-                <Button type="submit" disabled={isSubmitting}>
+                <Button 
+                  type="submit" 
+                  disabled={isSubmitting}
+                  onClick={() => {
+                    console.log('Submit button clicked')
+                    console.log('Form values:', form.getValues())
+                    console.log('Form errors:', form.formState.errors)
+                    console.log('Form is valid:', form.formState.isValid)
+                  }}
+                >
                   {isSubmitting ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
