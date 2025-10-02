@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { authClient } from "@/lib/auth-client";
+import { OAuthButtons } from "@/components/auth/oauth-buttons";
 import { Loader2, AlertCircle } from "lucide-react";
 import { signUpSchema, type SignUpFormData } from "@/lib/validations/auth";
 
@@ -74,6 +75,8 @@ export default function SignupPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
+          <OAuthButtons mode="signup" />
+          
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             {error && (
               <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-md text-sm flex items-center gap-2">
@@ -151,6 +154,25 @@ export default function SignupPage() {
               Create Account
             </Button>
           </form>
+
+          <div className="mt-4 text-center">
+            <p className="text-xs text-gray-500">
+              By continuing, you agree to our{" "}
+              <Link 
+                href="/terms" 
+                className="text-blue-600 hover:text-blue-500 underline"
+              >
+                Terms of Service
+              </Link>
+              {" "}and{" "}
+              <Link 
+                href="/privacy" 
+                className="text-blue-600 hover:text-blue-500 underline"
+              >
+                Privacy Policy
+              </Link>
+            </p>
+          </div>
           
           <div className="mt-4 text-center">
             <p className="text-sm text-gray-600">

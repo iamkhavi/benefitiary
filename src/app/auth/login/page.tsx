@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { authClient } from "@/lib/auth-client";
+import { OAuthButtons } from "@/components/auth/oauth-buttons";
 import { Loader2, AlertCircle } from "lucide-react";
 import { signInSchema, type SignInFormData } from "@/lib/validations/auth";
 
@@ -65,6 +66,8 @@ export default function LoginPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
+          <OAuthButtons mode="signin" callbackUrl="/dashboard" />
+          
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             {error && (
               <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-md text-sm flex items-center gap-2">
