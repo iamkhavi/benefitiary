@@ -2,6 +2,7 @@
 
 import { usePathname } from 'next/navigation';
 import { DashboardShell } from './dashboard-shell';
+import { OnboardingProvider } from '../onboarding/onboarding-provider';
 
 // Mock user for console app
 const mockUser = {
@@ -20,9 +21,11 @@ export function ConditionalLayout({ children }: { children: React.ReactNode }) {
 
   if (shouldShowShell) {
     return (
-      <DashboardShell user={mockUser}>
-        {children}
-      </DashboardShell>
+      <OnboardingProvider>
+        <DashboardShell user={mockUser}>
+          {children}
+        </DashboardShell>
+      </OnboardingProvider>
     );
   }
 
