@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { GeistSans } from 'geist/font/sans'
 import './globals.css'
+import { ConsoleLayout } from '@/components/layout/console-layout'
 // import { PerformanceMonitor } from '@/components/performance/performance-monitor'
 
 export const metadata: Metadata = {
@@ -45,7 +46,9 @@ export default function RootLayout({
     <html lang="en" className={GeistSans.variable}>
       <body className={GeistSans.className}>
         {/* <PerformanceMonitor /> */}
-        {children}
+        <ConsoleLayout>
+          {children}
+        </ConsoleLayout>
       </body>
     </html>
   )

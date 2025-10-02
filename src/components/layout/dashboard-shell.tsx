@@ -23,21 +23,21 @@ import { usePathname } from 'next/navigation';
 
 const mainMenuItems = [
   { title: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
-  { title: "Grant Explorer", href: "/grants", icon: Search, badge: "New" },
-  { title: "Applications", href: "/applications", icon: FileText, count: 12 },
-  { title: "Matches", href: "/matches", icon: Target, count: 8 }
+  { title: "Grant Explorer", href: "/dashboard/grants", icon: Search, badge: "New" },
+  { title: "Applications", href: "/dashboard/applications", icon: FileText, count: 12 },
+  { title: "Matches", href: "/dashboard/matches", icon: Target, count: 8 }
 ];
 
 const featureItems = [
-  { title: "AI Assistant", href: "/ai-assistant", icon: Zap, badge: "Pro" },
-  { title: "Analytics", href: "/analytics", icon: BarChart3, count: 20 },
-  { title: "Billing", href: "/billing", icon: CreditCard },
-  { title: "Feedback", href: "/feedback", icon: MessageSquare }
+  { title: "AI Assistant", href: "/dashboard/ai-assistant", icon: Zap, badge: "Pro" },
+  { title: "Analytics", href: "/dashboard/analytics", icon: BarChart3, count: 20 },
+  { title: "Billing", href: "/dashboard/billing", icon: CreditCard },
+  { title: "Feedback", href: "/dashboard/feedback", icon: MessageSquare }
 ];
 
 const generalItems = [
-  { title: "Settings", href: "/settings", icon: Settings },
-  { title: "Help Center", href: "/help", icon: HelpCircle },
+  { title: "Settings", href: "/dashboard/settings", icon: Settings },
+  { title: "Help Center", href: "/dashboard/help", icon: HelpCircle },
   { title: "Log out", href: "/logout", icon: LogOut }
 ];
 
@@ -59,26 +59,26 @@ export function DashboardShell({ children, user }: DashboardShellProps) {
   const getPageTitle = () => {
     if (!pathname) return 'Dashboard';
     if (pathname === '/dashboard' || pathname === '/dashboard/seeker') return 'Dashboard';
-    if (pathname === '/grants') return 'Grant Explorer';
-    if (pathname === '/applications') return 'Applications';
-    if (pathname === '/matches') return 'Grant Matches';
-    if (pathname === '/ai-assistant') return 'AI Assistant';
-    if (pathname === '/analytics') return 'Analytics';
-    if (pathname === '/billing') return 'Billing & Subscription';
-    if (pathname === '/feedback') return 'Feedback';
-    if (pathname === '/settings') return 'Settings';
-    if (pathname === '/help') return 'Help Center';
+    if (pathname === '/dashboard/grants') return 'Grant Explorer';
+    if (pathname === '/dashboard/applications') return 'Applications';
+    if (pathname === '/dashboard/matches') return 'Grant Matches';
+    if (pathname === '/dashboard/ai-assistant') return 'AI Assistant';
+    if (pathname === '/dashboard/analytics') return 'Analytics';
+    if (pathname === '/dashboard/billing') return 'Billing & Subscription';
+    if (pathname === '/dashboard/feedback') return 'Feedback';
+    if (pathname === '/dashboard/settings') return 'Settings';
+    if (pathname === '/dashboard/help') return 'Help Center';
     return 'Dashboard';
   };
 
   // Get page badge based on current path
   const getPageBadge = () => {
     if (!pathname) return undefined;
-    if (pathname === '/grants') return 'New';
-    if (pathname === '/applications') return '12 Active';
-    if (pathname === '/matches') return '8 New';
-    if (pathname === '/ai-assistant') return 'Pro';
-    if (pathname === '/analytics') return '20 Reports';
+    if (pathname === '/dashboard/grants') return 'New';
+    if (pathname === '/dashboard/applications') return '12 Active';
+    if (pathname === '/dashboard/matches') return '8 New';
+    if (pathname === '/dashboard/ai-assistant') return 'Pro';
+    if (pathname === '/dashboard/analytics') return '20 Reports';
     return undefined;
   };
 
