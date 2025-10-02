@@ -19,6 +19,14 @@ const CONSOLE_PAGES = [
   '/help'
 ];
 
+// Pages that should NEVER use console layout
+const AUTH_PAGES = [
+  '/auth/login',
+  '/auth/signup',
+  '/auth',
+  '/onboarding'
+];
+
 interface ConsoleLayoutProps {
   children: React.ReactNode;
 }
@@ -37,39 +45,51 @@ export function ConsoleLayout({ children }: ConsoleLayoutProps) {
   }, []);
 
   // Check if current page should use console layout
-  const isConsolePage = isAppSubdomain || CONSOLE_PAGES.some(page => pathname?.startsWith(page));
+  const isAuthPage = AUTH_PAGES.some(page => pathname?.startsWith(page));
+  const isConsolePage = !isAuthPage && (isAppSubdomain || CONSOLE_PAGES.some(page => pathname?.startsWith(page)));
 
   useEffect(() => {
-    // For app subdomain, always try to authenticate
+    // For app subdomain, always show dashboard (skip auth for now)
     if (isConsolePage) {
-      // Use a simple approach - check if user is logged in via document.cookie or localStorage
-      // For now, let's create a mock user for testing
-      setTimeout(() => {
-        const mockUser = {
-          id: '1',
-          name: 'Steve Khavi',
-          email: 'steve@example.com',
-          image: null
-        };
-        setUser(mockUser);
-        setLoading(false);
-      }, 500);
+      // Always create a mock user for app subdomain - no authentication required
+      const mockUser = {
+        id: '1',
+        name: 'Steve Khavi',
+        email: 'steve@example.com',
+        image: null
+      };
+      setUser(mockUser);
+      setLoading(false);
     } else {
       setLoading(false);
     }
   }, [isConsolePage]);
 
-  // Show loading for console pages while checking auth
+  // Show loading while checking authentication
   if (isConsolePage && loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      <div className="flex items-center justify-center min-h-screen bg-gray-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-gray-600">Checking authentication...</p>
+        </div>
       </div>
     );
   }
 
-  // Use console layout for console pages (app subdomain or specific console routes)
-  if (isConsolePage) {
+  // If not authenticated and on console page, show redirect message
+  if (isConsolePage && !user) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gray-50">
+        <div className="text-center">
+          <p className="text-gray-600">Redirecting to login...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // AUTHENTICATED USER - Show console layout
+  if (isConsolePage && user) {
     // If on app subdomain root, show dashboard content
     if (pathname === '/' && isAppSubdomain) {
       return (

@@ -38,8 +38,8 @@ export default function PreferencesPage() {
         throw new Error(errorData.error || 'Failed to save preferences');
       }
 
-      // Redirect to role-based dashboard
-      router.push('/dashboard');
+      // Redirect to app subdomain dashboard
+      window.location.href = 'https://app.benefitiary.com/';
     } catch (error) {
       console.error('Error saving preferences:', error);
       setError(error instanceof Error ? error.message : 'Failed to save preferences. Please try again.');

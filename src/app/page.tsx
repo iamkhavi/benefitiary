@@ -210,8 +210,8 @@ export default function Home() {
     );
   }
 
-  // If on app subdomain, the ConsoleLayout will handle this and show dashboard
-  // This content will be wrapped by DashboardShell via ConsoleLayout
+  // If on app subdomain, show dashboard content directly
+  // This will be wrapped by DashboardShell via ConsoleLayout
   if (isAppSubdomain) {
     return <DashboardContent />;
   }

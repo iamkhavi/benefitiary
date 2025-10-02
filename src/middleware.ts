@@ -17,10 +17,8 @@ export async function middleware(request: NextRequest) {
   // Check if we're on the app subdomain
   const isAppSubdomain = hostname.startsWith('app.');
 
-  // Only redirect to auth on app subdomain, not main domain
-  if (isAppSubdomain && pathname === '/') {
-    return NextResponse.redirect(new URL('/auth/signup', request.url));
-  }
+  // App subdomain root should show dashboard, not redirect to auth
+  // Remove the redirect - let the page handle subdomain detection
 
   // For main domain, let the homepage render normally
   return NextResponse.next();
