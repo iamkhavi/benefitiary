@@ -1,37 +1,222 @@
+'use client';
+
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { MarketingCTAButton } from "@/components/ui/smart-cta-button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Footer } from "@/components/layout/footer"
-import { Logo, LogoIcon } from "@/components/ui/logo"
 import { BenefitiaryNavbar } from "@/components/layout/benefitiary-navbar"
 import { GrantMatchingWidget, AIWritingWidget } from "@/components/ui/hero-widgets"
 import { VerticalTestimonials } from "@/components/ui/vertical-testimonials"
 import { 
-  Heart, 
-  Users, 
-  Building2, 
   Search, 
   FileText, 
   Target, 
   Clock, 
   Shield, 
   Zap,
-  CheckCircle,
   ArrowRight,
-  TrendingUp,
   Globe,
-  Award,
   Sparkles,
   BarChart3,
-  Brain,
-  Rocket,
   Star,
-  Play,
   ChevronRight
 } from "lucide-react"
 
+import { useEffect, useState } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
+import { 
+  DollarSign,
+  TrendingUp,
+  Send,
+  Award,
+  Building2
+} from 'lucide-react';
+
+// Dashboard content component
+function DashboardContent() {
+  return (
+    <div className="p-6">
+      <div className="max-w-7xl mx-auto">
+        {/* Welcome Section */}
+        <div className="mb-8">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-medium text-gray-900 mb-1">
+                Welcome back Steve Khavi
+              </h2>
+              <p className="text-sm text-gray-600">
+                Monitor and control what happens with your grants today for funding success.
+              </p>
+            </div>
+            <div className="flex items-center space-x-2 text-sm text-gray-600">
+              <span>Wed, Oct 1, 2025</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600">Available Funding</p>
+                  <p className="text-2xl font-bold text-gray-900">$2,450,000</p>
+                  <p className="text-xs text-gray-500">+12% from last month</p>
+                </div>
+                <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center">
+                  <DollarSign className="h-6 w-6 text-orange-600" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600">Total Applications</p>
+                  <p className="text-2xl font-bold text-gray-900">12</p>
+                  <p className="text-xs text-gray-500">-2% from last month</p>
+                </div>
+                <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                  <Send className="h-6 w-6 text-blue-600" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600">Success Rate</p>
+                  <p className="text-2xl font-bold text-gray-900">68%</p>
+                  <p className="text-xs text-gray-500">+5% from last month</p>
+                </div>
+                <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+                  <TrendingUp className="h-6 w-6 text-green-600" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Main Content Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {/* My Grant Portfolio */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-lg">My Grant Portfolio</CardTitle>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {[
+                  {
+                    title: "Health Innovation Grant",
+                    amount: "$50,000",
+                    status: "Active",
+                    color: "bg-green-100 text-green-800"
+                  },
+                  {
+                    title: "Education Access Fund",
+                    amount: "$25,000",
+                    status: "Active", 
+                    color: "bg-green-100 text-green-800"
+                  },
+                  {
+                    title: "Community Development",
+                    amount: "$30,000",
+                    status: "Inactive",
+                    color: "bg-gray-100 text-gray-800"
+                  }
+                ].map((grant, index) => (
+                  <div key={index} className="flex items-center justify-between p-4 border rounded-lg">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-2 h-2 bg-orange-500 rounded-full"></div>
+                      <div>
+                        <p className="font-medium text-sm">{grant.title}</p>
+                        <p className="text-xs text-gray-600">{grant.amount}</p>
+                      </div>
+                    </div>
+                    <Badge className={grant.color}>{grant.status}</Badge>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* My Funding Goals */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">My Funding Goals</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-6">
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center space-x-2">
+                      <Award className="h-4 w-4 text-blue-600" />
+                      <span className="text-sm font-medium">Program Expansion</span>
+                    </div>
+                    <span className="text-sm text-gray-600">82%</span>
+                  </div>
+                  <Progress value={82} className="h-2" />
+                  <p className="text-xs text-gray-500 mt-1">$18,500/$25,000</p>
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center space-x-2">
+                      <Building2 className="h-4 w-4 text-orange-600" />
+                      <span className="text-sm font-medium">Emergency Fund</span>
+                    </div>
+                    <span className="text-sm text-gray-600">55%</span>
+                  </div>
+                  <Progress value={55} className="h-2" />
+                  <p className="text-xs text-gray-500 mt-1">$8,250/$15,000</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function Home() {
+  const [isAppSubdomain, setIsAppSubdomain] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    // Check if we're on app subdomain
+    const hostname = window.location.hostname;
+    const isApp = hostname.startsWith('app.');
+    setIsAppSubdomain(isApp);
+    setLoading(false);
+  }, []);
+
+  // Show loading while checking subdomain
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  // If on app subdomain, the ConsoleLayout will handle this and show dashboard
+  // This content will be wrapped by DashboardShell via ConsoleLayout
+  if (isAppSubdomain) {
+    return <DashboardContent />;
+  }
+
+  // Regular marketing page for main domain
   return (
     <div className="min-h-screen bg-white">
       <BenefitiaryNavbar />
