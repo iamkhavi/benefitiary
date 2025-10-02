@@ -27,24 +27,39 @@ Goal: Provide **grant discovery, proposal assistance (AI-powered), and tracking*
 - **AI Proposal Writing**: OpenAI API integration (later phase)
 
 ### Infra & DevOps
-- **Hosting**: Vercel (frontend), Railway/Fly.io/Render (backend if separate)
+- **Hosting**: Vercel (both domains)
+  - `benefitiary.com` → Marketing site (lightweight)
+  - `app.benefitiary.com` → Console app (full stack)
+- **Database**: Neon (serverless Postgres) - Console app only
 - **Storage**: Neon for DB, optional S3 (for file uploads later)
-- **Payments**: DodoPayments (BetterAuth adapter)
+- **Payments**: DodoPayments (BetterAuth adapter) - Console app only
 - **Monitoring**: Logtail / Sentry
 
 ---
 
-## 📂 Repo & App Structure
-benefitiary/
-├── apps/
-│ ├── frontend/ # Next.js app
-│ └── backend/ # optional Express backend
-├── packages/
-│ ├── db/ # Prisma schema + migrations
-│ ├── scrapers/ # grant scraping jobs
-│ └── shared/ # utils, constants, types
-├── .env
-└── README.md
+## 📂 Repository Architecture
+
+### **Two-Repository Structure**
+```
+benefitiary-marketing/          # Landing page (benefitiary.com)
+├── src/app/                   # Next.js App Router
+├── src/components/            # Marketing components
+├── tailwind.config.ts         # Styling configuration
+├── package.json               # Lightweight dependencies
+└── vercel.json               # Deployment config
+
+benefitiary/                   # Console app (app.benefitiary.com)  
+├── src/app/                   # Next.js App Router
+├── src/components/            # App components
+├── prisma/                    # Database schema & migrations
+├── src/lib/                   # Auth, payments, utilities
+├── package.json               # Full app dependencies
+└── .env                       # Environment variables
+```
+
+### **Domain Mapping**
+- **Marketing**: `https://benefitiary.com` → `benefitiary-marketing` repo
+- **Console**: `https://app.benefitiary.com` → `benefitiary` repo (this repo)
 
 
 ---
@@ -113,27 +128,26 @@ benefitiary/
 
 ---
 
-## 🧭 Onboarding Wizard
+## 🧭 User Flow & Onboarding
 
-### Step 1: Organization Profile
+### **Landing to Console Flow**
+```
+https://benefitiary.com → https://app.benefitiary.com/auth/signup
+```
+
+### **Onboarding Wizard (2 Steps)**
+
+### Step 1: Organization Profile (`/onboarding/organization`)
+- **Organization Name**: Text input
 - **Organization Type**: SME, Nonprofit/NGO, Academic, Healthcare, Other
-- **Size**: Solo, Micro, Small, Medium, Large
+- **Size**: Solo, Micro, Small, Medium, Large  
+- **Position**: CEO, Founder, Program Manager, Development Manager, etc.
+- **Website**: Optional URL
 - **Location**: Country (dropdown), Region (optional)
 
 👉 Purpose: Ensures eligibility filtering (most grants are type/size/location specific).
 
----
-
-### Step 2: Role Selection
-- **Seeker** → Finds grants for their org
-- **Writer** → Offers proposal writing services
-- **Funder** → Posts grant opportunities
-
-👉 Purpose: Customizes dashboard & features.
-
----
-
-### Step 3: Preferences (Grant Categories) ✅ Refined
+### Step 2: Grant Preferences (`/onboarding/preferences`)
 Multi-select categories aligned with **real-world grant filters**:
 - Healthcare & Public Health
 - Education & Training
@@ -195,13 +209,21 @@ Multi-select categories aligned with **real-world grant filters**:
 
 ---
 
-## 🚀 Day 1 Deliverables
-1. Repo initialized (`benefitiary/` structure)
-2. Neon DB created + Prisma schema + migrations
-3. BetterAuth + DodoPayments integration working
-4. Onboarding Wizard (3 steps, role-based redirect)
-5. Dashboard skeleton by role
-6. Scraper prototype for 1 foundation
+## 🚀 Current Status ✅
+
+### **Completed**
+1. ✅ **Two-repository architecture** (`benefitiary-marketing` + `benefitiary`)
+2. ✅ **Landing page deployed** to `https://benefitiary.com`
+3. ✅ **Console app structure** with Next.js + Prisma + BetterAuth
+4. ✅ **Database schema** designed and implemented (Neon Postgres)
+5. ✅ **Onboarding wizard** (2-step flow: Organization → Preferences)
+6. ✅ **User flow** from landing page to console app
+7. ✅ **BetterAuth + DodoPayments** integration configured
+
+### **In Progress**
+- Dashboard implementation with grant matching
+- Grant scraping system
+- AI proposal assistance features
 
 ---
 
