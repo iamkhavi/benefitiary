@@ -1,6 +1,10 @@
-# Benefitiary
+# Benefitiary Console
 
-A modern grant discovery platform connecting SMEs, nonprofits, and healthcare organizations with funding opportunities.
+The console application for Benefitiary - a comprehensive dashboard for managing grant applications, tracking funding opportunities, and growing your organization.
+
+**This repository contains the console app deployed to `app.benefitiary.com`**
+
+For the landing page repository, see: [benefitiary-landing](https://github.com/iamkhavi/benefitiary-landing)
 
 ## Tech Stack
 

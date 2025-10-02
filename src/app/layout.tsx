@@ -1,12 +1,20 @@
 import type { Metadata } from 'next'
 import { GeistSans } from 'geist/font/sans'
 import './globals.css'
-import { ConsoleLayout } from '@/components/layout/console-layout'
+import { DashboardShell } from '@/components/layout/dashboard-shell'
 // import { PerformanceMonitor } from '@/components/performance/performance-monitor'
 
+// Mock user for console app
+const mockUser = {
+  id: '1',
+  name: 'Steve Khavi',
+  email: 'steve@example.com',
+  image: null
+};
+
 export const metadata: Metadata = {
-  title: 'Benefitiary - Grant Discovery Platform',
-  description: 'Connect with grant opportunities for SMEs, nonprofits, and healthcare organizations',
+  title: 'Benefitiary Console - Grant Management Dashboard',
+  description: 'Manage your grant applications, track funding opportunities, and grow your organization',
   icons: {
     icon: '/favicon.svg',
     shortcut: '/favicon.svg',
@@ -14,10 +22,10 @@ export const metadata: Metadata = {
   },
   metadataBase: new URL('https://benefitiary.com'),
   openGraph: {
-    title: 'Benefitiary - Grant Discovery Platform',
-    description: 'Connect with grant opportunities for SMEs, nonprofits, and healthcare organizations',
-    url: 'https://benefitiary.com',
-    siteName: 'Benefitiary',
+    title: 'Benefitiary Console - Grant Management Dashboard',
+    description: 'Manage your grant applications, track funding opportunities, and grow your organization',
+    url: 'https://app.benefitiary.com',
+    siteName: 'Benefitiary Console',
     images: [
       {
         url: '/logo.svg',
@@ -31,8 +39,8 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Benefitiary - Grant Discovery Platform',
-    description: 'Connect with grant opportunities for SMEs, nonprofits, and healthcare organizations',
+    title: 'Benefitiary Console - Grant Management Dashboard',
+    description: 'Manage your grant applications, track funding opportunities, and grow your organization',
     images: ['/logo.svg'],
   },
 }
@@ -46,9 +54,9 @@ export default function RootLayout({
     <html lang="en" className={GeistSans.variable}>
       <body className={GeistSans.className}>
         {/* <PerformanceMonitor /> */}
-        <ConsoleLayout>
+        <DashboardShell user={mockUser}>
           {children}
-        </ConsoleLayout>
+        </DashboardShell>
       </body>
     </html>
   )
