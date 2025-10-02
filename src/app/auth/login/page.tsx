@@ -66,7 +66,11 @@ export default function LoginPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <OAuthButtons mode="signin" callbackUrl="/dashboard" />
+          <OAuthButtons 
+            mode="login" 
+            onSuccess={() => router.push("/dashboard")}
+            onError={setError}
+          />
           
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             {error && (

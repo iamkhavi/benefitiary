@@ -9,9 +9,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { OAuthButtons } from "@/components/auth/oauth-buttons";
 import { authClient } from "@/lib/auth-client";
-import { Loader2, AlertCircle, Info, ArrowRight } from "lucide-react";
+import { Loader2, AlertCircle, Info } from "lucide-react";
 import { signUpSchema, type SignUpFormData } from "@/lib/validations/auth";
 
 export default function SignupPage() {
@@ -108,52 +108,54 @@ export default function SignupPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-purple-50 py-12 px-4 sm:px-6 lg:px-8">
-      <Card className="w-full max-w-md shadow-xl border-0">
-        <CardHeader className="space-y-1 text-center">
-          <CardTitle className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-            Join Benefitiary
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+      <Card className="w-full max-w-md">
+        <CardHeader className="space-y-1">
+          <CardTitle className="text-2xl font-bold text-center">
+            Create your account
           </CardTitle>
-          <CardDescription className="text-gray-600">
-            Discover grant opportunities tailored for your organization
+          <CardDescription className="text-center">
+            Sign up for your Benefitiary account
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-6">
+        <CardContent>
           {existingUser && (
-            <Alert className="border-blue-200 bg-blue-50">
-              <Info className="h-4 w-4 text-blue-600" />
-              <AlertDescription className="text-blue-800">
-                An account with this email already exists. 
-                <Button 
-                  variant="link" 
-                  className="p-0 h-auto text-blue-600 font-medium ml-1"
-                  onClick={handleSignInInstead}
-                >
-                  Sign in instead →
-                </Button>
-              </AlertDescription>
-            </Alert>
+            <div className="bg-blue-50 border border-blue-200 text-blue-600 px-4 py-3 rounded-md text-sm flex items-center gap-2">
+              <Info className="h-4 w-4" />
+              An account with this email already exists.{" "}
+              <button 
+                type="button"
+                onClick={handleSignInInstead}
+                className="font-medium text-blue-600 hover:text-blue-500 underline"
+              >
+                Sign in instead
+              </button>
+            </div>
           )}
+
+          <OAuthButtons 
+            mode="signup" 
+            onSuccess={() => router.push("/dashboard")}
+            onError={setError}
+          />
 
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
             {error && (
-              <Alert className="border-red-200 bg-red-50">
-                <AlertCircle className="h-4 w-4 text-red-600" />
-                <AlertDescription className="text-red-800">{error}</AlertDescription>
-              </Alert>
+              <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-md text-sm flex items-center gap-2">
+                <AlertCircle className="h-4 w-4" />
+                {error}
+              </div>
             )}
             
             <div className="space-y-2">
-              <Label htmlFor="name" className="text-sm font-medium text-gray-700">
-                Full Name
-              </Label>
+              <Label htmlFor="name">Full Name</Label>
               <Input
                 id="name"
                 type="text"
                 placeholder="Enter your full name"
                 {...register("name")}
                 disabled={isLoading}
-                className={`transition-all ${errors.name ? "border-red-500 focus:border-red-500" : "focus:border-blue-500"}`}
+                className={errors.name ? "border-red-500" : ""}
               />
               {errors.name && (
                 <p className="text-sm text-red-600">{errors.name.message}</p>
@@ -161,9 +163,7 @@ export default function SignupPage() {
             </div>
             
             <div className="space-y-2">
-              <Label htmlFor="email" className="text-sm font-medium text-gray-700">
-                Email Address
-              </Label>
+              <Label htmlFor="email">Email</Label>
               <Input
                 id="email"
                 type="email"
@@ -171,7 +171,7 @@ export default function SignupPage() {
                 {...register("email")}
                 onBlur={handleEmailBlur}
                 disabled={isLoading}
-                className={`transition-all ${errors.email ? "border-red-500 focus:border-red-500" : "focus:border-blue-500"}`}
+                className={errors.email ? "border-red-500" : ""}
               />
               {errors.email && (
                 <p className="text-sm text-red-600">{errors.email.message}</p>
@@ -179,16 +179,14 @@ export default function SignupPage() {
             </div>
             
             <div className="space-y-2">
-              <Label htmlFor="password" className="text-sm font-medium text-gray-700">
-                Password
-              </Label>
+              <Label htmlFor="password">Password</Label>
               <Input
                 id="password"
                 type="password"
-                placeholder="Create a secure password (min. 8 characters)"
+                placeholder="Enter your password"
                 {...register("password")}
                 disabled={isLoading}
-                className={`transition-all ${errors.password ? "border-red-500 focus:border-red-500" : "focus:border-blue-500"}`}
+                className={errors.password ? "border-red-500" : ""}
               />
               {errors.password && (
                 <p className="text-sm text-red-600">{errors.password.message}</p>
@@ -196,16 +194,14 @@ export default function SignupPage() {
             </div>
             
             <div className="space-y-2">
-              <Label htmlFor="confirmPassword" className="text-sm font-medium text-gray-700">
-                Confirm Password
-              </Label>
+              <Label htmlFor="confirmPassword">Confirm Password</Label>
               <Input
                 id="confirmPassword"
                 type="password"
                 placeholder="Confirm your password"
                 {...register("confirmPassword")}
                 disabled={isLoading}
-                className={`transition-all ${errors.confirmPassword ? "border-red-500 focus:border-red-500" : "focus:border-blue-500"}`}
+                className={errors.confirmPassword ? "border-red-500" : ""}
               />
               {errors.confirmPassword && (
                 <p className="text-sm text-red-600">{errors.confirmPassword.message}</p>
@@ -214,49 +210,24 @@ export default function SignupPage() {
             
             <Button 
               type="submit" 
-              className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-medium py-2.5 transition-all duration-200 shadow-lg hover:shadow-xl" 
+              className="w-full" 
               disabled={isLoading || !isValid || !!existingUser}
             >
-              {isLoading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Creating Account...
-                </>
-              ) : (
-                <>
-                  Create Account
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </>
-              )}
+              {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Sign Up
             </Button>
           </form>
 
-          <div className="text-center space-y-4">
-            <p className="text-xs text-gray-500">
-              By creating an account, you agree to our{" "}
-              <Link href="/terms" className="text-blue-600 hover:text-blue-500 underline">
-                Terms of Service
-              </Link>
-              {" "}and{" "}
-              <Link href="/privacy" className="text-blue-600 hover:text-blue-500 underline">
-                Privacy Policy
+          <div className="mt-4 text-center">
+            <p className="text-sm text-gray-600">
+              Already have an account?{" "}
+              <Link 
+                href="/auth/login" 
+                className="font-medium text-blue-600 hover:text-blue-500"
+              >
+                Sign in
               </Link>
             </p>
-            
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-gray-200" />
-              </div>
-              <div className="relative flex justify-center text-sm">
-                <span className="px-2 bg-white text-gray-500">Already have an account?</span>
-              </div>
-            </div>
-            
-            <Button variant="outline" className="w-full" asChild>
-              <Link href="/auth/login">
-                Sign In
-              </Link>
-            </Button>
           </div>
         </CardContent>
       </Card>
