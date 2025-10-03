@@ -32,43 +32,37 @@ const organizationTypes = [
     id: "Nonprofit",
     title: "Nonprofit",
     description: "501(c)(3) and other tax-exempt organizations",
-    icon: Users,
-    gradient: "from-emerald-500 to-teal-600"
+    icon: Users
   },
   {
     id: "Business",
     title: "Business",
     description: "For-profit companies, startups, and enterprises",
-    icon: Building2,
-    gradient: "from-blue-500 to-indigo-600"
+    icon: Building2
   },
   {
     id: "Government",
     title: "Government",
     description: "Federal, state, local agencies and municipalities",
-    icon: Briefcase,
-    gradient: "from-slate-500 to-gray-600"
+    icon: Briefcase
   },
   {
     id: "Academic",
     title: "Academic Institution",
     description: "Universities, colleges, schools, and research centers",
-    icon: GraduationCap,
-    gradient: "from-purple-500 to-violet-600"
+    icon: GraduationCap
   },
   {
     id: "Grant Consultancy",
     title: "Grant Consultancy",
     description: "Agencies, freelancers, and grant writing services",
-    icon: Target,
-    gradient: "from-orange-500 to-amber-600"
+    icon: Target
   },
   {
     id: "Other",
     title: "Other",
     description: "Specify your organization type",
-    icon: Sparkles,
-    gradient: "from-pink-500 to-rose-600"
+    icon: Sparkles
   }
 ];
 
@@ -162,33 +156,27 @@ export function OnboardingDialog({ isOpen, onComplete }: OnboardingDialogProps) 
 
   return (
     <Dialog open={isOpen} onOpenChange={() => {}}>
-      <DialogContent className="max-w-6xl max-h-[95vh] overflow-hidden p-0 gap-0 border-0 shadow-2xl bg-white rounded-3xl">
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden p-0 gap-0">
         <div className="flex flex-col h-full">
           {/* Header */}
-          <div className="px-8 py-8 border-b bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center space-x-4">
-                <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg">
-                  <Sparkles className="w-6 h-6 text-white" />
+          <div className="px-6 py-6 border-b bg-gray-50">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center space-x-3">
+                <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
+                  <Sparkles className="w-5 h-5 text-white" />
                 </div>
                 <div>
-                  <h2 className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">
+                  <h2 className="text-2xl font-bold text-gray-900">
                     Welcome to Benefitiary
                   </h2>
-                  <p className="text-gray-600 text-lg">Find perfect funding opportunities with AI-powered matching in minutes, not months</p>
+                  <p className="text-gray-600">Set up your grant discovery profile</p>
                 </div>
               </div>
-              <Badge variant="secondary" className="px-4 py-2 text-sm font-medium bg-white/80 backdrop-blur-sm">
+              <Badge variant="secondary" className="px-3 py-1">
                 Step {step} of {totalSteps}
               </Badge>
             </div>
-            <div className="space-y-2">
-              <div className="flex justify-between text-sm text-gray-600">
-                <span>Progress</span>
-                <span>{Math.round(progress)}% complete</span>
-              </div>
-              <Progress value={progress} className="h-3 bg-white/50" />
-            </div>
+            <Progress value={progress} className="h-2" />
           </div>
 
           {/* Content */}
@@ -202,30 +190,16 @@ export function OnboardingDialog({ isOpen, onComplete }: OnboardingDialogProps) 
                   exit={{ opacity: 0, x: -20 }}
                   className="p-8"
                 >
-                  <div className="text-center mb-12">
-                    <h3 className="text-3xl font-bold text-gray-900 mb-4">
+                  <div className="text-center mb-8">
+                    <h3 className="text-xl font-semibold text-gray-900 mb-2">
                       What type of organization are you?
                     </h3>
-                    <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-                      Different organization types are eligible for different funding sources. This helps us show the only relevant opportunities and understand your nonprofit status.
+                    <p className="text-gray-600">
+                      Different organization types are eligible for different funding sources
                     </p>
                   </div>
 
-                  <div className="mb-8 p-4 bg-blue-50 rounded-xl border border-blue-200">
-                    <div className="flex items-start space-x-3">
-                      <div className="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-                        <span className="text-blue-600 text-sm font-semibold">?</span>
-                      </div>
-                      <div>
-                        <h4 className="font-semibold text-blue-900 mb-1">Why This Matters</h4>
-                        <p className="text-blue-800 text-sm leading-relaxed">
-                          Different organization types are eligible for different funding sources. This helps us show the only relevant opportunities and understand your nonprofit status.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-5xl mx-auto">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-3xl mx-auto">
                     {organizationTypes.map((type) => {
                       const Icon = type.icon;
                       const isSelected = formData.orgType === type.id;
@@ -233,43 +207,33 @@ export function OnboardingDialog({ isOpen, onComplete }: OnboardingDialogProps) 
                       return (
                         <motion.div
                           key={type.id}
-                          whileHover={{ scale: 1.02, y: -2 }}
+                          whileHover={{ scale: 1.02 }}
                           whileTap={{ scale: 0.98 }}
                           className={`
-                            relative p-8 rounded-2xl border cursor-pointer transition-all duration-300 group
+                            relative p-6 rounded-xl border-2 cursor-pointer transition-all duration-200
                             ${isSelected 
-                              ? 'border-blue-400 bg-gradient-to-br from-blue-50 to-indigo-50 shadow-xl shadow-blue-100' 
-                              : 'border-gray-200 bg-white hover:border-gray-300 hover:shadow-lg'
+                              ? 'border-primary bg-primary/5 shadow-lg' 
+                              : 'border-gray-200 hover:border-gray-300 bg-white'
                             }
                           `}
                           onClick={() => setFormData(prev => ({ ...prev, orgType: type.id }))}
                         >
                           {isSelected && (
-                            <motion.div 
-                              initial={{ scale: 0 }}
-                              animate={{ scale: 1 }}
-                              className="absolute top-6 right-6"
-                            >
-                              <div className="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center">
-                                <CheckCircle className="w-4 h-4 text-white" />
-                              </div>
-                            </motion.div>
+                            <div className="absolute top-4 right-4">
+                              <CheckCircle className="w-5 h-5 text-primary" />
+                            </div>
                           )}
                           
-                          <div className="space-y-4">
+                          <div className="flex items-start space-x-4">
                             <div className={`
-                              w-16 h-16 rounded-2xl flex items-center justify-center transition-all duration-300
-                              ${isSelected 
-                                ? `bg-gradient-to-br ${type.gradient}` 
-                                : 'bg-gray-100 group-hover:bg-gray-200'
-                              }
+                              w-12 h-12 rounded-lg flex items-center justify-center
+                              ${isSelected ? 'bg-primary text-white' : 'bg-gray-100 text-gray-600'}
                             `}>
-                              <Icon className={`w-8 h-8 ${isSelected ? 'text-white' : 'text-gray-600'}`} />
+                              <Icon className="w-6 h-6" />
                             </div>
-                            
-                            <div className="space-y-2">
-                              <h4 className="text-xl font-semibold text-gray-900">{type.title}</h4>
-                              <p className="text-gray-600 leading-relaxed">{type.description}</p>
+                            <div className="flex-1">
+                              <h4 className="font-semibold text-gray-900 mb-1">{type.title}</h4>
+                              <p className="text-sm text-gray-600">{type.description}</p>
                             </div>
                           </div>
                         </motion.div>
@@ -287,34 +251,31 @@ export function OnboardingDialog({ isOpen, onComplete }: OnboardingDialogProps) 
                   exit={{ opacity: 0, x: -20 }}
                   className="p-8"
                 >
-                  <div className="text-center mb-12">
-                    <h3 className="text-3xl font-bold text-gray-900 mb-4">
+                  <div className="text-center mb-8">
+                    <h3 className="text-xl font-semibold text-gray-900 mb-2">
                       Tell us about your organization
                     </h3>
-                    <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-                      This helps us personalize your grant recommendations and match you with the most relevant opportunities
+                    <p className="text-gray-600">
+                      This helps us personalize your grant recommendations
                     </p>
                   </div>
 
-                  <div className="max-w-4xl mx-auto space-y-8">
-                    <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-8 border border-blue-100">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                        <div className="space-y-3">
-                          <Label htmlFor="name" className="text-base font-semibold text-gray-800">
-                            Organization Name
-                          </Label>
+                  <div className="max-w-2xl mx-auto space-y-6">
+                    <div className="bg-gray-50 rounded-lg p-6 border">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-2">
+                          <Label htmlFor="name">Organization Name</Label>
                           <Input
                             id="name"
                             value={formData.name}
                             onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
                             placeholder="Enter your organization name"
-                            className="h-12 text-base border-white/50 bg-white/80 backdrop-blur-sm focus:bg-white focus:border-blue-300 rounded-xl"
                           />
                         </div>
 
-                        <div className="space-y-3">
-                          <Label className="text-base font-semibold text-gray-800">Organization Size</Label>
-                          <div className="grid grid-cols-1 gap-3">
+                        <div className="space-y-2">
+                          <Label>Organization Size</Label>
+                          <div className="space-y-2">
                             {[
                               { value: "Solo", label: "Solo (1 person)" },
                               { value: "Micro", label: "Micro (2-10 people)" },
@@ -322,11 +283,9 @@ export function OnboardingDialog({ isOpen, onComplete }: OnboardingDialogProps) 
                               { value: "Medium", label: "Medium (51-250 people)" },
                               { value: "Large", label: "Large (250+ people)" }
                             ].map((size) => (
-                              <motion.label 
+                              <label 
                                 key={size.value} 
-                                className="flex items-center space-x-3 cursor-pointer p-3 rounded-xl bg-white/60 hover:bg-white/80 transition-all duration-200"
-                                whileHover={{ scale: 1.02 }}
-                                whileTap={{ scale: 0.98 }}
+                                className="flex items-center space-x-3 cursor-pointer"
                               >
                                 <input
                                   type="radio"
@@ -334,23 +293,21 @@ export function OnboardingDialog({ isOpen, onComplete }: OnboardingDialogProps) 
                                   value={size.value}
                                   checked={formData.size === size.value}
                                   onChange={(e) => setFormData(prev => ({ ...prev, size: e.target.value }))}
-                                  className="w-5 h-5 text-blue-600 border-2 border-gray-300 focus:ring-blue-500"
+                                  className="w-4 h-4 text-primary"
                                 />
-                                <span className="text-gray-700 font-medium">{size.label}</span>
-                              </motion.label>
+                                <span className="text-sm text-gray-700">{size.label}</span>
+                              </label>
                             ))}
                           </div>
                         </div>
 
-                        <div className="space-y-3">
-                          <Label htmlFor="position" className="text-base font-semibold text-gray-800">
-                            Your Position
-                          </Label>
+                        <div className="space-y-2">
+                          <Label htmlFor="position">Your Position</Label>
                           <select
                             id="position"
                             value={formData.position}
                             onChange={(e) => setFormData(prev => ({ ...prev, position: e.target.value }))}
-                            className="h-12 w-full px-4 text-base border-white/50 bg-white/80 backdrop-blur-sm focus:bg-white focus:border-blue-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
                           >
                             <option value="">Select your position</option>
                             <option value="CEO">CEO</option>
@@ -363,15 +320,13 @@ export function OnboardingDialog({ isOpen, onComplete }: OnboardingDialogProps) 
                           </select>
                         </div>
 
-                        <div className="space-y-3">
-                          <Label htmlFor="country" className="text-base font-semibold text-gray-800">
-                            Country
-                          </Label>
+                        <div className="space-y-2">
+                          <Label htmlFor="country">Country</Label>
                           <select
                             id="country"
                             value={formData.country}
                             onChange={(e) => setFormData(prev => ({ ...prev, country: e.target.value }))}
-                            className="h-12 w-full px-4 text-base border-white/50 bg-white/80 backdrop-blur-sm focus:bg-white focus:border-blue-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
                           >
                             <option value="">Select your country</option>
                             <option value="United States">United States</option>
@@ -399,59 +354,42 @@ export function OnboardingDialog({ isOpen, onComplete }: OnboardingDialogProps) 
                   exit={{ opacity: 0, x: -20 }}
                   className="p-8"
                 >
-                  <div className="text-center mb-12">
-                    <h3 className="text-3xl font-bold text-gray-900 mb-4">
+                  <div className="text-center mb-8">
+                    <h3 className="text-xl font-semibold text-gray-900 mb-2">
                       What areas are you interested in?
                     </h3>
-                    <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-                      Select the grant categories that match your focus areas. We'll use this to find the most relevant opportunities for you.
+                    <p className="text-gray-600">
+                      Select the grant categories that match your focus areas
                     </p>
                   </div>
 
-                  <div className="max-w-5xl mx-auto">
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <div className="max-w-4xl mx-auto">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
                       {grantCategories.map((category) => {
                         const isSelected = formData.categories.includes(category.id);
                         
                         return (
                           <motion.div
                             key={category.id}
-                            whileHover={{ scale: 1.03, y: -2 }}
-                            whileTap={{ scale: 0.97 }}
+                            whileHover={{ scale: 1.02 }}
+                            whileTap={{ scale: 0.98 }}
                             className={`
-                              relative p-6 rounded-2xl border-2 cursor-pointer transition-all duration-300 group
+                              p-4 rounded-lg border-2 cursor-pointer transition-all duration-200
                               ${isSelected 
-                                ? 'border-emerald-400 bg-gradient-to-br from-emerald-50 to-teal-50 shadow-lg shadow-emerald-100' 
-                                : 'border-gray-200 hover:border-gray-300 bg-white hover:shadow-md'
+                                ? 'border-primary bg-primary/5' 
+                                : 'border-gray-200 hover:border-gray-300 bg-white'
                               }
                             `}
                             onClick={() => toggleCategory(category.id)}
                           >
-                            {isSelected && (
-                              <motion.div 
-                                initial={{ scale: 0 }}
-                                animate={{ scale: 1 }}
-                                className="absolute top-4 right-4"
-                              >
-                                <div className="w-6 h-6 bg-emerald-500 rounded-full flex items-center justify-center">
-                                  <CheckCircle className="w-4 h-4 text-white" />
-                                </div>
-                              </motion.div>
-                            )}
-                            
-                            <div className="flex items-center space-x-4">
-                              <div className={`
-                                w-12 h-12 rounded-xl flex items-center justify-center text-2xl transition-all duration-300
-                                ${isSelected 
-                                  ? 'bg-white shadow-sm' 
-                                  : 'bg-gray-100 group-hover:bg-gray-200'
-                                }
-                              `}>
-                                {category.emoji}
-                              </div>
+                            <div className="flex items-center space-x-3">
+                              <span className="text-2xl">{category.emoji}</span>
                               <div className="flex-1">
-                                <h4 className="font-semibold text-gray-900 text-base leading-tight">{category.label}</h4>
+                                <h4 className="font-medium text-sm text-gray-900">{category.label}</h4>
                               </div>
+                              {isSelected && (
+                                <CheckCircle className="w-5 h-5 text-primary" />
+                              )}
                             </div>
                           </motion.div>
                         );
@@ -459,21 +397,12 @@ export function OnboardingDialog({ isOpen, onComplete }: OnboardingDialogProps) 
                     </div>
 
                     {formData.categories.length > 0 && (
-                      <motion.div 
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="mt-8 p-6 bg-gradient-to-r from-emerald-50 to-teal-50 rounded-2xl border border-emerald-200"
-                      >
-                        <div className="flex items-center space-x-3">
-                          <div className="w-8 h-8 bg-emerald-500 rounded-full flex items-center justify-center">
-                            <CheckCircle className="w-5 h-5 text-white" />
-                          </div>
-                          <p className="text-emerald-800 font-medium">
-                            <strong>{formData.categories.length}</strong> categories selected. 
-                            You can always update these later in your settings.
-                          </p>
-                        </div>
-                      </motion.div>
+                      <div className="mt-6 p-4 bg-primary/5 rounded-lg">
+                        <p className="text-sm text-gray-700">
+                          <strong>{formData.categories.length}</strong> categories selected. 
+                          You can always update these later in your settings.
+                        </p>
+                      </div>
                     )}
                   </div>
                 </motion.div>
@@ -482,19 +411,19 @@ export function OnboardingDialog({ isOpen, onComplete }: OnboardingDialogProps) 
           </div>
 
           {/* Footer */}
-          <div className="px-8 py-8 border-t bg-gradient-to-r from-gray-50 to-gray-100">
+          <div className="px-6 py-6 border-t bg-gray-50">
             <div className="flex items-center justify-between">
               <Button
                 variant="ghost"
                 onClick={handleBack}
                 disabled={step === 1}
-                className="flex items-center space-x-2 px-6 py-3 text-gray-600 hover:text-gray-900 hover:bg-white/50"
+                className="flex items-center space-x-2"
               >
                 <ArrowLeft className="w-4 h-4" />
                 <span>Back</span>
               </Button>
 
-              <div className="flex items-center space-x-4">
+              <div className="flex items-center space-x-2">
                 {step < totalSteps ? (
                   <Button
                     onClick={handleNext}
@@ -502,16 +431,16 @@ export function OnboardingDialog({ isOpen, onComplete }: OnboardingDialogProps) 
                       (step === 1 && !formData.orgType) ||
                       (step === 2 && (!formData.name || !formData.size || !formData.position || !formData.country))
                     }
-                    className="flex items-center space-x-2 px-8 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-medium rounded-xl shadow-lg hover:shadow-xl transition-all duration-200"
+                    className="flex items-center space-x-2"
                   >
-                    <span>Get Started</span>
+                    <span>Continue</span>
                     <ArrowRight className="w-4 h-4" />
                   </Button>
                 ) : (
                   <Button
                     onClick={handleComplete}
                     disabled={formData.categories.length === 0 || isLoading}
-                    className="flex items-center space-x-2 px-8 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-medium rounded-xl shadow-lg hover:shadow-xl transition-all duration-200"
+                    className="flex items-center space-x-2"
                   >
                     {isLoading ? (
                       <>
