@@ -14,12 +14,12 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { name, website, orgType, industries, country, grantSizeMin, grantSizeMax, fundingNeeds } = body;
+    const { name, website, orgType, orgSize, industries, country, grantSizeRange, fundingNeeds } = body;
 
     // Validate required fields
-    if (!name || !orgType || !industries || industries.length === 0 || !country) {
+    if (!name || !orgType || !orgSize || !industries || industries.length === 0 || !country) {
       return NextResponse.json(
-        { error: "Missing required fields: name, orgType, industries, and country are required" },
+        { error: "Missing required fields: name, orgType, orgSize, industries, and country are required" },
         { status: 400 }
       );
     }
@@ -31,10 +31,10 @@ export async function POST(request: NextRequest) {
         name,
         website: website || null,
         orgType: orgType as any,
+        orgSize: orgSize as any,
         industries: industries as any,
         country,
-        grantSizeMin: grantSizeMin || null,
-        grantSizeMax: grantSizeMax || null,
+        grantSizeRange: grantSizeRange as any || null,
         fundingNeeds: fundingNeeds as any || [],
       },
       create: {
@@ -42,10 +42,10 @@ export async function POST(request: NextRequest) {
         name,
         website: website || null,
         orgType: orgType as any,
+        orgSize: orgSize as any,
         industries: industries as any,
         country,
-        grantSizeMin: grantSizeMin || null,
-        grantSizeMax: grantSizeMax || null,
+        grantSizeRange: grantSizeRange as any || null,
         fundingNeeds: fundingNeeds as any || [],
       }
     });

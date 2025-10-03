@@ -33,22 +33,22 @@ interface OnboardingDialogProps {
 
 const organizationTypes = [
   {
-    id: "SME",
-    title: "SME",
-    description: "Small and Medium Enterprises",
+    id: "BUSINESS",
+    title: "Business",
+    description: "SMEs, startups, and for-profit enterprises",
     icon: Building2
   },
   {
     id: "NONPROFIT",
     title: "Non-Profit",
-    description: "501(c)(3) and other tax-exempt organizations",
+    description: "NGOs, charities, and other non-profit organizations",
     icon: Users
   },
   {
-    id: "STARTUP",
-    title: "Startup",
-    description: "Early-stage companies and ventures",
-    icon: Target
+    id: "GOVERNMENT",
+    title: "Government",
+    description: "Federal, state, local agencies and municipalities",
+    icon: Briefcase
   },
   {
     id: "SOCIAL_ENTERPRISE",
@@ -83,12 +83,31 @@ const industries = [
   { id: "GENDER", label: "Gender", emoji: "⚖️" }
 ];
 
+const organizationSizes = [
+  { id: "SOLO_1", label: "Solo (1 person)" },
+  { id: "MICRO_2_10", label: "Micro (2-10 people)" },
+  { id: "SMALL_11_50", label: "Small (11-50 people)" },
+  { id: "MEDIUM_51_250", label: "Medium (51-250 people)" },
+  { id: "LARGE_250_PLUS", label: "Large (250+ people)" }
+];
+
 const fundingNeeds = [
   { id: "CAPACITY_BUILDING", label: "Capacity Building" },
   { id: "RESEARCH", label: "Research" },
   { id: "PROJECT_IMPLEMENTATION", label: "Project Implementation" },
   { id: "EQUIPMENT", label: "Equipment" },
   { id: "TRAINING", label: "Training" }
+];
+
+const grantSizeRanges = [
+  { id: "UNDER_10K", label: "Under $10,000", min: 0, max: 10000 },
+  { id: "10K_25K", label: "$10,000 - $25,000", min: 10000, max: 25000 },
+  { id: "25K_50K", label: "$25,000 - $50,000", min: 25000, max: 50000 },
+  { id: "50K_100K", label: "$50,000 - $100,000", min: 50000, max: 100000 },
+  { id: "100K_250K", label: "$100,000 - $250,000", min: 100000, max: 250000 },
+  { id: "250K_500K", label: "$250,000 - $500,000", min: 250000, max: 500000 },
+  { id: "500K_1M", label: "$500,000 - $1,000,000", min: 500000, max: 1000000 },
+  { id: "OVER_1M", label: "Over $1,000,000", min: 1000000, max: null }
 ];
 
 const grantCategories = [
@@ -111,16 +130,16 @@ export function OnboardingDialog({ isOpen, onComplete }: OnboardingDialogProps) 
     organizationName: "",
     website: "",
     orgType: "",
+    orgSize: "",
     industries: [] as string[],
     country: "",
-    grantSizeMin: "",
-    grantSizeMax: "",
+    grantSizeRange: "",
     fundingNeeds: [] as string[]
   });
 
   const router = useRouter();
   const { data: session } = useSession();
-  const totalSteps = 5;
+  const totalSteps = 4;
   const progress = (step / totalSteps) * 100;
 
   // Initialize organization name from email when component mounts
@@ -161,10 +180,10 @@ export function OnboardingDialog({ isOpen, onComplete }: OnboardingDialogProps) 
           name: formData.organizationName,
           website: formData.website,
           orgType: formData.orgType,
+          orgSize: formData.orgSize,
           industries: formData.industries,
           country: formData.country,
-          grantSizeMin: formData.grantSizeMin ? parseInt(formData.grantSizeMin) : null,
-          grantSizeMax: formData.grantSizeMax ? parseInt(formData.grantSizeMax) : null,
+          grantSizeRange: formData.grantSizeRange || null,
           fundingNeeds: formData.fundingNeeds
         }),
       });
@@ -271,6 +290,51 @@ export function OnboardingDialog({ isOpen, onComplete }: OnboardingDialogProps) 
                         placeholder="https://example.com"
                         className="text-base"
                       />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="country">Country *</Label>
+                      <select
+                        id="country"
+                        value={formData.country}
+                        onChange={(e) => setFormData(prev => ({ ...prev, country: e.target.value }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary text-base"
+                      >
+                        <option value="">Select your country</option>
+                        {COUNTRIES.map((country) => (
+                          <option key={country} value={country}>
+                            {country}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>Organization Size *</Label>
+                      <div className="grid grid-cols-1 gap-2">
+                        {organizationSizes.map((size) => (
+                          <label 
+                            key={size.id}
+                            className={`
+                              flex items-center space-x-3 p-3 rounded-lg border cursor-pointer transition-all duration-200
+                              ${formData.orgSize === size.id
+                                ? 'border-primary bg-primary/5' 
+                                : 'border-gray-200 hover:border-gray-300'
+                              }
+                            `}
+                          >
+                            <input
+                              type="radio"
+                              name="orgSize"
+                              value={size.id}
+                              checked={formData.orgSize === size.id}
+                              onChange={(e) => setFormData(prev => ({ ...prev, orgSize: e.target.value }))}
+                              className="w-4 h-4 text-primary"
+                            />
+                            <span className="text-sm text-gray-900">{size.label}</span>
+                          </label>
+                        ))}
+                      </div>
                     </div>
                   </div>
                 </motion.div>
@@ -400,47 +464,8 @@ export function OnboardingDialog({ isOpen, onComplete }: OnboardingDialogProps) 
                 </motion.div>
               )}
 
-              {/* Step 4: Country */}
+              {/* Step 4: Grant Preferences (Optional) */}
               {step === 4 && (
-                <motion.div
-                  key="step4"
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -20 }}
-                  className="p-6"
-                >
-                  <div className="text-center mb-8">
-                    <h3 className="text-xl font-semibold text-gray-900 mb-2">
-                      Location
-                    </h3>
-                    <p className="text-gray-600">
-                      Select your organization's primary country
-                    </p>
-                  </div>
-
-                  <div className="max-w-md mx-auto">
-                    <div className="space-y-2">
-                      <Label htmlFor="country">Country *</Label>
-                      <select
-                        id="country"
-                        value={formData.country}
-                        onChange={(e) => setFormData(prev => ({ ...prev, country: e.target.value }))}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary text-base"
-                      >
-                        <option value="">Select your country</option>
-                        {COUNTRIES.map((country) => (
-                          <option key={country} value={country}>
-                            {country}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-                </motion.div>
-              )}
-
-              {/* Step 5: Grant Preferences (Optional) */}
-              {step === 5 && (
                 <motion.div
                   key="step5"
                   initial={{ opacity: 0, x: 20 }}
@@ -461,27 +486,33 @@ export function OnboardingDialog({ isOpen, onComplete }: OnboardingDialogProps) 
                     {/* Grant Size Range */}
                     <div className="space-y-4">
                       <Label className="text-base font-medium">Grant Size Range (USD)</Label>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <Label htmlFor="grantMin" className="text-sm">Minimum</Label>
-                          <Input
-                            id="grantMin"
-                            type="number"
-                            value={formData.grantSizeMin}
-                            onChange={(e) => setFormData(prev => ({ ...prev, grantSizeMin: e.target.value }))}
-                            placeholder="10,000"
-                          />
-                        </div>
-                        <div>
-                          <Label htmlFor="grantMax" className="text-sm">Maximum</Label>
-                          <Input
-                            id="grantMax"
-                            type="number"
-                            value={formData.grantSizeMax}
-                            onChange={(e) => setFormData(prev => ({ ...prev, grantSizeMax: e.target.value }))}
-                            placeholder="100,000"
-                          />
-                        </div>
+                      <div className="grid grid-cols-1 gap-2">
+                        {grantSizeRanges.map((range) => {
+                          const isSelected = formData.grantSizeRange === range.id;
+                          
+                          return (
+                            <label 
+                              key={range.id}
+                              className={`
+                                flex items-center space-x-3 p-3 rounded-lg border cursor-pointer transition-all duration-200
+                                ${isSelected 
+                                  ? 'border-primary bg-primary/5' 
+                                  : 'border-gray-200 hover:border-gray-300'
+                                }
+                              `}
+                            >
+                              <input
+                                type="radio"
+                                name="grantSizeRange"
+                                value={range.id}
+                                checked={isSelected}
+                                onChange={(e) => setFormData(prev => ({ ...prev, grantSizeRange: e.target.value }))}
+                                className="w-4 h-4 text-primary"
+                              />
+                              <span className="text-sm text-gray-900">{range.label}</span>
+                            </label>
+                          );
+                        })}
                       </div>
                     </div>
 
@@ -539,10 +570,9 @@ export function OnboardingDialog({ isOpen, onComplete }: OnboardingDialogProps) 
                   <Button
                     onClick={handleNext}
                     disabled={
-                      (step === 1 && !formData.organizationName) ||
+                      (step === 1 && (!formData.organizationName || !formData.country || !formData.orgSize)) ||
                       (step === 2 && !formData.orgType) ||
-                      (step === 3 && formData.industries.length === 0) ||
-                      (step === 4 && !formData.country)
+                      (step === 3 && formData.industries.length === 0)
                     }
                     className="flex items-center space-x-2"
                   >

@@ -97,18 +97,18 @@ model Verification {
 // Organization model
 
 model Organization {
-  id              String           @id @default(cuid())
-  userId          String           @unique
+  id              String             @id @default(cuid())
+  userId          String             @unique
   name            String
   website         String?
   orgType         OrganizationType
+  orgSize         OrganizationSize
   industries      Industry[]
   country         String
-  grantSizeMin    Int?             // Optional grant size range minimum
-  grantSizeMax    Int?             // Optional grant size range maximum
-  fundingNeeds    FundingNeed[]    // Optional funding needs
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
+  grantSizeRange  GrantSizeRange?    // Optional grant size range selection
+  fundingNeeds    FundingNeed[]      // Optional funding needs
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
 
   // Relations
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -137,23 +137,33 @@ enum UserRole {
   SEEKER
   WRITER
   FUNDER
+  ADMIN
 }
 
 enum OrganizationType {
-  SME
+  BUSINESS
   NONPROFIT
-  STARTUP
+  GOVERNMENT
   SOCIAL_ENTERPRISE
   RESEARCH_ACADEMIC
   OTHER
 }
 
 enum OrganizationSize {
-  SOLO
-  MICRO
-  SMALL
-  MEDIUM
-  LARGE
+  SOLO_1
+  MICRO_2_10
+  SMALL_11_50
+  MEDIUM_51_250
+  LARGE_250_PLUS
+}
+
+enum GrantSizeRange {
+  UNDER_10K
+  TEN_TO_50K
+  FIFTY_TO_100K
+  HUNDRED_TO_500K
+  FIVE_HUNDRED_K_TO_1M
+  OVER_1M
 }
 
 enum UserPosition {
