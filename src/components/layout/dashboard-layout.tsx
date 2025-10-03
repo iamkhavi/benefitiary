@@ -23,7 +23,7 @@ import { cn } from '@/lib/utils';
 import { usePathname } from 'next/navigation';
 
 const mainMenuItems = [
-  { title: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+  { title: "Dashboard", href: "/", icon: LayoutDashboard },
   { title: "Grant Explorer", href: "/grants", icon: Search, badge: "New" },
   { title: "Applications", href: "/applications", icon: FileText, count: 12 },
   { title: "Matches", href: "/matches", icon: Target, count: 8 }

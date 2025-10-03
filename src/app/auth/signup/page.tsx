@@ -97,8 +97,8 @@ export default function SignupPage() {
         return;
       }
 
-      // Redirect to dashboard (onboarding dialog will show automatically)
-      router.push("/dashboard");
+      // Redirect to main app (onboarding dialog will show automatically)
+      router.push("/");
     } catch (err) {
       setError("An unexpected error occurred. Please try again.");
       console.error("Signup error:", err);
@@ -135,7 +135,7 @@ export default function SignupPage() {
 
           <OAuthButtons 
             mode="signup" 
-            onSuccess={() => router.push("/dashboard")}
+            onSuccess={() => router.push("/")}
             onError={setError}
           />
 

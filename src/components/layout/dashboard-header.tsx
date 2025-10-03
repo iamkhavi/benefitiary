@@ -65,7 +65,7 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
             </Link>
             <nav className="hidden md:flex space-x-6">
               <Link
-                href="/dashboard"
+                href="/"
                 className="text-gray-600 hover:text-gray-900 transition-colors"
               >
                 Dashboard
@@ -130,7 +130,7 @@ export function DashboardHeader({ user }: DashboardHeaderProps) {
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
-                  <Link href="/dashboard" className="flex items-center">
+                  <Link href="/" className="flex items-center">
                     <User className="mr-2 h-4 w-4" />
                     <span>Dashboard</span>
                   </Link>

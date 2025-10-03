@@ -44,8 +44,8 @@ export default function LoginPage() {
         return;
       }
 
-      // Redirect to dashboard after successful login
-      router.push("/dashboard");
+      // Redirect to main app after successful login
+      router.push("/");
     } catch (err) {
       setError("An unexpected error occurred. Please try again.");
       console.error("Login error:", err);
@@ -68,7 +68,7 @@ export default function LoginPage() {
         <CardContent>
           <OAuthButtons 
             mode="login" 
-            onSuccess={() => router.push("/dashboard")}
+            onSuccess={() => router.push("/")}
             onError={setError}
           />
           

@@ -1,16 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
-import { authClient } from "@/lib/auth-client";
+import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { headers } from "next/headers";
 
 export async function GET(request: NextRequest) {
   try {
-    const sessionResult = await authClient.getSession();
+    const session = await auth.api.getSession({
+      headers: await headers(),
+    });
 
-    if (!sessionResult?.data?.user) {
+    if (!session?.user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
-
-    const session = sessionResult.data;
 
     // Check if user has completed onboarding by looking at database
     const user = await prisma.user.findUnique({
