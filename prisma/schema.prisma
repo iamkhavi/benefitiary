@@ -97,17 +97,18 @@ model Verification {
 // Organization model
 
 model Organization {
-  id        String           @id @default(cuid())
-  userId    String           @unique
-  name      String
-  orgType   OrganizationType
-  size      OrganizationSize
-  position  UserPosition
-  website   String?
-  country   String
-  region    String?
-  createdAt DateTime         @default(now())
-  updatedAt DateTime         @updatedAt
+  id              String           @id @default(cuid())
+  userId          String           @unique
+  name            String
+  website         String?
+  orgType         OrganizationType
+  industries      Industry[]
+  country         String
+  grantSizeMin    Int?             // Optional grant size range minimum
+  grantSizeMax    Int?             // Optional grant size range maximum
+  fundingNeeds    FundingNeed[]    // Optional funding needs
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
 
   // Relations
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -115,7 +116,7 @@ model Organization {
   @@map("organizations")
 }
 
-// User preferences model
+// User preferences model (keeping existing categories for backward compatibility)
 
 model UserPreferences {
   id         String          @id @default(cuid())
@@ -141,8 +142,9 @@ enum UserRole {
 enum OrganizationType {
   SME
   NONPROFIT
-  ACADEMIC
-  HEALTHCARE
+  STARTUP
+  SOCIAL_ENTERPRISE
+  RESEARCH_ACADEMIC
   OTHER
 }
 
@@ -165,6 +167,27 @@ enum UserPosition {
   RESEARCH_DIRECTOR
   FINANCE_MANAGER
   OTHER
+}
+
+enum Industry {
+  HEALTHCARE
+  PUBLIC_HEALTH
+  EDUCATION
+  AGRICULTURE
+  ENVIRONMENT
+  TECHNOLOGY
+  CLIMATE
+  SUPPLY_CHAIN
+  HUMANITARIAN
+  GENDER
+}
+
+enum FundingNeed {
+  CAPACITY_BUILDING
+  RESEARCH
+  PROJECT_IMPLEMENTATION
+  EQUIPMENT
+  TRAINING
 }
 
 enum GrantCategory {

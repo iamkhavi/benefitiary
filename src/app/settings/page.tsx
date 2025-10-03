@@ -128,14 +128,17 @@ export default async function SettingsPage() {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Organization Size
+                    Industries
                   </label>
                   <div className="flex items-center space-x-2">
                     <Users className="h-4 w-4 text-gray-400" />
-                    <Input defaultValue={organization.size} />
-                    <Badge variant="outline" className="capitalize">
-                      {organization.size.replace('_', ' ')}
-                    </Badge>
+                    <div className="flex flex-wrap gap-2">
+                      {organization.industries.map((industry) => (
+                        <Badge key={industry} variant="outline" className="capitalize">
+                          {industry.replace('_', ' ').toLowerCase()}
+                        </Badge>
+                      ))}
+                    </div>
                   </div>
                 </div>
                 <div>

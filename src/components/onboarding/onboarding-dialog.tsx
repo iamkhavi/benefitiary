@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useSession } from "@/lib/auth-client";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,9 +19,12 @@ import {
   CheckCircle,
   ArrowRight,
   ArrowLeft,
-  Sparkles
+  Sparkles,
+  Globe,
+  DollarSign
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { extractOrganizationFromEmail, COUNTRIES } from "@/lib/utils/email-utils";
 
 interface OnboardingDialogProps {
   isOpen: boolean;
@@ -29,41 +33,62 @@ interface OnboardingDialogProps {
 
 const organizationTypes = [
   {
-    id: "Nonprofit",
-    title: "Nonprofit",
+    id: "SME",
+    title: "SME",
+    description: "Small and Medium Enterprises",
+    icon: Building2
+  },
+  {
+    id: "NONPROFIT",
+    title: "Non-Profit",
     description: "501(c)(3) and other tax-exempt organizations",
     icon: Users
   },
   {
-    id: "Business",
-    title: "Business",
-    description: "For-profit companies, startups, and enterprises",
-    icon: Building2
-  },
-  {
-    id: "Government",
-    title: "Government",
-    description: "Federal, state, local agencies and municipalities",
-    icon: Briefcase
-  },
-  {
-    id: "Academic",
-    title: "Academic Institution",
-    description: "Universities, colleges, schools, and research centers",
-    icon: GraduationCap
-  },
-  {
-    id: "Grant Consultancy",
-    title: "Grant Consultancy",
-    description: "Agencies, freelancers, and grant writing services",
+    id: "STARTUP",
+    title: "Startup",
+    description: "Early-stage companies and ventures",
     icon: Target
   },
   {
-    id: "Other",
+    id: "SOCIAL_ENTERPRISE",
+    title: "Social Enterprise",
+    description: "Mission-driven businesses with social impact",
+    icon: Heart
+  },
+  {
+    id: "RESEARCH_ACADEMIC",
+    title: "Research/Academic Institute",
+    description: "Universities, colleges, and research centers",
+    icon: GraduationCap
+  },
+  {
+    id: "OTHER",
     title: "Other",
-    description: "Specify your organization type",
+    description: "Other organization types",
     icon: Sparkles
   }
+];
+
+const industries = [
+  { id: "HEALTHCARE", label: "Healthcare", emoji: "🏥" },
+  { id: "PUBLIC_HEALTH", label: "Public Health", emoji: "🩺" },
+  { id: "EDUCATION", label: "Education", emoji: "📚" },
+  { id: "AGRICULTURE", label: "Agriculture", emoji: "🌾" },
+  { id: "ENVIRONMENT", label: "Environment", emoji: "🌍" },
+  { id: "TECHNOLOGY", label: "Technology", emoji: "💻" },
+  { id: "CLIMATE", label: "Climate", emoji: "🌡️" },
+  { id: "SUPPLY_CHAIN", label: "Supply Chain", emoji: "🚚" },
+  { id: "HUMANITARIAN", label: "Humanitarian", emoji: "🤝" },
+  { id: "GENDER", label: "Gender", emoji: "⚖️" }
+];
+
+const fundingNeeds = [
+  { id: "CAPACITY_BUILDING", label: "Capacity Building" },
+  { id: "RESEARCH", label: "Research" },
+  { id: "PROJECT_IMPLEMENTATION", label: "Project Implementation" },
+  { id: "EQUIPMENT", label: "Equipment" },
+  { id: "TRAINING", label: "Training" }
 ];
 
 const grantCategories = [
@@ -83,17 +108,34 @@ export function OnboardingDialog({ isOpen, onComplete }: OnboardingDialogProps) 
   const [step, setStep] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
-    name: "",
+    organizationName: "",
+    website: "",
     orgType: "",
-    size: "",
-    position: "",
+    industries: [] as string[],
     country: "",
-    categories: [] as string[]
+    grantSizeMin: "",
+    grantSizeMax: "",
+    fundingNeeds: [] as string[]
   });
 
   const router = useRouter();
-  const totalSteps = 3;
+  const { data: session } = useSession();
+  const totalSteps = 5;
   const progress = (step / totalSteps) * 100;
+
+  // Initialize organization name from email when component mounts
+  useEffect(() => {
+    if (session?.user?.email && !formData.organizationName) {
+      const orgInfo = extractOrganizationFromEmail(session.user.email);
+      if (orgInfo.isWorkEmail) {
+        setFormData(prev => ({
+          ...prev,
+          organizationName: orgInfo.name,
+          website: orgInfo.website
+        }));
+      }
+    }
+  }, [session?.user?.email, formData.organizationName]);
 
   const handleNext = () => {
     if (step < totalSteps) {
@@ -116,26 +158,18 @@ export function OnboardingDialog({ isOpen, onComplete }: OnboardingDialogProps) 
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          name: formData.name,
+          name: formData.organizationName,
+          website: formData.website,
           orgType: formData.orgType,
-          size: formData.size,
-          position: formData.position,
-          country: formData.country
+          industries: formData.industries,
+          country: formData.country,
+          grantSizeMin: formData.grantSizeMin ? parseInt(formData.grantSizeMin) : null,
+          grantSizeMax: formData.grantSizeMax ? parseInt(formData.grantSizeMax) : null,
+          fundingNeeds: formData.fundingNeeds
         }),
       });
 
       if (!orgResponse.ok) throw new Error("Failed to save organization");
-
-      // Save preferences
-      const prefResponse = await fetch("/api/onboarding/preferences", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          categories: formData.categories
-        }),
-      });
-
-      if (!prefResponse.ok) throw new Error("Failed to save preferences");
 
       onComplete();
     } catch (error) {
@@ -145,12 +179,21 @@ export function OnboardingDialog({ isOpen, onComplete }: OnboardingDialogProps) 
     }
   };
 
-  const toggleCategory = (categoryId: string) => {
+  const toggleIndustry = (industryId: string) => {
     setFormData(prev => ({
       ...prev,
-      categories: prev.categories.includes(categoryId)
-        ? prev.categories.filter(id => id !== categoryId)
-        : [...prev.categories, categoryId]
+      industries: prev.industries.includes(industryId)
+        ? prev.industries.filter(id => id !== industryId)
+        : [...prev.industries, industryId]
+    }));
+  };
+
+  const toggleFundingNeed = (needId: string) => {
+    setFormData(prev => ({
+      ...prev,
+      fundingNeeds: prev.fundingNeeds.includes(needId)
+        ? prev.fundingNeeds.filter(id => id !== needId)
+        : [...prev.fundingNeeds, needId]
     }));
   };
 
@@ -182,20 +225,72 @@ export function OnboardingDialog({ isOpen, onComplete }: OnboardingDialogProps) 
           {/* Content */}
           <div className="flex-1 overflow-y-auto">
             <AnimatePresence mode="wait">
+              {/* Step 1: Organization Name */}
               {step === 1 && (
                 <motion.div
                   key="step1"
                   initial={{ opacity: 0, x: 20 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: -20 }}
-                  className="p-8"
+                  className="p-6"
                 >
                   <div className="text-center mb-8">
                     <h3 className="text-xl font-semibold text-gray-900 mb-2">
-                      What type of organization are you?
+                      Organization Details
                     </h3>
                     <p className="text-gray-600">
-                      Different organization types are eligible for different funding sources
+                      Confirm or edit your organization information
+                    </p>
+                  </div>
+
+                  <div className="max-w-2xl mx-auto space-y-6">
+                    <div className="space-y-2">
+                      <Label htmlFor="orgName">Organization Name *</Label>
+                      <Input
+                        id="orgName"
+                        value={formData.organizationName}
+                        onChange={(e) => setFormData(prev => ({ ...prev, organizationName: e.target.value }))}
+                        placeholder="Enter your organization name"
+                        className="text-base"
+                      />
+                      <p className="text-sm text-gray-500">
+                        {session?.user?.email && extractOrganizationFromEmail(session.user.email).isWorkEmail 
+                          ? "We detected this from your work email. You can edit it if needed."
+                          : "Enter your organization's full name"
+                        }
+                      </p>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="website">Website (Optional)</Label>
+                      <Input
+                        id="website"
+                        type="url"
+                        value={formData.website}
+                        onChange={(e) => setFormData(prev => ({ ...prev, website: e.target.value }))}
+                        placeholder="https://example.com"
+                        className="text-base"
+                      />
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+
+              {/* Step 2: Organization Type */}
+              {step === 2 && (
+                <motion.div
+                  key="step2"
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -20 }}
+                  className="p-6"
+                >
+                  <div className="text-center mb-8">
+                    <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                      Organization Type
+                    </h3>
+                    <p className="text-gray-600">
+                      Select the type that best describes your organization
                     </p>
                   </div>
 
@@ -243,134 +338,32 @@ export function OnboardingDialog({ isOpen, onComplete }: OnboardingDialogProps) 
                 </motion.div>
               )}
 
-              {step === 2 && (
-                <motion.div
-                  key="step2"
-                  initial={{ opacity: 0, x: 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -20 }}
-                  className="p-8"
-                >
-                  <div className="text-center mb-8">
-                    <h3 className="text-xl font-semibold text-gray-900 mb-2">
-                      Tell us about your organization
-                    </h3>
-                    <p className="text-gray-600">
-                      This helps us personalize your grant recommendations
-                    </p>
-                  </div>
-
-                  <div className="max-w-2xl mx-auto space-y-6">
-                    <div className="bg-gray-50 rounded-lg p-6 border">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div className="space-y-2">
-                          <Label htmlFor="name">Organization Name</Label>
-                          <Input
-                            id="name"
-                            value={formData.name}
-                            onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                            placeholder="Enter your organization name"
-                          />
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label>Organization Size</Label>
-                          <div className="space-y-2">
-                            {[
-                              { value: "Solo", label: "Solo (1 person)" },
-                              { value: "Micro", label: "Micro (2-10 people)" },
-                              { value: "Small", label: "Small (11-50 people)" },
-                              { value: "Medium", label: "Medium (51-250 people)" },
-                              { value: "Large", label: "Large (250+ people)" }
-                            ].map((size) => (
-                              <label 
-                                key={size.value} 
-                                className="flex items-center space-x-3 cursor-pointer"
-                              >
-                                <input
-                                  type="radio"
-                                  name="size"
-                                  value={size.value}
-                                  checked={formData.size === size.value}
-                                  onChange={(e) => setFormData(prev => ({ ...prev, size: e.target.value }))}
-                                  className="w-4 h-4 text-primary"
-                                />
-                                <span className="text-sm text-gray-700">{size.label}</span>
-                              </label>
-                            ))}
-                          </div>
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label htmlFor="position">Your Position</Label>
-                          <select
-                            id="position"
-                            value={formData.position}
-                            onChange={(e) => setFormData(prev => ({ ...prev, position: e.target.value }))}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
-                          >
-                            <option value="">Select your position</option>
-                            <option value="CEO">CEO</option>
-                            <option value="Founder">Founder</option>
-                            <option value="Program Manager">Program Manager</option>
-                            <option value="Development Manager">Development Manager</option>
-                            <option value="Grant Writer">Grant Writer</option>
-                            <option value="Operations Manager">Operations Manager</option>
-                            <option value="Other">Other</option>
-                          </select>
-                        </div>
-
-                        <div className="space-y-2">
-                          <Label htmlFor="country">Country</Label>
-                          <select
-                            id="country"
-                            value={formData.country}
-                            onChange={(e) => setFormData(prev => ({ ...prev, country: e.target.value }))}
-                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
-                          >
-                            <option value="">Select your country</option>
-                            <option value="United States">United States</option>
-                            <option value="Canada">Canada</option>
-                            <option value="United Kingdom">United Kingdom</option>
-                            <option value="Germany">Germany</option>
-                            <option value="France">France</option>
-                            <option value="Australia">Australia</option>
-                            <option value="Netherlands">Netherlands</option>
-                            <option value="Sweden">Sweden</option>
-                            <option value="Other">Other</option>
-                          </select>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </motion.div>
-              )}
-
+              {/* Step 3: Industry/Sector */}
               {step === 3 && (
                 <motion.div
                   key="step3"
                   initial={{ opacity: 0, x: 20 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: -20 }}
-                  className="p-8"
+                  className="p-6"
                 >
                   <div className="text-center mb-8">
                     <h3 className="text-xl font-semibold text-gray-900 mb-2">
-                      What areas are you interested in?
+                      Industry/Sector
                     </h3>
                     <p className="text-gray-600">
-                      Select the grant categories that match your focus areas
+                      Select the industries your organization focuses on (multiple selection allowed)
                     </p>
                   </div>
 
                   <div className="max-w-4xl mx-auto">
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                      {grantCategories.map((category) => {
-                        const isSelected = formData.categories.includes(category.id);
+                      {industries.map((industry) => {
+                        const isSelected = formData.industries.includes(industry.id);
                         
                         return (
                           <motion.div
-                            key={category.id}
+                            key={industry.id}
                             whileHover={{ scale: 1.02 }}
                             whileTap={{ scale: 0.98 }}
                             className={`
@@ -380,12 +373,12 @@ export function OnboardingDialog({ isOpen, onComplete }: OnboardingDialogProps) 
                                 : 'border-gray-200 hover:border-gray-300 bg-white'
                               }
                             `}
-                            onClick={() => toggleCategory(category.id)}
+                            onClick={() => toggleIndustry(industry.id)}
                           >
                             <div className="flex items-center space-x-3">
-                              <span className="text-2xl">{category.emoji}</span>
+                              <span className="text-2xl">{industry.emoji}</span>
                               <div className="flex-1">
-                                <h4 className="font-medium text-sm text-gray-900">{category.label}</h4>
+                                <h4 className="font-medium text-sm text-gray-900">{industry.label}</h4>
                               </div>
                               {isSelected && (
                                 <CheckCircle className="w-5 h-5 text-primary" />
@@ -396,14 +389,132 @@ export function OnboardingDialog({ isOpen, onComplete }: OnboardingDialogProps) 
                       })}
                     </div>
 
-                    {formData.categories.length > 0 && (
+                    {formData.industries.length > 0 && (
                       <div className="mt-6 p-4 bg-primary/5 rounded-lg">
                         <p className="text-sm text-gray-700">
-                          <strong>{formData.categories.length}</strong> categories selected. 
-                          You can always update these later in your settings.
+                          <strong>{formData.industries.length}</strong> industries selected.
                         </p>
                       </div>
                     )}
+                  </div>
+                </motion.div>
+              )}
+
+              {/* Step 4: Country */}
+              {step === 4 && (
+                <motion.div
+                  key="step4"
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -20 }}
+                  className="p-6"
+                >
+                  <div className="text-center mb-8">
+                    <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                      Location
+                    </h3>
+                    <p className="text-gray-600">
+                      Select your organization's primary country
+                    </p>
+                  </div>
+
+                  <div className="max-w-md mx-auto">
+                    <div className="space-y-2">
+                      <Label htmlFor="country">Country *</Label>
+                      <select
+                        id="country"
+                        value={formData.country}
+                        onChange={(e) => setFormData(prev => ({ ...prev, country: e.target.value }))}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary text-base"
+                      >
+                        <option value="">Select your country</option>
+                        {COUNTRIES.map((country) => (
+                          <option key={country} value={country}>
+                            {country}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+
+              {/* Step 5: Grant Preferences (Optional) */}
+              {step === 5 && (
+                <motion.div
+                  key="step5"
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -20 }}
+                  className="p-6"
+                >
+                  <div className="text-center mb-8">
+                    <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                      Grant Preferences
+                    </h3>
+                    <p className="text-gray-600">
+                      Help us find the most relevant grants for you (optional)
+                    </p>
+                  </div>
+
+                  <div className="max-w-2xl mx-auto space-y-8">
+                    {/* Grant Size Range */}
+                    <div className="space-y-4">
+                      <Label className="text-base font-medium">Grant Size Range (USD)</Label>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <Label htmlFor="grantMin" className="text-sm">Minimum</Label>
+                          <Input
+                            id="grantMin"
+                            type="number"
+                            value={formData.grantSizeMin}
+                            onChange={(e) => setFormData(prev => ({ ...prev, grantSizeMin: e.target.value }))}
+                            placeholder="10,000"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="grantMax" className="text-sm">Maximum</Label>
+                          <Input
+                            id="grantMax"
+                            type="number"
+                            value={formData.grantSizeMax}
+                            onChange={(e) => setFormData(prev => ({ ...prev, grantSizeMax: e.target.value }))}
+                            placeholder="100,000"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Funding Needs */}
+                    <div className="space-y-4">
+                      <Label className="text-base font-medium">Funding Needs (select all that apply)</Label>
+                      <div className="grid grid-cols-1 gap-2">
+                        {fundingNeeds.map((need) => {
+                          const isSelected = formData.fundingNeeds.includes(need.id);
+                          
+                          return (
+                            <label 
+                              key={need.id}
+                              className={`
+                                flex items-center space-x-3 p-3 rounded-lg border cursor-pointer transition-all duration-200
+                                ${isSelected 
+                                  ? 'border-primary bg-primary/5' 
+                                  : 'border-gray-200 hover:border-gray-300'
+                                }
+                              `}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={isSelected}
+                                onChange={() => toggleFundingNeed(need.id)}
+                                className="w-4 h-4 text-primary"
+                              />
+                              <span className="text-sm text-gray-900">{need.label}</span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                    </div>
                   </div>
                 </motion.div>
               )}
@@ -428,8 +539,10 @@ export function OnboardingDialog({ isOpen, onComplete }: OnboardingDialogProps) 
                   <Button
                     onClick={handleNext}
                     disabled={
-                      (step === 1 && !formData.orgType) ||
-                      (step === 2 && (!formData.name || !formData.size || !formData.position || !formData.country))
+                      (step === 1 && !formData.organizationName) ||
+                      (step === 2 && !formData.orgType) ||
+                      (step === 3 && formData.industries.length === 0) ||
+                      (step === 4 && !formData.country)
                     }
                     className="flex items-center space-x-2"
                   >
@@ -439,7 +552,7 @@ export function OnboardingDialog({ isOpen, onComplete }: OnboardingDialogProps) 
                 ) : (
                   <Button
                     onClick={handleComplete}
-                    disabled={formData.categories.length === 0 || isLoading}
+                    disabled={isLoading}
                     className="flex items-center space-x-2"
                   >
                     {isLoading ? (

@@ -14,12 +14,12 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { name, orgType, size, position, country, website, region } = body;
+    const { name, website, orgType, industries, country, grantSizeMin, grantSizeMax, fundingNeeds } = body;
 
     // Validate required fields
-    if (!name || !orgType || !size || !position || !country) {
+    if (!name || !orgType || !industries || industries.length === 0 || !country) {
       return NextResponse.json(
-        { error: "Missing required fields" },
+        { error: "Missing required fields: name, orgType, industries, and country are required" },
         { status: 400 }
       );
     }
@@ -29,22 +29,32 @@ export async function POST(request: NextRequest) {
       where: { userId: session.user.id },
       update: {
         name,
-        orgType: orgType as any,
-        size: size as any,
-        position: position as any,
-        country,
         website: website || null,
-        region: region || null,
+        orgType: orgType as any,
+        industries: industries as any,
+        country,
+        grantSizeMin: grantSizeMin || null,
+        grantSizeMax: grantSizeMax || null,
+        fundingNeeds: fundingNeeds as any || [],
       },
       create: {
         userId: session.user.id,
         name,
-        orgType: orgType as any,
-        size: size as any,
-        position: position as any,
-        country,
         website: website || null,
-        region: region || null,
+        orgType: orgType as any,
+        industries: industries as any,
+        country,
+        grantSizeMin: grantSizeMin || null,
+        grantSizeMax: grantSizeMax || null,
+        fundingNeeds: fundingNeeds as any || [],
+      }
+    });
+
+    // Mark onboarding as completed
+    await prisma.user.update({
+      where: { id: session.user.id },
+      data: {
+        onboardingCompleted: true,
       }
     });
 
