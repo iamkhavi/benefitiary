@@ -20,7 +20,7 @@ export function OAuthButtons({ mode, onSuccess, onError }: OAuthButtonsProps) {
     try {
       const result = await authClient.signIn.social({
         provider: "google",
-        callbackURL: "/dashboard",
+        callbackURL: "/",
       });
 
       if (result.error) {
