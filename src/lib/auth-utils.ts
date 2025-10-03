@@ -52,7 +52,7 @@ export function getDashboardPath(role: string): string {
       return "/dashboard/funder";
     case "SEEKER":
     default:
-      return "/dashboard/seeker";
+      return "/";
   }
 }
 

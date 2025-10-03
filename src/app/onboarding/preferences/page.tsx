@@ -57,8 +57,8 @@ export default function PreferencesPage() {
         return;
       }
 
-      // Redirect to dashboard after completing onboarding
-      router.push("/dashboard");
+      // Redirect to main app after completing onboarding
+      router.push("/");
     } catch (err) {
       setError("An unexpected error occurred. Please try again.");
       console.error("Preferences setup error:", err);

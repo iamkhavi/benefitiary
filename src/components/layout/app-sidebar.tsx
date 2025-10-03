@@ -22,7 +22,7 @@ import { Badge } from "@/components/ui/badge"
 const mainMenuItems = [
   {
     title: "Dashboard",
-    href: "/dashboard",
+    href: "/",
     icon: LayoutDashboard,
   },
   {
