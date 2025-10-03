@@ -1,64 +1,44 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@/lib/auth";
-import { PrismaClient } from "@prisma/client";
-
-const prisma = new PrismaClient();
+import { authClient } from "@/lib/auth-client";
+import { prisma } from "@/lib/prisma";
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await auth.api.getSession({
-      headers: request.headers,
-    });
+    const sessionResult = await authClient.getSession();
 
-    if (!session?.user) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      );
+    if (!sessionResult?.data?.user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Check if user has completed each onboarding step
-    const [organization, userWithRole, preferences] = await Promise.all([
-      // Check if user has an organization
-      prisma.organization.findFirst({
-        where: { userId: session.user.id }
-      }),
-      
-      // Check if user has a role set (from the user table)
-      prisma.user.findUnique({
-        where: { id: session.user.id },
-        select: { role: true }
-      }),
-      
-      // Check if user has preferences set
-      prisma.userPreferences.findFirst({
-        where: { userId: session.user.id }
-      })
-    ]);
+    const session = sessionResult.data;
 
-    const hasOrganization = !!organization;
-    const hasRole = !!(userWithRole?.role && userWithRole.role !== 'SEEKER'); // Default role is SEEKER
-    const hasPreferences = !!preferences;
-    
-    const isOnboardingComplete = hasOrganization && hasRole && hasPreferences;
+    // Check if user has completed onboarding by looking at database
+    const user = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        onboardingCompleted: true,
+      }
+    });
 
-    const onboardingStatus = {
-      hasOrganization,
-      hasRole,
-      hasPreferences,
-      isComplete: isOnboardingComplete,
-      nextStep: !hasOrganization 
-        ? '/onboarding/organization'
-        : !hasRole 
-        ? '/onboarding/role'
-        : !hasPreferences 
-        ? '/onboarding/preferences'
-        : '/dashboard'
-    };
+    if (!user) {
+      return NextResponse.json({ error: "User not found" }, { status: 404 });
+    }
 
-    return NextResponse.json(onboardingStatus);
+    const needsOnboarding = !user.onboardingCompleted;
+
+    return NextResponse.json({
+      needsOnboarding,
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name
+      }
+    });
   } catch (error) {
-    console.error("Error checking onboarding status:", error);
+    console.error("Onboarding status check error:", error);
     return NextResponse.json(
       { error: "Failed to check onboarding status" },
       { status: 500 }

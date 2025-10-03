@@ -1,3 +1,5 @@
+"use client";
+
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -30,6 +32,7 @@ export default function Dashboard() {
               <Button size="sm" variant="outline">
                 Export
               </Button>
+
             </div>
           </div>
         </div>
