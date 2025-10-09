@@ -38,8 +38,12 @@ export async function POST(request: NextRequest) {
       '10K_25K': 'TEN_TO_50K',
       '25K_50K': 'TEN_TO_50K',
       'TEN_TO_50K': 'TEN_TO_50K',
+      '50K_100K': 'FIFTY_TO_100K',
       'FIFTY_TO_100K': 'FIFTY_TO_100K',
+      '100K_250K': 'HUNDRED_TO_500K',
+      '250K_500K': 'HUNDRED_TO_500K',
       'HUNDRED_TO_500K': 'HUNDRED_TO_500K',
+      '500K_1M': 'FIVE_HUNDRED_K_TO_1M',
       'FIVE_HUNDRED_K_TO_1M': 'FIVE_HUNDRED_K_TO_1M',
       'OVER_1M': 'OVER_1M'
     };
