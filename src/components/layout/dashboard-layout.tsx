@@ -2,6 +2,7 @@ import { auth } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import { headers } from 'next/headers';
 import { Badge } from '@/components/ui/badge';
+import { SubscriptionBadge } from '@/components/ui/subscription-badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { 
@@ -187,7 +188,7 @@ function DashboardHeader({ user, title, badge }: { user: any; title: string; bad
           )}
         </div>
         <div className="flex items-center space-x-4">
-          <Badge className="bg-green-100 text-green-800">Pro Plan</Badge>
+          <SubscriptionBadge />
           <div className="flex items-center space-x-2">
             <Avatar className="h-8 w-8">
               <AvatarImage src={user.image || undefined} alt={user.name || 'User'} />

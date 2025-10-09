@@ -34,6 +34,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
+import { SubscriptionBadge } from '@/components/ui/subscription-badge';
 
 const mainMenuItems = [
   { title: "Dashboard", href: "/", icon: LayoutDashboard },
@@ -211,7 +212,7 @@ export default async function MatchesPage() {
               <Badge className="bg-purple-100 text-purple-800">8 New</Badge>
             </div>
             <div className="flex items-center space-x-4">
-              <Badge className="bg-green-100 text-green-800">Pro Plan</Badge>
+              <SubscriptionBadge />
               <div className="flex items-center space-x-2">
                 <Avatar className="h-8 w-8">
                   <AvatarImage src={session.user.image || undefined} alt={session.user.name || 'User'} />

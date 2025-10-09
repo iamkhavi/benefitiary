@@ -91,21 +91,25 @@ export function QuickActions({ onActionClick }: QuickActionsProps) {
         <CardTitle className="text-base">Quick Actions</CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
           {actions.map((action) => {
             const IconComponent = action.icon;
             return (
               <Button
                 key={action.id}
                 variant="outline"
-                className="h-auto p-3 flex flex-col items-start text-left"
+                className="h-auto p-2 sm:p-3 flex flex-col items-start text-left hover:bg-gray-50 transition-colors"
                 onClick={() => onActionClick(action.id, action.prompt)}
               >
-                <div className="flex items-center space-x-2 mb-1">
-                  <IconComponent className={`h-4 w-4 ${action.color}`} />
-                  <span className="font-medium text-sm">{action.title}</span>
+                <div className="flex items-center space-x-1 sm:space-x-2 mb-1 w-full">
+                  <IconComponent className={`h-3 w-3 sm:h-4 sm:w-4 ${action.color} flex-shrink-0`} />
+                  <span className="font-medium text-xs sm:text-sm truncate">{action.title}</span>
                 </div>
-                <span className="text-xs text-gray-500 text-left">
+                <span className="text-xs text-gray-500 text-left leading-tight overflow-hidden" style={{ 
+                  display: '-webkit-box',
+                  WebkitLineClamp: 2,
+                  WebkitBoxOrient: 'vertical'
+                }}>
                   {action.description}
                 </span>
               </Button>

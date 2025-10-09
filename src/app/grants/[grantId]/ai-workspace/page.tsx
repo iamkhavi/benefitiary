@@ -4,10 +4,8 @@ import { useState, useRef, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Progress } from '@/components/ui/progress';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { 
   Bot,
   User,
@@ -15,27 +13,17 @@ import {
   Paperclip,
   Download,
   FileText,
-  Calendar,
-  DollarSign,
-  MapPin,
-  Building2,
   ArrowLeft,
   Sparkles,
   MessageSquare,
-  Upload,
   X,
-  CheckCircle,
-  AlertCircle,
-  Clock,
-  Target,
-  Lightbulb,
-  FileCheck,
   Zap
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
 import { QuickActions } from '@/components/ai/quick-actions';
 import { GrantSummary } from '@/components/grants/grant-summary';
+import { ProposalEditor } from '@/components/ai/proposal-editor';
 
 interface Message {
   id: string;
@@ -80,6 +68,8 @@ How can I help you with your application today?`,
   const [inputMessage, setInputMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
+  const [showSidebar, setShowSidebar] = useState(false);
+  const [showCanvas, setShowCanvas] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -146,7 +136,7 @@ How can I help you with your application today?`,
     }, 1500);
   };
 
-  const handleQuickAction = (actionId: string, prompt: string) => {
+  const handleQuickAction = (_actionId: string, prompt: string) => {
     handleSendMessage(prompt);
   };
 
@@ -251,11 +241,29 @@ I'm analyzing this document and will incorporate it into our conversation contex
             </div>
           </div>
           <div className="flex items-center space-x-3">
-            <Badge className="bg-green-100 text-green-800">
+            <div className="flex md:hidden space-x-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowSidebar(!showSidebar)}
+                className="px-2"
+              >
+                <FileText className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowCanvas(!showCanvas)}
+                className="px-2 hidden lg:inline-flex"
+              >
+                <Download className="h-4 w-4" />
+              </Button>
+            </div>
+            <Badge className="bg-green-100 text-green-800 hidden sm:inline-flex">
               <Sparkles className="h-3 w-3 mr-1" />
               {grantData.match}% Match
             </Badge>
-            <Badge variant="outline">
+            <Badge variant="outline" className="hidden sm:inline-flex">
               <MessageSquare className="h-3 w-3 mr-1" />
               {messages.length} Messages
             </Badge>
@@ -265,15 +273,31 @@ I'm analyzing this document and will incorporate it into our conversation contex
 
       <div className="flex-1 flex overflow-hidden">
         {/* Grant Info Sidebar */}
-        <div className="w-80 bg-white border-r border-gray-200 overflow-y-auto">
-          <div className="p-6 space-y-4">
+        <div className={cn(
+          "w-72 lg:w-80 bg-white border-r border-gray-200 overflow-y-auto",
+          "md:block",
+          showSidebar ? "block absolute inset-y-0 left-0 z-50 md:relative" : "hidden"
+        )}>
+          <div className="p-4 space-y-4">
+            {showSidebar && (
+              <div className="flex justify-between items-center md:hidden mb-4">
+                <h3 className="font-semibold">Grant Info</h3>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowSidebar(false)}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            )}
             <GrantSummary grant={grantData} />
             
             <QuickActions onActionClick={handleQuickAction} />
 
             {/* Uploaded Files */}
             {uploadedFiles.length > 0 && (
-              <Card className="mt-4">
+              <Card>
                 <CardHeader>
                   <CardTitle className="text-base flex items-center">
                     <Paperclip className="h-4 w-4 mr-2" />
@@ -309,8 +333,20 @@ I'm analyzing this document and will incorporate it into our conversation contex
           </div>
         </div>
 
-        {/* Chat Area */}
-        <div className="flex-1 flex flex-col">
+        {/* Proposal Canvas */}
+        <div className={cn(
+          "flex-1 bg-white border-r border-gray-200 overflow-hidden",
+          "lg:block",
+          showCanvas ? "block absolute inset-0 z-40 lg:relative" : "hidden"
+        )}>
+          <ProposalEditor 
+            showCanvas={showCanvas} 
+            onClose={() => setShowCanvas(false)} 
+          />
+        </div>
+
+        {/* Chat Area - Moved to Right */}
+        <div className="w-full md:w-96 lg:w-80 xl:w-96 flex flex-col bg-white">
           {/* Messages */}
           <div className="flex-1 overflow-y-auto p-6 space-y-6">
             {messages.map((message) => (

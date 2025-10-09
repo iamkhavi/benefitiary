@@ -3,6 +3,7 @@
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
+import { SubscriptionBadge } from '@/components/ui/subscription-badge';
 import { 
   LayoutDashboard, 
   Search, 
@@ -233,7 +234,7 @@ export function DashboardShell({ children, user }: DashboardShellProps) {
               )}
             </div>
             <div className="flex items-center space-x-4">
-              <Badge className="bg-green-100 text-green-800">Pro Plan</Badge>
+              <SubscriptionBadge />
               <div className="flex items-center space-x-2">
                 <Avatar className="h-8 w-8">
                   <AvatarImage src={user.image || undefined} alt={user.name || 'User'} />
