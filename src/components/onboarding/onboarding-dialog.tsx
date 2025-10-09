@@ -218,23 +218,23 @@ export function OnboardingDialog({ isOpen, onComplete }: OnboardingDialogProps) 
 
   return (
     <Dialog open={isOpen} onOpenChange={() => {}}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden p-0 gap-0">
-        <div className="flex flex-col h-full">
+      <DialogContent className="max-w-4xl w-[95vw] max-h-[95vh] overflow-hidden p-0 gap-0">
+        <div className="flex flex-col h-full min-h-[600px]">
           {/* Header */}
-          <div className="px-6 py-6 border-b bg-gray-50">
-            <div className="flex items-center justify-between mb-4">
+          <div className="px-4 sm:px-6 py-4 sm:py-6 border-b bg-gray-50 flex-shrink-0">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
               <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
-                  <Sparkles className="w-5 h-5 text-white" />
+                <div className="w-8 h-8 sm:w-10 sm:h-10 bg-primary rounded-lg flex items-center justify-center">
+                  <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
                 </div>
                 <div>
-                  <h2 className="text-2xl font-bold text-gray-900">
+                  <h2 className="text-xl sm:text-2xl font-bold text-gray-900">
                     Welcome to Benefitiary
                   </h2>
-                  <p className="text-gray-600">Set up your grant discovery profile</p>
+                  <p className="text-sm sm:text-base text-gray-600">Set up your grant discovery profile</p>
                 </div>
               </div>
-              <Badge variant="secondary" className="px-3 py-1">
+              <Badge variant="secondary" className="px-3 py-1 self-start sm:self-auto">
                 Step {step} of {totalSteps}
               </Badge>
             </div>
@@ -242,7 +242,7 @@ export function OnboardingDialog({ isOpen, onComplete }: OnboardingDialogProps) 
           </div>
 
           {/* Content */}
-          <div className="flex-1 overflow-y-auto">
+          <div className="flex-1 overflow-y-auto min-h-0">
             <AnimatePresence mode="wait">
               {/* Step 1: Organization Name */}
               {step === 1 && (
@@ -251,18 +251,18 @@ export function OnboardingDialog({ isOpen, onComplete }: OnboardingDialogProps) 
                   initial={{ opacity: 0, x: 20 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: -20 }}
-                  className="p-6"
+                  className="p-4 sm:p-6"
                 >
-                  <div className="text-center mb-8">
-                    <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                  <div className="text-center mb-6 sm:mb-8">
+                    <h3 className="text-lg sm:text-xl font-semibold text-gray-900 mb-2">
                       Organization Details
                     </h3>
-                    <p className="text-gray-600">
+                    <p className="text-sm sm:text-base text-gray-600">
                       Confirm or edit your organization information
                     </p>
                   </div>
 
-                  <div className="max-w-2xl mx-auto space-y-6">
+                  <div className="max-w-2xl mx-auto space-y-4 sm:space-y-6">
                     <div className="space-y-2">
                       <Label htmlFor="orgName">Organization Name *</Label>
                       <Input
@@ -311,12 +311,12 @@ export function OnboardingDialog({ isOpen, onComplete }: OnboardingDialogProps) 
 
                     <div className="space-y-2">
                       <Label>Organization Size *</Label>
-                      <div className="grid grid-cols-1 gap-2">
+                      <div className="grid grid-cols-1 gap-2 max-h-48 overflow-y-auto">
                         {organizationSizes.map((size) => (
                           <label 
                             key={size.id}
                             className={`
-                              flex items-center space-x-3 p-3 rounded-lg border cursor-pointer transition-all duration-200
+                              flex items-center space-x-3 p-2 sm:p-3 rounded-lg border cursor-pointer transition-all duration-200
                               ${formData.orgSize === size.id
                                 ? 'border-primary bg-primary/5' 
                                 : 'border-gray-200 hover:border-gray-300'
@@ -329,7 +329,7 @@ export function OnboardingDialog({ isOpen, onComplete }: OnboardingDialogProps) 
                               value={size.id}
                               checked={formData.orgSize === size.id}
                               onChange={(e) => setFormData(prev => ({ ...prev, orgSize: e.target.value }))}
-                              className="w-4 h-4 text-primary"
+                              className="w-4 h-4 text-primary flex-shrink-0"
                             />
                             <span className="text-sm text-gray-900">{size.label}</span>
                           </label>
@@ -347,18 +347,18 @@ export function OnboardingDialog({ isOpen, onComplete }: OnboardingDialogProps) 
                   initial={{ opacity: 0, x: 20 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: -20 }}
-                  className="p-6"
+                  className="p-4 sm:p-6"
                 >
-                  <div className="text-center mb-8">
-                    <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                  <div className="text-center mb-6 sm:mb-8">
+                    <h3 className="text-lg sm:text-xl font-semibold text-gray-900 mb-2">
                       Organization Type
                     </h3>
-                    <p className="text-gray-600">
+                    <p className="text-sm sm:text-base text-gray-600">
                       Select the type that best describes your organization
                     </p>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-3xl mx-auto">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 max-w-3xl mx-auto max-h-96 overflow-y-auto">
                     {organizationTypes.map((type) => {
                       const Icon = type.icon;
                       const isSelected = formData.orgType === type.id;
@@ -369,7 +369,7 @@ export function OnboardingDialog({ isOpen, onComplete }: OnboardingDialogProps) 
                           whileHover={{ scale: 1.02 }}
                           whileTap={{ scale: 0.98 }}
                           className={`
-                            relative p-6 rounded-xl border-2 cursor-pointer transition-all duration-200
+                            relative p-4 sm:p-6 rounded-xl border-2 cursor-pointer transition-all duration-200
                             ${isSelected 
                               ? 'border-primary bg-primary/5 shadow-lg' 
                               : 'border-gray-200 hover:border-gray-300 bg-white'
@@ -409,19 +409,19 @@ export function OnboardingDialog({ isOpen, onComplete }: OnboardingDialogProps) 
                   initial={{ opacity: 0, x: 20 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: -20 }}
-                  className="p-6"
+                  className="p-4 sm:p-6"
                 >
-                  <div className="text-center mb-8">
-                    <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                  <div className="text-center mb-6 sm:mb-8">
+                    <h3 className="text-lg sm:text-xl font-semibold text-gray-900 mb-2">
                       Industry/Sector
                     </h3>
-                    <p className="text-gray-600">
+                    <p className="text-sm sm:text-base text-gray-600">
                       Select the industries your organization focuses on (multiple selection allowed)
                     </p>
                   </div>
 
                   <div className="max-w-4xl mx-auto">
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3 max-h-80 overflow-y-auto">
                       {industries.map((industry) => {
                         const isSelected = formData.industries.includes(industry.id);
                         
@@ -431,7 +431,7 @@ export function OnboardingDialog({ isOpen, onComplete }: OnboardingDialogProps) 
                             whileHover={{ scale: 1.02 }}
                             whileTap={{ scale: 0.98 }}
                             className={`
-                              p-4 rounded-lg border-2 cursor-pointer transition-all duration-200
+                              p-3 sm:p-4 rounded-lg border-2 cursor-pointer transition-all duration-200
                               ${isSelected 
                                 ? 'border-primary bg-primary/5' 
                                 : 'border-gray-200 hover:border-gray-300 bg-white'
@@ -471,22 +471,22 @@ export function OnboardingDialog({ isOpen, onComplete }: OnboardingDialogProps) 
                   initial={{ opacity: 0, x: 20 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: -20 }}
-                  className="p-6"
+                  className="p-4 sm:p-6"
                 >
-                  <div className="text-center mb-8">
-                    <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                  <div className="text-center mb-6 sm:mb-8">
+                    <h3 className="text-lg sm:text-xl font-semibold text-gray-900 mb-2">
                       Grant Preferences
                     </h3>
-                    <p className="text-gray-600">
+                    <p className="text-sm sm:text-base text-gray-600">
                       Help us find the most relevant grants for you (optional)
                     </p>
                   </div>
 
-                  <div className="max-w-2xl mx-auto space-y-8">
+                  <div className="max-w-2xl mx-auto space-y-6 sm:space-y-8">
                     {/* Grant Size Range */}
                     <div className="space-y-4">
                       <Label className="text-base font-medium">Grant Size Range (USD)</Label>
-                      <div className="grid grid-cols-1 gap-2">
+                      <div className="grid grid-cols-1 gap-2 max-h-48 overflow-y-auto">
                         {grantSizeRanges.map((range) => {
                           const isSelected = formData.grantSizeRange === range.id;
                           
@@ -494,7 +494,7 @@ export function OnboardingDialog({ isOpen, onComplete }: OnboardingDialogProps) 
                             <label 
                               key={range.id}
                               className={`
-                                flex items-center space-x-3 p-3 rounded-lg border cursor-pointer transition-all duration-200
+                                flex items-center space-x-3 p-2 sm:p-3 rounded-lg border cursor-pointer transition-all duration-200
                                 ${isSelected 
                                   ? 'border-primary bg-primary/5' 
                                   : 'border-gray-200 hover:border-gray-300'
@@ -507,7 +507,7 @@ export function OnboardingDialog({ isOpen, onComplete }: OnboardingDialogProps) 
                                 value={range.id}
                                 checked={isSelected}
                                 onChange={(e) => setFormData(prev => ({ ...prev, grantSizeRange: e.target.value }))}
-                                className="w-4 h-4 text-primary"
+                                className="w-4 h-4 text-primary flex-shrink-0"
                               />
                               <span className="text-sm text-gray-900">{range.label}</span>
                             </label>
@@ -519,7 +519,7 @@ export function OnboardingDialog({ isOpen, onComplete }: OnboardingDialogProps) 
                     {/* Funding Needs */}
                     <div className="space-y-4">
                       <Label className="text-base font-medium">Funding Needs (select all that apply)</Label>
-                      <div className="grid grid-cols-1 gap-2">
+                      <div className="grid grid-cols-1 gap-2 max-h-48 overflow-y-auto">
                         {fundingNeeds.map((need) => {
                           const isSelected = formData.fundingNeeds.includes(need.id);
                           
@@ -527,7 +527,7 @@ export function OnboardingDialog({ isOpen, onComplete }: OnboardingDialogProps) 
                             <label 
                               key={need.id}
                               className={`
-                                flex items-center space-x-3 p-3 rounded-lg border cursor-pointer transition-all duration-200
+                                flex items-center space-x-3 p-2 sm:p-3 rounded-lg border cursor-pointer transition-all duration-200
                                 ${isSelected 
                                   ? 'border-primary bg-primary/5' 
                                   : 'border-gray-200 hover:border-gray-300'
@@ -538,7 +538,7 @@ export function OnboardingDialog({ isOpen, onComplete }: OnboardingDialogProps) 
                                 type="checkbox"
                                 checked={isSelected}
                                 onChange={() => toggleFundingNeed(need.id)}
-                                className="w-4 h-4 text-primary"
+                                className="w-4 h-4 text-primary flex-shrink-0"
                               />
                               <span className="text-sm text-gray-900">{need.label}</span>
                             </label>
@@ -553,19 +553,20 @@ export function OnboardingDialog({ isOpen, onComplete }: OnboardingDialogProps) 
           </div>
 
           {/* Footer */}
-          <div className="px-6 py-6 border-t bg-gray-50">
-            <div className="flex items-center justify-between">
+          <div className="px-4 sm:px-6 py-4 sm:py-6 border-t bg-gray-50 flex-shrink-0">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
               <Button
                 variant="ghost"
                 onClick={handleBack}
                 disabled={step === 1}
-                className="flex items-center space-x-2"
+                className="flex items-center justify-center space-x-2 order-2 sm:order-1"
+                size="sm"
               >
                 <ArrowLeft className="w-4 h-4" />
                 <span>Back</span>
               </Button>
 
-              <div className="flex items-center space-x-2">
+              <div className="flex items-center space-x-2 order-1 sm:order-2">
                 {step < totalSteps ? (
                   <Button
                     onClick={handleNext}
@@ -574,7 +575,8 @@ export function OnboardingDialog({ isOpen, onComplete }: OnboardingDialogProps) 
                       (step === 2 && !formData.orgType) ||
                       (step === 3 && formData.industries.length === 0)
                     }
-                    className="flex items-center space-x-2"
+                    className="flex items-center justify-center space-x-2 w-full sm:w-auto"
+                    size="sm"
                   >
                     <span>Continue</span>
                     <ArrowRight className="w-4 h-4" />
@@ -583,7 +585,8 @@ export function OnboardingDialog({ isOpen, onComplete }: OnboardingDialogProps) 
                   <Button
                     onClick={handleComplete}
                     disabled={isLoading}
-                    className="flex items-center space-x-2"
+                    className="flex items-center justify-center space-x-2 w-full sm:w-auto"
+                    size="sm"
                   >
                     {isLoading ? (
                       <>
