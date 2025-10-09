@@ -1,0 +1,164 @@
+// Additional models needed for full Benefitiary functionality
+
+// 1. Grant RFP Documents (for AI context)
+model GrantRFP {
+  id            String   @id @default(cuid())
+  grantId       String?
+  uploadedById  String?
+  title         String?
+  sourceUrl     String?
+  fileUrl       String?  // S3/Vercel Blob URL
+  extractedText String?  // Parsed PDF content
+  summary       String?  // AI-generated summary
+  vectorReady   Boolean  @default(false)
+  createdAt     DateTime @default(now())
+
+  grant      Grant? @relation(fields: [grantId], references: [id], onDelete: SetNull)
+  uploadedBy User?  @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
+
+  @@map("grant_rfp")
+}
+
+// 2. AI Grant Sessions (persistent chat workspaces)
+model AIGrantSession {
+  id             String    @id @default(cuid())
+  userId         String
+  grantId        String
+  contextSummary String?
+  lastMessageAt  DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  user     User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  grant    Grant           @relation(fields: [grantId], references: [id], onDelete: Cascade)
+  messages AIMessage[]
+  files    AIContextFile[]
+
+  @@map("ai_grant_sessions")
+}
+
+// 3. AI Messages (chat history)
+model AIMessage {
+  id          String      @id @default(cuid())
+  sessionId   String
+  sender      MessageSender
+  messageType MessageType
+  content     String
+  metadata    Json?
+  createdAt   DateTime    @default(now())
+
+  session AIGrantSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@map("ai_messages")
+}
+
+// 4. AI Context Files (uploaded documents)
+model AIContextFile {
+  id            String   @id @default(cuid())
+  sessionId     String
+  fileName      String
+  fileUrl       String
+  mimeType      String
+  sizeBytes     Int
+  uploadedBy    String
+  extractedText String?
+  createdAt     DateTime @default(now())
+
+  session AIGrantSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@map("ai_context_files")
+}
+
+// 5. Notifications (email, WhatsApp, in-app)
+model Notification {
+  id        String              @id @default(cuid())
+  userId    String
+  type      NotificationType
+  title     String
+  message   String
+  link      String?
+  read      Boolean             @default(false)
+  channel   NotificationChannel @default(IN_APP)
+  sentAt    DateTime?
+  createdAt DateTime            @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notifications")
+}
+
+// 6. Grant Tags (multi-tag classification)
+model GrantTag {
+  id      String @id @default(cuid())
+  grantId String
+  tag     String
+
+  grant Grant @relation(fields: [grantId], references: [id], onDelete: Cascade)
+
+  @@unique([grantId, tag])
+  @@map("grant_tags")
+}
+
+// 7. Scrape Jobs (audit trail)
+model ScrapeJob {
+  id            String          @id @default(cuid())
+  sourceId      String
+  status        ScrapeJobStatus @default(PENDING)
+  totalFound    Int?
+  totalInserted Int?
+  totalUpdated  Int?
+  startedAt     DateTime        @default(now())
+  finishedAt    DateTime?
+  log           String?
+
+  source ScrapedSource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+
+  @@map("scrape_jobs")
+}
+
+// 8. Enhanced Grants table additions
+// Add these fields to your existing Grant model:
+// locationEligibility  Json?     // Array of country codes/regions
+// applicationMethod    String?   // "Online", "Email", etc.
+// applicationUrl       String?   // Direct application link
+// requiredDocuments    Json?     // Array of required docs
+// confidenceScore      Decimal?  // Extraction confidence (0-1)
+// contentHash          String?   // For change detection
+// language             String?   @default("en")
+// aiSummary           String?   // AI-generated summary
+// deadlineTimestamp   DateTime? // For notifications
+// isFeatured          Boolean   @default(false)
+
+// New Enums
+enum MessageSender {
+  USER
+  AI
+}
+
+enum MessageType {
+  TEXT
+  FILE
+  SUMMARY
+  INSTRUCTION
+}
+
+enum NotificationType {
+  DEADLINE_REMINDER
+  NEW_GRANT_MATCH
+  SUBMISSION_STATUS
+  PAYMENT_SUCCESS
+  AI_USAGE_ALERT
+}
+
+enum NotificationChannel {
+  IN_APP
+  EMAIL
+  WHATSAPP
+}
+
+enum ScrapeJobStatus {
+  PENDING
+  RUNNING
+  SUCCESS
+  FAILED
+}

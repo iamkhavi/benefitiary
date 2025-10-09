@@ -426,9 +426,12 @@ export default async function MatchesPage() {
                         <Button variant="outline" size="sm">
                           View Details
                         </Button>
-                        <Button size="sm">
-                          Apply Now
-                        </Button>
+                        <Link href={`/grants/grant_${index + 1}/ai-workspace`}>
+                          <Button size="sm" className="bg-purple-600 hover:bg-purple-700">
+                            <Zap className="h-4 w-4 mr-2" />
+                            AI Workspace
+                          </Button>
+                        </Link>
                       </div>
                     </div>
                   </CardContent>

@@ -25,14 +25,19 @@ model User {
   updatedAt           DateTime @updatedAt
 
   // Relations
-  organization Organization?
-  preferences  UserPreferences?
-  accounts     Account[]
-  sessions     Session[]
-  grantMatches GrantMatch[]
-  submissions  Submission[]
-  payments     Payment[]
-  aiUsage      AIUsage[]
+  organization   Organization?
+  preferences    UserPreferences?
+  accounts       Account[]
+  sessions       Session[]
+  grantMatches   GrantMatch[]
+  submissions    Submission[]
+  payments       Payment[]
+  aiUsage        AIUsage[]
+  notifications  Notification[]
+  aiSessions     AIGrantSession[]
+  uploadedRFPs   GrantRFP[]
+  feedback       Feedback[]
+  auditLogs      AuditLog[]
 
   lastLoginAt   DateTime?
   loginAttempts Int?      @default(0)
@@ -116,14 +121,27 @@ model Organization {
   @@map("organizations")
 }
 
-// User preferences model (keeping existing categories for backward compatibility)
-
+// User preferences model (enhanced for notifications and matching)
 model UserPreferences {
-  id         String          @id @default(cuid())
-  userId     String          @unique
-  categories GrantCategory[]
-  createdAt  DateTime        @default(now())
-  updatedAt  DateTime        @updatedAt
+  id                    String          @id @default(cuid())
+  userId                String          @unique
+  categories            GrantCategory[]
+  
+  // Notification preferences
+  emailNotifications    Boolean         @default(true)
+  whatsappNotifications Boolean         @default(false)
+  inAppNotifications    Boolean         @default(true)
+  deadlineReminders     Boolean         @default(true)
+  matchNotifications    Boolean         @default(true)
+  
+  // Matching preferences
+  preferredFundingMin   Decimal?
+  preferredFundingMax   Decimal?
+  preferredRegions      String[]        // Array of regions/countries
+  excludedFunders       String[]        // Funders to exclude from matches
+  
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
 
   // Relations
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -231,7 +249,7 @@ model Funder {
   @@map("funders")
 }
 
-// Grants model
+// Grants model (Enhanced for full functionality)
 model Grant {
   id                  String        @id @default(cuid())
   funderId            String?
@@ -244,13 +262,41 @@ model Grant {
   source              String?
   category            GrantCategory
   scrapedFrom         String?
+  
+  // Enhanced fields for scraping and AI
+  locationEligibility Json?         // Array of country codes/regions
+  applicationMethod   String?       // "Online", "Email", "Portal"
+  applicationUrl      String?       // Direct application link
+  requiredDocuments   Json?         // Array of required documents
+  confidenceScore     Decimal?      // Extraction confidence (0-1)
+  contentHash         String?       // For change detection in scraping
+  language            String?       @default("en")
+  aiSummary          String?       // AI-generated summary
+  deadlineTimestamp  DateTime?     // For precise notifications
+  isFeatured         Boolean       @default(false)
+  sector             String?       // Broader categorization
+  subCategory        String?       // More granular than category
+  applicantType      String?       // SME, NGO, Academic, etc.
+  fundingType        FundingType?  // Grant, loan, equity, etc.
+  durationMonths     Int?          // Project duration
+  contactEmail       String?       // Funder contact
+  fundingCycle       String?       // Annual, quarterly, rolling
+  regionFocus        String?       // Geographic focus
+  rfaPdfUrl          String?       // Link to RFP document
+  sourceUpdatedAt    DateTime?     // When source last changed
+  status             String?       @default("ACTIVE") // ACTIVE, EXPIRED, CLOSED
+  
   createdAt           DateTime      @default(now())
   updatedAt           DateTime      @updatedAt
 
   // Relations
-  funder      Funder?      @relation(fields: [funderId], references: [id], onDelete: SetNull)
-  matches     GrantMatch[]
-  submissions Submission[]
+  funder         Funder?           @relation(fields: [funderId], references: [id], onDelete: SetNull)
+  matches        GrantMatch[]
+  submissions    Submission[]
+  tags           GrantTag[]
+  rfpDocuments   GrantRFP[]
+  aiSessions     AIGrantSession[]
+  feedback       Feedback[]
 
   @@map("grants")
 }
@@ -289,16 +335,29 @@ model Submission {
   @@map("submissions")
 }
 
-// Scraped sources
+// Scraped sources (Enhanced for comprehensive scraping)
 model ScrapedSource {
   id             String              @id @default(cuid())
-  url            String
+  url            String              @unique
   type           ScrapedSourceType
   lastScrapedAt  DateTime?
   frequency      ScrapingFrequency   @default(WEEKLY)
   status         ScrapedSourceStatus @default(ACTIVE)
+  
+  // Enhanced scraping metadata
+  category       String?             // Healthcare, Climate, etc.
+  region         String?             // Geographic focus
+  notes          String?             // Admin notes
+  successRate    Decimal?            // Success percentage
+  avgParseTime   Int?                // Average parsing time in ms
+  failCount      Int?                @default(0)
+  lastError      String?             // Last error message
+  
   createdAt      DateTime            @default(now())
   updatedAt      DateTime            @updatedAt
+
+  // Relations
+  scrapeJobs     ScrapeJob[]
 
   @@map("scraped_sources")
 }
@@ -397,4 +456,315 @@ enum AITaskType {
   PROPOSAL_GENERATION
   EDITING
   SUMMARIZATION
+  GRANT_ANALYSIS
+  REQUIREMENT_EXTRACTION
+}
+
+enum FundingType {
+  GRANT
+  LOAN
+  EQUITY
+  FELLOWSHIP
+  AWARD
+  SUBSIDY
+  PRIZE
+}
+
+enum MessageSender {
+  USER
+  AI
+}
+
+enum MessageType {
+  TEXT
+  FILE
+  SUMMARY
+  INSTRUCTION
+  SYSTEM
+}
+
+enum NotificationType {
+  DEADLINE_REMINDER
+  NEW_GRANT_MATCH
+  SUBMISSION_STATUS
+  PAYMENT_SUCCESS
+  AI_USAGE_ALERT
+  SCRAPE_COMPLETED
+  SYSTEM_MAINTENANCE
+}
+
+enum NotificationChannel {
+  IN_APP
+  EMAIL
+  WHATSAPP
+  SMS
+}
+
+enum ScrapeJobStatus {
+  PENDING
+  RUNNING
+  SUCCESS
+  FAILED
+  CANCELLED
+}
+
+enum AuditAction {
+  LOGIN
+  LOGOUT
+  GRANT_SAVED
+  PROPOSAL_SUBMITTED
+  PAYMENT_MADE
+  PROFILE_UPDATED
+  SCRAPE_EXECUTED
+  FILE_UPLOADED
+  AI_SESSION_STARTED
+  NOTIFICATION_SENT
+}
+
+// ============================================================================
+// AI AND DOCUMENT MANAGEMENT MODELS
+// ============================================================================
+
+// Grant RFP Documents (for AI context and analysis)
+model GrantRFP {
+  id            String   @id @default(cuid())
+  grantId       String?
+  uploadedById  String?
+  title         String?
+  sourceUrl     String?
+  fileUrl       String?  // S3/Vercel Blob URL
+  fileName      String?
+  fileSize      Int?     // File size in bytes
+  mimeType      String?  // PDF, DOCX, etc.
+  extractedText String?  // Parsed content from document
+  summary       String?  // AI-generated summary
+  vectorReady   Boolean  @default(false) // For future vector search
+  processingStatus String? @default("pending") // pending, processing, completed, failed
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relations
+  grant      Grant? @relation(fields: [grantId], references: [id], onDelete: SetNull)
+  uploadedBy User?  @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
+
+  @@map("grant_rfp")
+}
+
+// AI Grant Sessions (persistent chat workspaces per grant)
+model AIGrantSession {
+  id             String    @id @default(cuid())
+  userId         String
+  grantId        String
+  title          String?   // User-defined session title
+  contextSummary String?   // AI-maintained context summary
+  lastMessageAt  DateTime?
+  isActive       Boolean   @default(true)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  // Relations
+  user     User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  grant    Grant           @relation(fields: [grantId], references: [id], onDelete: Cascade)
+  messages AIMessage[]
+  files    AIContextFile[]
+
+  @@unique([userId, grantId]) // One active session per user per grant
+  @@map("ai_grant_sessions")
+}
+
+// AI Messages (chat history within sessions)
+model AIMessage {
+  id          String      @id @default(cuid())
+  sessionId   String
+  sender      MessageSender
+  messageType MessageType
+  content     String
+  metadata    Json?       // Token usage, model used, confidence, etc.
+  parentId    String?     // For threaded conversations
+  createdAt   DateTime    @default(now())
+
+  // Relations
+  session AIGrantSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  parent  AIMessage?     @relation("MessageThread", fields: [parentId], references: [id])
+  replies AIMessage[]    @relation("MessageThread")
+
+  @@map("ai_messages")
+}
+
+// AI Context Files (documents uploaded within chat sessions)
+model AIContextFile {
+  id            String   @id @default(cuid())
+  sessionId     String
+  fileName      String
+  fileUrl       String
+  mimeType      String
+  sizeBytes     Int
+  uploadedBy    String
+  extractedText String?  // Parsed content for AI context
+  summary       String?  // AI summary of the file
+  createdAt     DateTime @default(now())
+
+  // Relations
+  session AIGrantSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@map("ai_context_files")
+}
+
+// ============================================================================
+// NOTIFICATION AND COMMUNICATION MODELS
+// ============================================================================
+
+// Notifications (email, WhatsApp, in-app alerts)
+model Notification {
+  id        String              @id @default(cuid())
+  userId    String
+  type      NotificationType
+  title     String
+  message   String
+  link      String?             // Deep link to relevant page
+  read      Boolean             @default(false)
+  channel   NotificationChannel @default(IN_APP)
+  sentAt    DateTime?           // When actually sent
+  metadata  Json?               // Additional data (grant_id, etc.)
+  createdAt DateTime            @default(now())
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notifications")
+}
+
+// ============================================================================
+// ENHANCED CLASSIFICATION AND TAGGING
+// ============================================================================
+
+// Grant Tags (multi-tag classification for better matching)
+model GrantTag {
+  id      String @id @default(cuid())
+  grantId String
+  tag     String
+  source  String? @default("system") // system, user, ai
+
+  // Relations
+  grant Grant @relation(fields: [grantId], references: [id], onDelete: Cascade)
+
+  @@unique([grantId, tag])
+  @@map("grant_tags")
+}
+
+// ============================================================================
+// SCRAPING AND DATA PIPELINE MODELS
+// ============================================================================
+
+// Scrape Jobs (audit trail and monitoring)
+model ScrapeJob {
+  id            String          @id @default(cuid())
+  sourceId      String
+  status        ScrapeJobStatus @default(PENDING)
+  totalFound    Int?            // Total grants found
+  totalInserted Int?            // New grants added
+  totalUpdated  Int?            // Existing grants updated
+  totalSkipped  Int?            // Grants skipped (duplicates, etc.)
+  startedAt     DateTime        @default(now())
+  finishedAt    DateTime?
+  duration      Int?            // Duration in seconds
+  log           String?         // Detailed log or error messages
+  metadata      Json?           // Additional scraping metadata
+
+  // Relations
+  source ScrapedSource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+
+  @@map("scrape_jobs")
+}
+
+// ============================================================================
+// FEEDBACK AND QUALITY ASSURANCE
+// ============================================================================
+
+// User Feedback (for improving matching and grant quality)
+model Feedback {
+  id          String   @id @default(cuid())
+  userId      String
+  grantId     String?
+  type        String?  // "match_quality", "grant_accuracy", "feature_request"
+  message     String
+  rating      Int?     // 1-5 rating
+  resolved    Boolean  @default(false)
+  adminNotes  String?  // Internal notes
+  createdAt   DateTime @default(now())
+
+  // Relations
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  grant Grant? @relation(fields: [grantId], references: [id], onDelete: SetNull)
+
+  @@map("feedback")
+}
+
+// ============================================================================
+// AUDIT AND COMPLIANCE
+// ============================================================================
+
+// Audit Log (track important system and user actions)
+model AuditLog {
+  id         String      @id @default(cuid())
+  userId     String?
+  action     AuditAction
+  entityType String?     // "grant", "user", "payment", etc.
+  entityId   String?     // ID of the affected entity
+  metadata   Json?       // Additional context data
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime    @default(now())
+
+  // Relations
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@map("audit_log")
+}
+
+// ============================================================================
+// ADVANCED MATCHING AND ANALYTICS
+// ============================================================================
+
+// Grant Match Analytics (track matching performance)
+model MatchAnalytics {
+  id            String   @id @default(cuid())
+  userId        String
+  grantId       String
+  matchScore    Decimal  // Computed match score
+  factors       Json     // Breakdown of matching factors
+  userAction    String?  // "saved", "applied", "dismissed"
+  createdAt     DateTime @default(now())
+
+  @@map("match_analytics")
+}
+
+// User Activity Tracking (for personalization)
+model UserActivity {
+  id         String   @id @default(cuid())
+  userId     String
+  action     String   // "viewed_grant", "searched", "filtered"
+  entityType String?  // "grant", "funder"
+  entityId   String?
+  metadata   Json?    // Search terms, filters used, etc.
+  createdAt  DateTime @default(now())
+
+  @@map("user_activity")
+}
+
+// ============================================================================
+// SYSTEM CONFIGURATION
+// ============================================================================
+
+// System Settings (for admin configuration)
+model SystemSetting {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     String
+  type      String   @default("string") // string, number, boolean, json
+  category  String?  // grouping settings
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("system_settings")
 }
