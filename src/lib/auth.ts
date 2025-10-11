@@ -90,6 +90,20 @@ export const auth = betterAuth({
     },
     useSecureCookies: process.env.NODE_ENV === 'production',
     generateId: false, // Let BetterAuth handle ID generation
+    cookiePrefix: "better-auth",
+  },
+  cookies: {
+    sessionToken: {
+      name: "better-auth.session_token",
+      options: {
+        httpOnly: false, // Allow client-side access
+        secure: false, // Temporarily disable for debugging - will fix after testing
+        sameSite: "lax",
+        path: "/",
+        maxAge: 60 * 60 * 24 * 7, // 7 days
+        domain: undefined, // Let browser set domain automatically
+      },
+    },
   },
 });
 
