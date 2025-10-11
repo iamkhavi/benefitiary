@@ -10,13 +10,13 @@ export class ScrapingOrchestrator {
 
   async scrapeSource(scraperName: string, url: string): Promise<ScrapingResult> {
     const scraper = this.scrapers.get(scraperName);
-    
+
     if (!scraper) {
       throw new Error(`Scraper not found: ${scraperName}`);
     }
 
     console.log(`Starting scraping with ${scraperName} for ${url}`);
-    
+
     try {
       const result = await scraper.scrape(url);
       console.log(`Scraping completed: ${result.totalFound} grants found`);

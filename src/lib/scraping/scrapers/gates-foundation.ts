@@ -19,8 +19,9 @@ export class GatesFoundationScraper extends BaseScraper {
       const $ = cheerio.load(response.data);
       const grants: GrantData[] = [];
 
-      // Gates Foundation specific selectors (these would need to be updated based on actual site structure)
-      $('.grant-item, .commitment-item, .funding-item').each((index, element) => {
+      // Gates Foundation actual selectors - need to inspect the real website
+      // For now, let's try more generic selectors that might work
+      $('article, .card, .item, [class*="grant"], [class*="commitment"]').each((index, element) => {
         try {
           const $el = $(element);
           
@@ -61,13 +62,10 @@ export class GatesFoundationScraper extends BaseScraper {
         }
       });
 
-      // If no grants found with specific selectors, try a more generic approach
+      // If no grants found, return empty array - DO NOT CREATE FAKE DATA
       if (grants.length === 0) {
-        console.log('No grants found with specific selectors, trying generic approach...');
-        
-        // Create sample grants for demonstration (in real implementation, this would parse actual content)
-        const sampleGrants = this.createSampleGatesGrants(url);
-        grants.push(...sampleGrants);
+        console.log('No grants found with current selectors. Website structure may have changed.');
+        console.log('Returning empty result - no placeholder data will be stored.');
       }
 
       console.log(`Found ${grants.length} grants from Gates Foundation`);
@@ -129,43 +127,5 @@ export class GatesFoundationScraper extends BaseScraper {
     return 'community';
   }
 
-  private createSampleGatesGrants(url: string): GrantData[] {
-    // Sample grants for demonstration - in production, this would be removed
-    return [
-      {
-        title: 'Global Health Innovation Initiative',
-        description: 'Supporting breakthrough innovations in global health to save and improve lives in the world\'s poorest communities.',
-        deadline: undefined,
-        fundingAmountMin: 1000000,
-        fundingAmountMax: 5000000,
-        applicationUrl: undefined,
-        category: 'healthcare',
-        funderName: 'Bill & Melinda Gates Foundation',
-        eligibilityCriteria: 'Organizations working on global health innovations',
-        locationEligibility: ['Global'],
-        source: url,
-        contentHash: this.generateContentHash({
-          title: 'Global Health Innovation Initiative',
-          funderName: 'Bill & Melinda Gates Foundation'
-        })
-      },
-      {
-        title: 'Agricultural Development Program',
-        description: 'Empowering smallholder farmers with tools, technologies, and market access to increase productivity and income.',
-        deadline: undefined,
-        fundingAmountMin: 500000,
-        fundingAmountMax: 2000000,
-        applicationUrl: undefined,
-        category: 'agriculture',
-        funderName: 'Bill & Melinda Gates Foundation',
-        eligibilityCriteria: 'Agricultural development organizations',
-        locationEligibility: ['Sub-Saharan Africa', 'South Asia'],
-        source: url,
-        contentHash: this.generateContentHash({
-          title: 'Agricultural Development Program',
-          funderName: 'Bill & Melinda Gates Foundation'
-        })
-      }
-    ];
-  }
+
 }

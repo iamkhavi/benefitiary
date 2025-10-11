@@ -12,45 +12,45 @@ async function main() {
       type: 'FOUNDATION' as const,
       category: 'Global Health & Development',
       region: 'Global',
-      notes: 'Gates Foundation committed grants - updated regularly',
+      notes: 'Gates Foundation committed grants - scraper needs real implementation',
       frequency: 'WEEKLY' as const,
-      status: 'ACTIVE' as const
+      status: 'INACTIVE' as const // Set to INACTIVE until real scraper is implemented
     },
     {
       url: 'https://www.grants.gov/web/grants/search-grants.html',
       type: 'GOV' as const,
       category: 'Government Grants',
       region: 'United States',
-      notes: 'US Government grants portal - comprehensive federal funding',
+      notes: 'US Government grants portal - needs API integration',
       frequency: 'DAILY' as const,
-      status: 'ACTIVE' as const
+      status: 'INACTIVE' as const // Set to INACTIVE until API integration is implemented
     },
     {
       url: 'https://www.fordfoundation.org/work/our-grants/',
       type: 'FOUNDATION' as const,
       category: 'Social Justice & Human Rights',
       region: 'Global',
-      notes: 'Ford Foundation grants - focus on social justice',
+      notes: 'Ford Foundation grants - scraper needs real implementation',
       frequency: 'WEEKLY' as const,
-      status: 'ACTIVE' as const
+      status: 'INACTIVE' as const // Set to INACTIVE until real scraper is implemented
     },
     {
       url: 'https://www.rockefellerfoundation.org/grants/',
       type: 'FOUNDATION' as const,
       category: 'Innovation & Resilience',
       region: 'Global',
-      notes: 'Rockefeller Foundation - innovation and resilience focus',
+      notes: 'Rockefeller Foundation - scraper needs real implementation',
       frequency: 'WEEKLY' as const,
-      status: 'ACTIVE' as const
+      status: 'INACTIVE' as const // Set to INACTIVE until real scraper is implemented
     },
     {
       url: 'https://www.globalgiving.org/projects/',
       type: 'NGO' as const,
       category: 'Community Development',
       region: 'Global',
-      notes: 'GlobalGiving platform - grassroots projects',
+      notes: 'GlobalGiving platform - grassroots projects (scraper not yet implemented)',
       frequency: 'WEEKLY' as const,
-      status: 'ACTIVE' as const
+      status: 'INACTIVE' as const // Set to INACTIVE until real scraper is implemented
     }
   ];
 

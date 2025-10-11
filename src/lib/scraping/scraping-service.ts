@@ -119,7 +119,7 @@ export class ScrapingService {
     if (url.includes('gatesfoundation.org')) return 'gates-foundation';
     if (url.includes('grants.gov')) return 'grants-gov';
     if (url.includes('fordfoundation.org')) return 'ford-foundation';
-    return 'generic';
+    throw new Error(`No scraper available for URL: ${url}`);
   }
 
   async getScrapingStatus() {
