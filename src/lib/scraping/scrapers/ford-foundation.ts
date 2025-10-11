@@ -1,4 +1,5 @@
-import { BaseScraper, GrantData } from '../base-scraper';
+import { BaseScraper } from '../base-scraper';
+import { GrantData } from '../types';
 
 export class FordFoundationScraper extends BaseScraper {
   protected async extractGrants(url: string): Promise<GrantData[]> {

@@ -1,12 +1,5 @@
 import { BaseScraper } from './base-scraper';
-
-export interface ScrapingResult {
-  totalFound: number;
-  totalInserted: number;
-  totalUpdated: number;
-  totalSkipped: number;
-  grants: any[];
-}
+import { ScrapingResult } from './types';
 
 export class ScrapingOrchestrator {
   private scrapers: Map<string, BaseScraper> = new Map();

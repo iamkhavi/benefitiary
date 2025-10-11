@@ -1,22 +1,7 @@
 import { PrismaClient } from '@prisma/client';
-import { ScrapingResult } from './orchestrator';
+import { ScrapingResult, GrantData } from './types';
 
 const prisma = new PrismaClient();
-
-export interface GrantData {
-  title: string;
-  description?: string;
-  deadline?: Date;
-  fundingAmountMin?: number;
-  fundingAmountMax?: number;
-  applicationUrl?: string;
-  category: string;
-  funderName: string;
-  eligibilityCriteria?: string;
-  locationEligibility?: string[];
-  source: string;
-  contentHash: string;
-}
 
 export abstract class BaseScraper {
   protected abstract extractGrants(url: string): Promise<GrantData[]>;

@@ -1,4 +1,5 @@
-import { BaseScraper, GrantData } from '../base-scraper';
+import { BaseScraper } from '../base-scraper';
+import { GrantData } from '../types';
 import axios from 'axios';
 
 export class GrantsGovScraper extends BaseScraper {
