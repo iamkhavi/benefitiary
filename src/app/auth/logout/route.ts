@@ -38,10 +38,22 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Redirect to login page
-    return NextResponse.redirect(new URL('/auth/login', request.url));
+    // Create a response that redirects to login
+    const response = NextResponse.redirect(new URL('/auth/login', request.url));
+    
+    // Clear any client-side cookies
+    response.cookies.delete('better-auth.session_token');
+    response.cookies.delete('better-auth.csrf_token');
+    
+    return response;
   } catch (error) {
     console.error('Logout error:', error);
-    return NextResponse.redirect(new URL('/auth/login', request.url));
+    const response = NextResponse.redirect(new URL('/auth/login', request.url));
+    
+    // Clear cookies even on error
+    response.cookies.delete('better-auth.session_token');
+    response.cookies.delete('better-auth.csrf_token');
+    
+    return response;
   }
 }

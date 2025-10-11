@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { SubscriptionBadge } from '@/components/ui/subscription-badge';
+import { LogoutButton } from '@/components/ui/logout-button';
 import { 
   LayoutDashboard, 
   Search, 
@@ -38,8 +39,7 @@ const featureItems = [
 
 const generalItems = [
   { title: "Settings", href: "/settings", icon: Settings },
-  { title: "Help Center", href: "/help", icon: HelpCircle },
-  { title: "Log out", href: "/logout", icon: LogOut }
+  { title: "Help Center", href: "/help", icon: HelpCircle }
 ];
 
 interface DashboardShellProps {
@@ -204,6 +204,19 @@ export function DashboardShell({ children, user }: DashboardShellProps) {
                   </Link>
                 );
               })}
+              
+              {/* Logout Button */}
+              <LogoutButton
+                className={cn(
+                  "flex items-center justify-between px-3 py-2 text-sm font-medium rounded-lg transition-colors w-full text-left",
+                  "text-gray-700 hover:bg-gray-100"
+                )}
+              >
+                <div className="flex items-center space-x-3">
+                  <LogOut className="h-5 w-5" />
+                  <span>Log out</span>
+                </div>
+              </LogoutButton>
             </nav>
           </div>
         </div>
