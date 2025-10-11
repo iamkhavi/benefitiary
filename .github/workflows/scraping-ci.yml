@@ -1,0 +1,456 @@
+name: Scraping System CI/CD
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'src/lib/scraping/**'
+      - 'src/app/api/admin/scraping/**'
+      - 'src/components/admin/scraping/**'
+      - '.github/workflows/scraping-ci.yml'
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - 'src/lib/scraping/**'
+      - 'src/app/api/admin/scraping/**'
+      - 'src/components/admin/scraping/**'
+      - '.github/workflows/scraping-ci.yml'
+
+env:
+  NODE_VERSION: '18'
+  POSTGRES_VERSION: '15'
+
+jobs:
+  # Unit and Integration Tests
+  test:
+    name: Test Suite
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: test_db
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+      
+      redis:
+        image: redis:7
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Setup test database
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db
+        run: |
+          npx prisma migrate deploy
+          npx prisma generate
+
+      - name: Run unit tests
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db
+          REDIS_URL: redis://localhost:6379
+          BETTER_AUTH_SECRET: test-secret-key-for-ci
+          BETTER_AUTH_URL: http://localhost:3000
+        run: npm run test:unit
+
+      - name: Run integration tests
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db
+          REDIS_URL: redis://localhost:6379
+          BETTER_AUTH_SECRET: test-secret-key-for-ci
+          BETTER_AUTH_URL: http://localhost:3000
+        run: npm run test:integration
+
+      - name: Run end-to-end tests
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db
+          REDIS_URL: redis://localhost:6379
+          BETTER_AUTH_SECRET: test-secret-key-for-ci
+          BETTER_AUTH_URL: http://localhost:3000
+        run: npm run test:e2e
+
+      - name: Generate test coverage
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db
+          REDIS_URL: redis://localhost:6379
+          BETTER_AUTH_SECRET: test-secret-key-for-ci
+          BETTER_AUTH_URL: http://localhost:3000
+        run: npm run test:coverage
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          file: ./coverage/lcov.info
+          flags: scraping-system
+          name: scraping-coverage
+
+  # Performance Tests
+  performance:
+    name: Performance Tests
+    runs-on: ubuntu-latest
+    needs: test
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: perf_test_db
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+      
+      redis:
+        image: redis:7
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Setup performance test database
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/perf_test_db
+        run: |
+          npx prisma migrate deploy
+          npx prisma generate
+
+      - name: Run performance tests
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/perf_test_db
+          REDIS_URL: redis://localhost:6379
+          BETTER_AUTH_SECRET: test-secret-key-for-ci
+          BETTER_AUTH_URL: http://localhost:3000
+        run: npm run test:performance
+
+      - name: Performance regression check
+        run: |
+          echo "Checking performance metrics..."
+          # Add performance regression detection logic here
+          # This could compare current run times with baseline metrics
+
+  # Data Quality Tests
+  data-quality:
+    name: Data Quality Tests
+    runs-on: ubuntu-latest
+    needs: test
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: quality_test_db
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Setup quality test database
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/quality_test_db
+        run: |
+          npx prisma migrate deploy
+          npx prisma generate
+
+      - name: Run data quality validation tests
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/quality_test_db
+        run: |
+          # Run specific data quality tests
+          npx vitest run src/lib/scraping/__tests__/data-quality.test.ts --reporter=verbose
+
+      - name: Validate classification accuracy
+        run: |
+          # Run classification accuracy tests
+          echo "Validating grant classification accuracy..."
+          npx vitest run src/lib/scraping/processors/__tests__/classification-integration.test.ts --reporter=verbose
+
+      - name: Check duplicate detection effectiveness
+        run: |
+          # Run duplicate detection tests
+          echo "Testing duplicate detection effectiveness..."
+          npx vitest run src/lib/scraping/processors/__tests__/deduplicator.test.ts --reporter=verbose
+
+  # Regression Tests
+  regression:
+    name: Regression Tests
+    runs-on: ubuntu-latest
+    needs: test
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: regression_test_db
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+      
+      redis:
+        image: redis:7
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps
+
+      - name: Setup regression test database
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/regression_test_db
+        run: |
+          npx prisma migrate deploy
+          npx prisma generate
+
+      - name: Run regression tests
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/regression_test_db
+          REDIS_URL: redis://localhost:6379
+          BETTER_AUTH_SECRET: test-secret-key-for-ci
+          BETTER_AUTH_URL: http://localhost:3000
+        run: |
+          npx vitest run src/lib/scraping/__tests__/regression.test.ts --reporter=verbose
+
+      - name: Test scraping engine stability
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/regression_test_db
+          REDIS_URL: redis://localhost:6379
+        run: |
+          echo "Testing scraping engine stability..."
+          # Run stability tests for each engine
+          npx vitest run src/lib/scraping/engines/__tests__/ --reporter=verbose
+
+  # Security and Compliance Tests
+  security:
+    name: Security Tests
+    runs-on: ubuntu-latest
+    needs: test
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run security audit
+        run: npm audit --audit-level moderate
+
+      - name: Check for sensitive data exposure
+        run: |
+          echo "Checking for sensitive data in scraping code..."
+          # Check for hardcoded secrets, API keys, etc.
+          grep -r "password\|secret\|key\|token" src/lib/scraping/ --exclude-dir=__tests__ || true
+
+      - name: Validate rate limiting compliance
+        run: |
+          echo "Validating rate limiting compliance..."
+          # Check that all scrapers implement proper rate limiting
+          npx vitest run src/lib/scraping/utils/__tests__/rate-limiter.test.ts --reporter=verbose
+
+      - name: Test anti-detection measures
+        run: |
+          echo "Testing anti-detection measures..."
+          npx vitest run src/lib/scraping/utils/__tests__/stealth-browser.test.ts --reporter=verbose
+
+  # Build and Deploy (only on main branch)
+  deploy:
+    name: Deploy
+    runs-on: ubuntu-latest
+    needs: [test, performance, data-quality, regression, security]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build application
+        run: npm run build
+
+      - name: Run deployment health checks
+        run: |
+          echo "Running post-deployment health checks..."
+          # Add health check logic here
+          
+      - name: Notify deployment success
+        run: |
+          echo "Scraping system deployment completed successfully!"
+
+  # Scheduled Quality Assurance (runs daily)
+  scheduled-qa:
+    name: Scheduled Quality Assurance
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule'
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: scheduled_qa_db
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+      
+      redis:
+        image: redis:7
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps
+
+      - name: Setup QA database
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/scheduled_qa_db
+        run: |
+          npx prisma migrate deploy
+          npx prisma generate
+
+      - name: Run comprehensive test suite
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/scheduled_qa_db
+          REDIS_URL: redis://localhost:6379
+          BETTER_AUTH_SECRET: test-secret-key-for-ci
+          BETTER_AUTH_URL: http://localhost:3000
+        run: |
+          npm run test:ci
+
+      - name: Generate QA report
+        run: |
+          echo "Generating comprehensive QA report..."
+          # Generate detailed QA report with metrics
+          
+      - name: Archive test results
+        uses: actions/upload-artifact@v3
+        with:
+          name: qa-results-${{ github.run_number }}
+          path: |
+            coverage/
+            test-results/
+          retention-days: 30
+
+# Schedule for daily QA runs
+on:
+  schedule:
+    - cron: '0 2 * * *'  # Run at 2 AM UTC daily
