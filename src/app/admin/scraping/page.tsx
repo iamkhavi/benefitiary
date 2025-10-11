@@ -46,9 +46,7 @@ export default async function ScrapingAdminPage() {
     }, null as Date | null)
   };
 
-  const handleRefresh = () => {
-    // This will be handled by the client component
-  };
+
 
   return (
     <div className="p-6 space-y-6">
@@ -124,7 +122,7 @@ export default async function ScrapingAdminPage() {
       </div>
 
       {/* Scraping Controls */}
-      <ScrapingControls sources={sources} onRefresh={handleRefresh} />
+      <ScrapingControls sources={sources} />
 
       {/* Recent Jobs */}
       {jobs.length > 0 && (

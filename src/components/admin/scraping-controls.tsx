@@ -9,10 +9,9 @@ import { toast } from 'sonner';
 
 interface ScrapingControlsProps {
   sources: any[];
-  onRefresh: () => void;
 }
 
-export function ScrapingControls({ sources, onRefresh }: ScrapingControlsProps) {
+export function ScrapingControls({ sources }: ScrapingControlsProps) {
   const [isTriggering, setIsTriggering] = useState(false);
   const [triggeringSource, setTriggeringSource] = useState<string | null>(null);
 
@@ -29,7 +28,8 @@ export function ScrapingControls({ sources, onRefresh }: ScrapingControlsProps) 
       
       if (result.success) {
         toast.success(`Started ${result.jobIds.length} scraping jobs`);
-        onRefresh();
+        // Refresh the page to show updated data
+        window.location.reload();
       } else {
         toast.error(result.error || 'Failed to trigger scraping');
       }
@@ -54,7 +54,8 @@ export function ScrapingControls({ sources, onRefresh }: ScrapingControlsProps) 
       
       if (result.success) {
         toast.success('Scraping job started');
-        onRefresh();
+        // Refresh the page to show updated data
+        window.location.reload();
       } else {
         toast.error(result.error || 'Failed to trigger scraping');
       }
