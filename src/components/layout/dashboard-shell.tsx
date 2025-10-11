@@ -17,7 +17,12 @@ import {
   Zap,
   CreditCard,
   MessageSquare,
-  ChevronDown
+  ChevronDown,
+  Shield,
+  Users,
+  Database,
+  Eye,
+  Plus
 } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
@@ -35,6 +40,13 @@ const featureItems = [
   { title: "Analytics", href: "/analytics", icon: BarChart3, count: 20 },
   { title: "Billing", href: "/billing", icon: CreditCard },
   { title: "Feedback", href: "/feedback", icon: MessageSquare }
+];
+
+const adminItems = [
+  { title: "User Management", href: "/admin/users", icon: Users },
+  { title: "Grant Management", href: "/admin/grants", icon: Database },
+  { title: "Add Grant", href: "/admin/grants/add", icon: Plus },
+  { title: "Scraping Status", href: "/admin/scraping", icon: Eye }
 ];
 
 const generalItems = [
@@ -178,6 +190,40 @@ export function DashboardShell({ children, user }: DashboardShellProps) {
               })}
             </nav>
           </div>
+
+          {/* Admin Section - Only show for admin users */}
+          {user.role === 'ADMIN' && (
+            <div className="px-3 mt-8">
+              <h3 className="px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
+                <div className="flex items-center space-x-2">
+                  <Shield className="h-3 w-3" />
+                  <span>ADMIN</span>
+                </div>
+              </h3>
+              <nav className="space-y-1">
+                {adminItems.map((item) => {
+                  const isActive = pathname === item.href;
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      className={cn(
+                        "flex items-center justify-between px-3 py-2 text-sm font-medium rounded-lg transition-colors",
+                        isActive
+                          ? "bg-red-600 text-white"
+                          : "text-gray-700 hover:bg-red-50"
+                      )}
+                    >
+                      <div className="flex items-center space-x-3">
+                        <item.icon className="h-5 w-5" />
+                        <span>{item.title}</span>
+                      </div>
+                    </Link>
+                  );
+                })}
+              </nav>
+            </div>
+          )}
 
           <div className="px-3 mt-8">
             <h3 className="px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
