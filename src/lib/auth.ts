@@ -52,6 +52,26 @@ export const auth = betterAuth({
       maxAge: 60 * 5, // 5 minutes
     },
   },
+  user: {
+    additionalFields: {
+      role: {
+        type: "string",
+        defaultValue: "SEEKER",
+        input: false, // Don't allow setting this during registration
+      },
+      onboardingCompleted: {
+        type: "boolean", 
+        defaultValue: false,
+        input: false,
+      },
+      onboardingStep: {
+        type: "number",
+        defaultValue: 0,
+        input: false,
+      }
+    }
+  },
+
   secret: process.env.BETTER_AUTH_SECRET || 'dev-secret-for-build',
   baseURL: process.env.BETTER_AUTH_URL || 'https://app.benefitiary.com',
   trustedOrigins: process.env.NODE_ENV === 'production' 

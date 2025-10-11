@@ -267,18 +267,20 @@ export function DashboardShell({ children, user }: DashboardShellProps) {
           </div>
         </div>
 
-        {/* Upgrade CTA */}
-        <div className="p-4 border-t border-gray-200">
-          <div className="bg-gradient-to-r from-primary to-orange-600 rounded-lg p-4 text-white">
-            <h4 className="font-semibold text-sm mb-1">Upgrade Pro!</h4>
-            <p className="text-xs opacity-90 mb-3">
-              Unlock unlimited AI with better features.
-            </p>
-            <Button size="sm" variant="secondary" className="w-full">
-              Upgrade
-            </Button>
+        {/* Upgrade CTA - Only show for non-admin users */}
+        {user.role !== 'ADMIN' && (
+          <div className="p-4 border-t border-gray-200">
+            <div className="bg-gradient-to-r from-primary to-orange-600 rounded-lg p-4 text-white">
+              <h4 className="font-semibold text-sm mb-1">Upgrade Pro!</h4>
+              <p className="text-xs opacity-90 mb-3">
+                Unlock unlimited AI with better features.
+              </p>
+              <Button size="sm" variant="secondary" className="w-full">
+                Upgrade
+              </Button>
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* Main Content */}
@@ -293,7 +295,15 @@ export function DashboardShell({ children, user }: DashboardShellProps) {
               )}
             </div>
             <div className="flex items-center space-x-4">
-              <SubscriptionBadge />
+              {/* Show admin badge for admins, subscription badge for others */}
+              {user.role === 'ADMIN' ? (
+                <Badge className="bg-red-100 text-red-800 border-red-200">
+                  <Shield className="h-3 w-3 mr-1" />
+                  Admin
+                </Badge>
+              ) : (
+                <SubscriptionBadge />
+              )}
               <div className="flex items-center space-x-2">
                 <Avatar className="h-8 w-8">
                   <AvatarImage src={user.image || undefined} alt={user.name || 'User'} />

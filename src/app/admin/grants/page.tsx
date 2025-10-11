@@ -1,6 +1,6 @@
-import { auth } from '@/lib/auth';
+import { requireAdmin } from '@/lib/auth-helpers';
+import { prisma } from '@/lib/prisma';
 import { redirect } from 'next/navigation';
-import { headers } from 'next/headers';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -23,15 +23,11 @@ import Link from 'next/link';
 import { cn } from '@/lib/utils';
 
 export default async function AdminGrantsPage() {
-  const session = await auth.api.getSession({
-    headers: await headers(),
-  });
-
-  if (!session?.user) {
+  try {
+    await requireAdmin();
+  } catch (error) {
     redirect('/auth/login');
   }
-
-  // TODO: Add proper admin role check once auth types are updated
 
   // Mock data - replace with actual database query
   const grants = [

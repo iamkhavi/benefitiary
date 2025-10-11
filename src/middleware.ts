@@ -1,26 +1,21 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
 
-export async function middleware(request: NextRequest) {
+export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  const hostname = request.headers.get('host') || '';
 
-  // Skip middleware for static files and API routes
-  if (
-    pathname.startsWith('/_next') ||
-    pathname.startsWith('/api') ||
-    pathname.includes('.') ||
-    pathname === '/favicon.ico'
-  ) {
+  // Admin routes protection - check for session cookie
+  if (pathname.startsWith('/admin')) {
+    const sessionCookie = request.cookies.get('better-auth.session_token');
+    
+    if (!sessionCookie) {
+      return NextResponse.redirect(new URL('/auth/login', request.url));
+    }
+
+    // Let the page handle the detailed role check
     return NextResponse.next();
   }
 
-  // Check if we're on the app subdomain
-  const isAppSubdomain = hostname.startsWith('app.');
-
-  // App subdomain root should show dashboard, not redirect to auth
-  // Remove the redirect - let the page handle subdomain detection
-
-  // For main domain, let the homepage render normally
   return NextResponse.next();
 }
 

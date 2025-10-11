@@ -1,59 +1,72 @@
-import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { UserRole } from '@prisma/client';
+import { headers } from 'next/headers';
+import { NextResponse } from 'next/server';
 
-export interface AuthenticatedUser {
-  id: string;
-  email: string;
-  name: string | null;
-  role: UserRole;
-}
-
-/**
- * Check if user is authenticated and has required role
- */
-export async function requireAuth(
-  request: NextRequest, 
-  requiredRole?: UserRole
-): Promise<{ user: AuthenticatedUser } | NextResponse> {
+export async function getCurrentUserWithRole() {
   try {
-    const session = await auth.api.getSession({ headers: request.headers });
-    
+    const session = await auth.api.getSession({
+      headers: await headers(),
+    });
+
     if (!session?.user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return null;
     }
 
-    // Get user with role from database
+    // Fetch user with role from database
     const user = await prisma.user.findUnique({
       where: { id: session.user.id },
-      select: { 
+      select: {
         id: true,
-        email: true, 
+        email: true,
         name: true,
-        role: true 
+        image: true,
+        role: true,
+        onboardingCompleted: true,
+        onboardingStep: true,
+        createdAt: true
       }
     });
 
     if (!user) {
-      return NextResponse.json({ error: 'User not found' }, { status: 401 });
+      return null;
     }
 
-    // Check role if required
-    if (requiredRole && user.role !== requiredRole) {
-      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 });
-    }
-
-    return { user: user as AuthenticatedUser };
+    return {
+      ...session.user,
+      role: user.role,
+      onboardingCompleted: user.onboardingCompleted,
+      onboardingStep: user.onboardingStep
+    };
   } catch (error) {
-    console.error('Auth error:', error);
-    return NextResponse.json({ error: 'Authentication failed' }, { status: 500 });
+    console.error('Error fetching current user with role:', error);
+    return null;
   }
 }
 
-/**
- * Require admin role
- */
-export async function requireAdmin(request: NextRequest) {
-  return requireAuth(request, UserRole.ADMIN);
+export async function requireAdmin(request?: any): Promise<{ user: any }> {
+  const user = await getCurrentUserWithRole();
+  
+  if (!user || user.role !== 'ADMIN') {
+    if (request) {
+      // Return NextResponse for API routes
+      throw new Error('Admin access required');
+    } else {
+      // Throw error for page components
+      throw new Error('Admin access required');
+    }
+  }
+  
+  // Return user wrapped in an object to match existing API expectations
+  return { user };
+}
+
+export async function requireAuth() {
+  const user = await getCurrentUserWithRole();
+  
+  if (!user) {
+    throw new Error('Authentication required');
+  }
+  
+  return user;
 }
