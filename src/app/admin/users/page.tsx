@@ -17,6 +17,8 @@ import {
   Trash2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { prisma } from '@/lib/prisma';
+import { RoleSelector } from '@/components/admin/role-selector';
 
 export default async function AdminUsersPage() {
   try {
@@ -25,53 +27,37 @@ export default async function AdminUsersPage() {
     redirect('/auth/login');
   }
 
-  // Mock data - replace with actual database query
-  const users = [
-    {
-      id: '1',
-      name: 'Steve Khavi',
-      email: 'steevekhavi@gmail.com',
-      role: 'ADMIN',
-      status: 'active',
-      createdAt: '2024-01-15',
-      lastLogin: '2024-12-10',
-      organization: 'Benefitiary',
-      applications: 0
+  // Fetch real users from database
+  const users = await prisma.user.findMany({
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      role: true,
+      onboardingCompleted: true,
+      onboardingStep: true,
+      createdAt: true,
+      updatedAt: true,
+      image: true
     },
-    {
-      id: '2',
-      name: 'John Doe',
-      email: 'john@example.com',
-      role: 'SEEKER',
-      status: 'active',
-      createdAt: '2024-02-20',
-      lastLogin: '2024-12-09',
-      organization: 'Health Innovations Inc',
-      applications: 5
-    },
-    {
-      id: '3',
-      name: 'Jane Smith',
-      email: 'jane@writer.com',
-      role: 'WRITER',
-      status: 'active',
-      createdAt: '2024-03-10',
-      lastLogin: '2024-12-08',
-      organization: 'Grant Writing Services',
-      applications: 0
-    },
-    {
-      id: '4',
-      name: 'Gates Foundation',
-      email: 'contact@gatesfoundation.org',
-      role: 'FUNDER',
-      status: 'active',
-      createdAt: '2024-01-05',
-      lastLogin: '2024-12-07',
-      organization: 'Bill & Melinda Gates Foundation',
-      applications: 0
+    orderBy: {
+      createdAt: 'desc'
     }
-  ];
+  });
+
+  // Transform data for display
+  const transformedUsers = users.map(user => ({
+    id: user.id,
+    name: user.name || 'Unknown User',
+    email: user.email,
+    role: user.role || 'SEEKER',
+    status: user.onboardingCompleted ? 'active' : 'pending',
+    createdAt: user.createdAt.toISOString().split('T')[0],
+    lastLogin: user.updatedAt.toISOString().split('T')[0],
+    organization: user.onboardingCompleted ? 'Completed Onboarding' : 'Pending Setup',
+    applications: 0, // TODO: Count from applications table when implemented
+    image: user.image
+  }));
 
   const getRoleBadgeColor = (role: string) => {
     switch (role) {
@@ -103,7 +89,7 @@ export default async function AdminUsersPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">Total Users</p>
-                <p className="text-2xl font-bold text-gray-900">{users.length}</p>
+                <p className="text-2xl font-bold text-gray-900">{transformedUsers.length}</p>
               </div>
               <Users className="h-8 w-8 text-blue-600" />
             </div>
@@ -114,7 +100,7 @@ export default async function AdminUsersPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">Active Users</p>
-                <p className="text-2xl font-bold text-gray-900">{users.filter(u => u.status === 'active').length}</p>
+                <p className="text-2xl font-bold text-gray-900">{transformedUsers.filter(u => u.status === 'active').length}</p>
               </div>
               <UserCheck className="h-8 w-8 text-green-600" />
             </div>
@@ -125,7 +111,7 @@ export default async function AdminUsersPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">Seekers</p>
-                <p className="text-2xl font-bold text-gray-900">{users.filter(u => u.role === 'SEEKER').length}</p>
+                <p className="text-2xl font-bold text-gray-900">{transformedUsers.filter(u => u.role === 'SEEKER').length}</p>
               </div>
               <UserCheck className="h-8 w-8 text-primary" />
             </div>
@@ -136,7 +122,7 @@ export default async function AdminUsersPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">Funders</p>
-                <p className="text-2xl font-bold text-gray-900">{users.filter(u => u.role === 'FUNDER').length}</p>
+                <p className="text-2xl font-bold text-gray-900">{transformedUsers.filter(u => u.role === 'FUNDER').length}</p>
               </div>
               <Shield className="h-8 w-8 text-purple-600" />
             </div>
@@ -181,11 +167,12 @@ export default async function AdminUsersPage() {
                 </tr>
               </thead>
               <tbody>
-                {users.map((user) => (
+                {transformedUsers.map((user) => (
                   <tr key={user.id} className="border-b hover:bg-gray-50">
                     <td className="py-4 px-4">
                       <div className="flex items-center space-x-3">
                         <Avatar className="h-8 w-8">
+                          <AvatarImage src={user.image || undefined} alt={user.name} />
                           <AvatarFallback className="bg-primary/10 text-primary">
                             {user.name.charAt(0)}
                           </AvatarFallback>
@@ -197,9 +184,11 @@ export default async function AdminUsersPage() {
                       </div>
                     </td>
                     <td className="py-4 px-4">
-                      <Badge className={cn("text-xs", getRoleBadgeColor(user.role))}>
-                        {user.role}
-                      </Badge>
+                      <RoleSelector
+                        userId={user.id}
+                        currentRole={user.role}
+                        userName={user.name}
+                      />
                     </td>
                     <td className="py-4 px-4">
                       <p className="text-sm text-gray-900">{user.organization}</p>

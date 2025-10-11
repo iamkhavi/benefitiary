@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@/lib/auth';
-import { headers } from 'next/headers';
+import { requireAdmin } from '@/lib/auth-helpers';
 import { prisma } from '@/lib/prisma';
 
 export async function PATCH(
@@ -8,19 +7,21 @@ export async function PATCH(
   { params }: { params: { userId: string } }
 ) {
   try {
-    const session = await auth.api.getSession({
-      headers: await headers(),
+    // Require admin access
+    await requireAdmin();
+
+    // Get current user for audit trail
+    const currentUser = await prisma.user.findUnique({
+      where: { id: params.userId },
+      select: { role: true }
     });
 
-    // Check if user is authenticated
-    if (!session?.user) {
+    if (!currentUser) {
       return NextResponse.json(
-        { error: 'Unauthorized. Authentication required.' },
-        { status: 401 }
+        { error: 'User not found' },
+        { status: 404 }
       );
     }
-
-    // TODO: Add proper admin role check once auth types are updated
 
     const { role } = await request.json();
 
@@ -46,8 +47,27 @@ export async function PATCH(
       }
     });
 
+    // Create audit log (optional, don't fail if audit table doesn't exist)
+    try {
+      await prisma.auditLog.create({
+        data: {
+          action: 'PROFILE_UPDATED',
+          entityType: 'user',
+          entityId: params.userId,
+          metadata: {
+            oldRole: currentUser.role,
+            newRole: role,
+            updatedBy: 'admin'
+          }
+        }
+      });
+    } catch (auditError) {
+      console.warn('Failed to create audit log:', auditError);
+    }
+
     return NextResponse.json({
       success: true,
+      message: `User role updated from ${currentUser.role} to ${role}`,
       user: updatedUser
     });
 
