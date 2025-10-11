@@ -4,15 +4,20 @@ import type { NextRequest } from 'next/server';
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Admin routes protection - check for session cookie
+  // Admin routes protection - check for any BetterAuth session cookie
   if (pathname.startsWith('/admin')) {
-    const sessionCookie = request.cookies.get('better-auth.session_token');
+    // Look for BetterAuth session cookies (they typically start with better-auth)
+    const allCookies = request.cookies.getAll();
+    const hasBetterAuthSession = allCookies.some(cookie => 
+      cookie.name.startsWith('better-auth') && cookie.value
+    );
     
-    if (!sessionCookie) {
+    if (!hasBetterAuthSession) {
+      console.log('No BetterAuth session cookie found, redirecting to login');
       return NextResponse.redirect(new URL('/auth/login', request.url));
     }
 
-    // Let the page handle the detailed role check
+    // Let the page handle the detailed session validation and role check
     return NextResponse.next();
   }
 
