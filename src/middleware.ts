@@ -4,6 +4,11 @@ import type { NextRequest } from 'next/server';
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
+  // Skip middleware for API routes - they handle their own auth
+  if (pathname.startsWith('/api/')) {
+    return NextResponse.next();
+  }
+
   // Admin routes protection - check for any BetterAuth session cookie
   if (pathname.startsWith('/admin')) {
     // Look for BetterAuth session cookies with more comprehensive check
@@ -23,6 +28,10 @@ export function middleware(request: NextRequest) {
     
     if (!hasBetterAuthSession) {
       console.log('No valid session cookie found, redirecting to login');
+      // Prevent redirect loops - don't redirect if already on auth pages
+      if (pathname.startsWith('/auth/')) {
+        return NextResponse.next();
+      }
       return NextResponse.redirect(new URL('/auth/login', request.url));
     }
 

@@ -97,7 +97,7 @@ export const auth = betterAuth({
       name: "better-auth.session_token",
       options: {
         httpOnly: false, // Allow client-side access
-        secure: false, // Temporarily disable for debugging - will fix after testing
+        secure: process.env.NODE_ENV === 'production', // Use secure cookies in production
         sameSite: "lax",
         path: "/",
         maxAge: 60 * 60 * 24 * 7, // 7 days
