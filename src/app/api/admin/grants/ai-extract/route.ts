@@ -87,9 +87,24 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
+// Test endpoint to verify route is working
+export async function GET() {
+  return NextResponse.json({ 
+    message: 'AI Grant Extraction API is working',
+    methods: ['POST'],
+    timestamp: new Date().toISOString()
+  });
+}
+
 export async function POST(request: NextRequest) {
+  console.log('🚀 AI Grant Extraction API called');
+  console.log('📝 Request method:', request.method);
+  console.log('📝 Request URL:', request.url);
+  
   try {
+    console.log('🔐 Checking admin access...');
     await requireAdmin();
+    console.log('✅ Admin access verified');
 
     // OpenAI API key is configured in environment
 
