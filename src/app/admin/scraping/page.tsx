@@ -1,5 +1,7 @@
 import { requireAdmin } from '@/lib/auth-helpers';
 import { redirect } from 'next/navigation';
+
+export const dynamic = 'force-dynamic';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { 
