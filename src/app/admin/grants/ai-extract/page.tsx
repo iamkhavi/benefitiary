@@ -229,6 +229,17 @@ export default function AIGrantExtractionPage() {
             </TabsContent>
             
             <TabsContent value="pdf" className="space-y-4">
+              <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <div className="flex items-start space-x-2">
+                  <AlertCircle className="h-4 w-4 text-blue-600 mt-0.5" />
+                  <div className="text-sm">
+                    <p className="font-medium text-blue-800">PDF Processing Optimization</p>
+                    <p className="text-blue-700 mt-1">
+                      We're enhancing PDF processing. For immediate results: Open your PDF → Select All (Ctrl+A) → Copy (Ctrl+C) → Use "Paste Text" tab above.
+                    </p>
+                  </div>
+                </div>
+              </div>
               <div>
                 <Label htmlFor="pdf-file">Upload PDF File</Label>
                 <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center mt-2">
@@ -249,10 +260,10 @@ export default function AIGrantExtractionPage() {
                           {selectedFile ? selectedFile.name : 'Click to upload PDF'}
                         </p>
                         <p className="text-sm text-gray-500">
-                          Upload RFP documents, grant announcements, or any PDF with grant information
+                          PDF processing is being optimized. For best results, copy text from your PDF and use "Paste Text" tab.
                         </p>
                         <p className="text-xs text-gray-400 mt-1">
-                          Supports PDF files up to 10MB
+                          Quick tip: Open PDF → Ctrl+A → Ctrl+C → Switch to "Paste Text" → Ctrl+V
                         </p>
                       </div>
                     </div>
