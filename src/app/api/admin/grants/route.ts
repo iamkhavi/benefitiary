@@ -63,67 +63,162 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    console.log('🚀 Creating new grant via API...');
     const { user } = await requireAdmin();
     const data = await request.json();
+    
+    console.log('📝 Received grant data:', {
+      title: data.title,
+      funderName: data.funderName,
+      category: data.category,
+      fundingAmountMin: data.fundingAmountMin,
+      fundingAmountMax: data.fundingAmountMax
+    });
+
+    // Validate required fields
+    if (!data.title?.trim()) {
+      return NextResponse.json(
+        { error: 'Grant title is required' },
+        { status: 400 }
+      );
+    }
+
+    if (!data.category) {
+      return NextResponse.json(
+        { error: 'Grant category is required' },
+        { status: 400 }
+      );
+    }
 
     // Create or find funder
     let funder = null;
-    if (data.funderName) {
-      // First try to find existing funder
+    if (data.funderName?.trim()) {
+      console.log('🔍 Looking for existing funder:', data.funderName);
+      
+      // First try to find existing funder (case insensitive)
       funder = await prisma.funder.findFirst({
-        where: { name: data.funderName }
+        where: { 
+          name: { 
+            equals: data.funderName.trim(), 
+            mode: 'insensitive' 
+          } 
+        }
       });
 
       // If not found, create new funder
       if (!funder) {
+        console.log('➕ Creating new funder:', data.funderName);
         funder = await prisma.funder.create({
           data: {
-            name: data.funderName,
+            name: data.funderName.trim(),
             type: data.funderType || 'PRIVATE_FOUNDATION',
-            website: data.funderWebsite,
-            contactEmail: data.funderContactEmail
+            website: data.funderWebsite?.trim() || null,
+            contactEmail: data.funderContactEmail?.trim() || null
           }
         });
+        console.log('✅ Funder created:', funder.id);
+      } else {
+        console.log('✅ Found existing funder:', funder.id);
       }
     }
 
+    // Prepare grant data with proper type conversions
+    const grantData = {
+      title: data.title.trim(),
+      description: data.description?.trim() || null,
+      eligibilityCriteria: data.eligibilityCriteria?.trim() || null,
+      deadline: data.deadline ? new Date(data.deadline) : null,
+      fundingAmountMin: data.fundingAmountMin ? Number(data.fundingAmountMin) : null,
+      fundingAmountMax: data.fundingAmountMax ? Number(data.fundingAmountMax) : null,
+      source: data.source?.trim() || 'Manual Entry',
+      category: data.category,
+      // Handle JSON fields properly
+      locationEligibility: data.locationEligibility ? 
+        (typeof data.locationEligibility === 'string' ? 
+          data.locationEligibility.split(',').map((s: string) => s.trim()).filter(Boolean) :
+          data.locationEligibility) : 
+        null,
+      applicationMethod: data.applicationMethod?.trim() || null,
+      applicationUrl: data.applicationUrl?.trim() || null,
+      requiredDocuments: data.requiredDocuments ? 
+        (typeof data.requiredDocuments === 'string' ? 
+          data.requiredDocuments.split(',').map((s: string) => s.trim()).filter(Boolean) :
+          data.requiredDocuments) : 
+        null,
+      contactEmail: data.contactEmail?.trim() || null,
+      fundingCycle: data.fundingCycle?.trim() || null,
+      regionFocus: data.regionFocus?.trim() || null,
+      funderId: funder?.id || null,
+      status: 'ACTIVE',
+      scrapedFrom: null, // This is a manual entry
+      // Add additional fields that might be useful
+      applicantType: data.applicantType?.trim() || null,
+      fundingType: data.fundingType || 'GRANT',
+      durationMonths: data.durationMonths ? Number(data.durationMonths) : null
+    };
+
+    console.log('💾 Creating grant with data:', grantData);
+
     // Create grant
     const grant = await prisma.grant.create({
-      data: {
-        title: data.title,
-        description: data.description,
-        eligibilityCriteria: data.eligibilityCriteria,
-        deadline: data.deadline ? new Date(data.deadline) : null,
-        fundingAmountMin: data.fundingAmountMin ? parseFloat(data.fundingAmountMin) : null,
-        fundingAmountMax: data.fundingAmountMax ? parseFloat(data.fundingAmountMax) : null,
-        source: data.source,
-        category: data.category,
-        locationEligibility: data.locationEligibility ? data.locationEligibility.split(',').map((s: string) => s.trim()) : undefined,
-        applicationMethod: data.applicationMethod,
-        applicationUrl: data.applicationUrl,
-        requiredDocuments: data.requiredDocuments ? data.requiredDocuments.split(',').map((s: string) => s.trim()) : undefined,
-        contactEmail: data.contactEmail,
-        fundingCycle: data.fundingCycle,
-        regionFocus: data.regionFocus,
-        funderId: funder?.id,
-        status: 'ACTIVE',
-        scrapedFrom: null // This is a manual entry
+      data: grantData,
+      include: {
+        funder: {
+          select: {
+            id: true,
+            name: true,
+            type: true
+          }
+        }
       }
     });
+
+    console.log('✅ Grant created successfully:', grant.id);
 
     return NextResponse.json({
       success: true,
       grant: {
         id: grant.id,
         title: grant.title,
-        funder: funder?.name || 'Unknown Funder'
+        funder: grant.funder?.name || 'Unknown Funder',
+        category: grant.category,
+        fundingAmountMin: grant.fundingAmountMin,
+        fundingAmountMax: grant.fundingAmountMax,
+        deadline: grant.deadline,
+        createdAt: grant.createdAt
       }
     });
 
   } catch (error) {
-    console.error('Error creating grant:', error);
+    console.error('❌ Error creating grant:', error);
+    
+    // Provide more specific error messages
+    if (error instanceof Error) {
+      if (error.message.includes('Unique constraint')) {
+        return NextResponse.json(
+          { error: 'A grant with this title already exists' },
+          { status: 409 }
+        );
+      }
+      if (error.message.includes('Invalid enum value')) {
+        return NextResponse.json(
+          { error: 'Invalid category value provided' },
+          { status: 400 }
+        );
+      }
+      if (error.message.includes('Foreign key constraint')) {
+        return NextResponse.json(
+          { error: 'Invalid funder reference' },
+          { status: 400 }
+        );
+      }
+    }
+    
     return NextResponse.json(
-      { error: 'Failed to create grant' },
+      { 
+        error: 'Failed to create grant',
+        details: error instanceof Error ? error.message : 'Unknown error'
+      },
       { status: 500 }
     );
   }

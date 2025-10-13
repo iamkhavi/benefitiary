@@ -39,6 +39,8 @@ interface ExtractedGrant {
   evaluationCriteria: string[];
   programGoals: string[];
   expectedOutcomes: string[];
+  contactEmail?: string;
+  fundingCycle?: string;
 }
 
 export default function AIGrantExtractionPage() {
@@ -147,48 +149,92 @@ export default function AIGrantExtractionPage() {
     if (!extractedData) return;
 
     setIsSaving(true);
+    setError(null);
+    
     try {
       console.log('💾 Saving grant to database...', extractedData);
       
-      // Save to the grants API, not the AI extraction API
+      // Prepare the payload with proper data types and validation
+      const payload = {
+        title: extractedData.title?.trim() || 'Untitled Grant',
+        description: extractedData.description?.trim() || '',
+        funderName: extractedData.funderName?.trim() || 'Unknown Funder',
+        category: extractedData.category || 'COMMUNITY_DEVELOPMENT', // Use valid enum value
+        fundingAmountMin: extractedData.fundingAmountMin || null,
+        fundingAmountMax: extractedData.fundingAmountMax || null,
+        deadline: extractedData.deadline || null,
+        eligibilityCriteria: extractedData.eligibilityCriteria?.trim() || '',
+        applicationUrl: extractedData.applicationUrl?.trim() || null,
+        // Convert arrays to comma-separated strings as expected by API
+        locationEligibility: Array.isArray(extractedData.locationEligibility) 
+          ? extractedData.locationEligibility.filter(Boolean).join(', ') 
+          : (extractedData.locationEligibility || ''),
+        requiredDocuments: Array.isArray(extractedData.requiredDocuments)
+          ? extractedData.requiredDocuments.filter(Boolean).join(', ')
+          : (extractedData.requiredDocuments || ''),
+        // Add fields the API expects with proper defaults
+        applicationMethod: 'Online Portal',
+        contactEmail: extractedData.contactEmail || '',
+        fundingCycle: extractedData.fundingCycle || 'Annual',
+        regionFocus: Array.isArray(extractedData.locationEligibility) 
+          ? extractedData.locationEligibility[0] || 'Global'
+          : 'Global',
+        source: 'AI Extraction'
+      };
+
+      console.log('📤 Sending payload:', payload);
+      
       const response = await fetch('/api/admin/grants', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          title: extractedData.title,
-          description: extractedData.description,
-          funderName: extractedData.funderName,
-          category: extractedData.category,
-          fundingAmountMin: extractedData.fundingAmountMin,
-          fundingAmountMax: extractedData.fundingAmountMax,
-          deadline: extractedData.deadline,
-          eligibilityCriteria: extractedData.eligibilityCriteria,
-          applicationUrl: extractedData.applicationUrl,
-          locationEligibility: extractedData.locationEligibility,
-          requiredDocuments: extractedData.requiredDocuments,
-          applicantType: extractedData.applicantType,
-          fundingType: extractedData.fundingType,
-          durationMonths: extractedData.durationMonths,
-          source: 'admin_input',
-          rawContent: originalContent || 'AI extracted content',
-          contentSource: inputMethod === 'pdf' ? 'pdf' : 'text'
-        }),
+        body: JSON.stringify(payload),
       });
 
-      const data = await response.json();
-
+      console.log('📡 API Response status:', response.status);
+      
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to save grant');
+        let errorMessage = `HTTP ${response.status}`;
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.error || errorMessage;
+          console.error('❌ API Error Response:', errorData);
+        } catch (parseError) {
+          const errorText = await response.text();
+          errorMessage = errorText || errorMessage;
+          console.error('❌ API Error Text:', errorText);
+        }
+        throw new Error(errorMessage);
       }
 
+      const data = await response.json();
       console.log('✅ Grant saved successfully:', data);
-      setSuccess(`Grant "${data.grant.title}" saved successfully!`);
+      
+      if (data.success && data.grant) {
+        setSuccess(`Grant "${data.grant.title}" saved successfully! ID: ${data.grant.id}`);
+        // Clear the form after successful save
+        setTimeout(() => {
+          setExtractedData(null);
+          setGrantText('');
+        }, 2000);
+      } else {
+        throw new Error('Unexpected response format from server');
+      }
       
     } catch (err) {
       console.error('❌ Failed to save grant:', err);
-      setError(err instanceof Error ? err.message : 'Failed to save changes');
+      if (err instanceof Error) {
+        if (err.name === 'AbortError') {
+          setError('Request timed out. Please try again.');
+        } else if (err.message.includes('fetch')) {
+          setError('Network error. Please check your connection and try again.');
+        } else {
+          setError(`Save failed: ${err.message}`);
+        }
+      } else {
+        setError('An unexpected error occurred while saving.');
+      }
     } finally {
       setIsSaving(false);
     }
@@ -384,14 +430,27 @@ export default function AIGrantExtractionPage() {
       {error && (
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
-          <AlertDescription>{error}</AlertDescription>
+          <AlertDescription>
+            <div className="space-y-2">
+              <p className="font-medium">Error:</p>
+              <p>{error}</p>
+              <p className="text-sm opacity-90">
+                If this persists, try refreshing the page or check the browser console for more details.
+              </p>
+            </div>
+          </AlertDescription>
         </Alert>
       )}
 
       {success && (
         <Alert className="border-green-200 bg-green-50">
           <CheckCircle className="h-4 w-4 text-green-600" />
-          <AlertDescription className="text-green-800">{success}</AlertDescription>
+          <AlertDescription className="text-green-800">
+            <div className="space-y-1">
+              <p className="font-medium">Success!</p>
+              <p>{success}</p>
+            </div>
+          </AlertDescription>
         </Alert>
       )}
 
@@ -561,6 +620,24 @@ export default function AIGrantExtractionPage() {
                 onClick={() => router.push('/admin/grants')}
               >
                 View All Grants
+              </Button>
+
+              <Button 
+                variant="ghost"
+                size="sm"
+                onClick={async () => {
+                  try {
+                    const response = await fetch('/api/admin/grants');
+                    const data = await response.json();
+                    console.log('API Test Result:', data);
+                    setSuccess(`API test successful. Found ${data.grants?.length || 0} grants in database.`);
+                  } catch (err) {
+                    console.error('API Test Failed:', err);
+                    setError(`API test failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
+                  }
+                }}
+              >
+                Test API Connection
               </Button>
             </div>
           </CardContent>
