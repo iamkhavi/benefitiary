@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/auth-helpers';
 import { prisma } from '@/lib/prisma';
 import OpenAI from 'openai';
-const pdf = require('pdf-parse');
+const PDFParser = require('pdf2json');
 
 // Smart content chunking for large documents
 function smartChunkContent(content: string, maxSize: number): string[] {
@@ -136,14 +136,49 @@ export async function POST(request: NextRequest) {
           
           console.log('🔄 Extracting text from PDF...');
           
-          // Use pdf-parse - 100% Node.js safe, no DOM dependencies
-          const parsed = await pdf(buffer);
+          // Use pdf2json - 100% Node.js safe, no DOM dependencies
+          const pdfParser = new PDFParser();
           
-          grantText = parsed.text;
+          const extractedText = await new Promise<string>((resolve, reject) => {
+            pdfParser.on('pdfParser_dataError', (errData: any) => {
+              reject(new Error(errData.parserError));
+            });
+            
+            pdfParser.on('pdfParser_dataReady', (pdfData: any) => {
+              try {
+                // Extract text from all pages
+                let fullText = '';
+                if (pdfData.Pages) {
+                  pdfData.Pages.forEach((page: any) => {
+                    if (page.Texts) {
+                      page.Texts.forEach((text: any) => {
+                        if (text.R) {
+                          text.R.forEach((run: any) => {
+                            if (run.T) {
+                              fullText += decodeURIComponent(run.T) + ' ';
+                            }
+                          });
+                        }
+                      });
+                    }
+                    fullText += '\n\n'; // Add page break
+                  });
+                }
+                resolve(fullText.trim());
+              } catch (error) {
+                reject(error);
+              }
+            });
+            
+            // Parse the PDF buffer
+            pdfParser.parseBuffer(buffer);
+          });
+          
+          grantText = extractedText;
           contentSource = 'pdf';
           originalFileName = file.name;
           
-          console.log(`✅ PDF text extracted successfully: ${parsed.text.length} characters from ${parsed.numpages} pages`);
+          console.log(`✅ PDF text extracted successfully: ${extractedText.length} characters`);
           
           if (!grantText || grantText.trim().length < 100) {
             return NextResponse.json(
@@ -151,7 +186,6 @@ export async function POST(request: NextRequest) {
                 error: 'PDF appears to be empty or contains very little text',
                 details: 'The PDF may be image-based, scanned, or corrupted. Please try converting it to text first or use OCR.',
                 extractedLength: grantText.length,
-                pagesProcessed: parsed.numpages,
                 suggestion: 'Try copying text directly from the PDF and using the "Paste Text" option, or ensure the PDF contains selectable text'
               },
               { status: 400 }
