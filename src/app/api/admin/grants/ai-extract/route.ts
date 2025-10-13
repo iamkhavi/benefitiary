@@ -14,7 +14,14 @@ function smartChunkContent(content: string, maxSize: number): string[] {
     'evaluation', 'selection', 'review',
     'documents', 'required', 'submission',
     'contact', 'email', 'phone',
-    'program goals', 'objectives', 'outcomes'
+    'program goals', 'objectives', 'outcomes',
+    // RFP-specific keywords
+    'request for proposals', 'rfp', 'nofo', 'foa',
+    'geographic scope', 'project types', 'key milestones',
+    'funding range', 'project length', 'overview',
+    'clinical application', 'research focus', 'therapeutic',
+    'anticipated decision', 'project start', 'notification',
+    'up to', 'will be considered', 'target markets'
   ];
 
   // Split content into paragraphs
@@ -235,10 +242,17 @@ BASIC INFORMATION:
 - eligibilityCriteria: Detailed eligibility requirements including organization types, geographic restrictions, and qualifications (string)
 
 FINANCIAL & TIMELINE:
-- deadline: Application deadline in ISO 8601 format (YYYY-MM-DD) or null if rolling
+- deadline: Primary application deadline in ISO 8601 format (YYYY-MM-DD) or null if rolling
 - fundingAmountMin: Minimum funding amount as number (no currency symbols)
-- fundingAmountMax: Maximum funding amount as number (no currency symbols)
+- fundingAmountMax: Maximum funding amount as number (no currency symbols, look for "up to $X" patterns)
 - durationMonths: Project duration in months as integer
+
+MULTIPLE DEADLINE HANDLING:
+If multiple deadlines are present (common in RFPs), prioritize in this order:
+1. Application submission deadline (most critical)
+2. Letter of intent deadline
+3. Pre-proposal deadline
+Extract other deadlines in the description or additional fields
 
 CLASSIFICATION (choose most appropriate):
 - category: Select ONE from: HEALTHCARE_PUBLIC_HEALTH, EDUCATION_TRAINING, AGRICULTURE_FOOD_SECURITY, CLIMATE_ENVIRONMENT, TECHNOLOGY_INNOVATION, WOMEN_YOUTH_EMPOWERMENT, ARTS_CULTURE, COMMUNITY_DEVELOPMENT, HUMAN_RIGHTS_GOVERNANCE, SME_BUSINESS_GROWTH
@@ -267,6 +281,16 @@ SPECIAL RFP PROCESSING NOTES:
 - Extract any partnership requirements or collaboration expectations
 - Note any capacity building or training components
 - Identify target beneficiaries and geographic focus areas
+
+COMMON RFP STRUCTURE PATTERNS TO RECOGNIZE:
+- "Request for Proposals" or "RFP" in title indicates this is an RFP document
+- Look for sections like: Overview, Geographic Scope, Project Types, Key Milestones, Funding Range
+- Multiple deadline types: Application submission, Decision notification, Project start dates
+- Specific research focus areas or therapeutic areas (e.g., "ATM-AVI in Patients with CRE Infections")
+- Geographic restrictions often specified (e.g., "China (specifically target markets Mainland and Hong Kong)")
+- Funding amounts may be specified as "up to $X will be considered"
+- Research objectives and clinical outcomes are often detailed
+- Look for milestone-based funding or phased approaches
 
 ADDITIONAL CONTEXT:
 - website: Funder's main website URL if mentioned
