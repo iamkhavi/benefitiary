@@ -57,30 +57,76 @@ export default function AIWorkspacePage({ params }: { params: { grantId: string 
   // Initialize welcome message when grant data loads
   useEffect(() => {
     if (grantData && messages.length === 0) {
+      const isSpecializedGrant = grantData.title?.includes('ATM-AVI') || grantData.title?.includes('Clinical') || grantData.title?.includes('Research');
+      const deadline = new Date(grantData.deadline);
+      const daysUntilDeadline = Math.ceil((deadline.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+      
+      let welcomeContent = '';
+      
+      if (isSpecializedGrant) {
+        welcomeContent = `**🧬 EXPERT GRANT ADVISOR - Clinical Research Specialist**
+
+Welcome to your AI Workspace for **${grantData.title}**!
+
+I'm your **expert grant writing advisor** with deep expertise in:
+✅ **Clinical Research Protocols** - Study design, regulatory compliance
+✅ **Pharmaceutical Partnerships** - Industry collaboration best practices  
+✅ **Regulatory Pathways** - FDA, EMA, NMPA approval processes
+✅ **Budget Optimization** - Cost-effective research planning
+
+**🎯 GRANT INTELLIGENCE ANALYSIS:**
+- **Funding**: ${grantData.amount} (${grantData.funder})
+- **Deadline**: ${grantData.deadline} (${daysUntilDeadline > 0 ? `${daysUntilDeadline} days remaining` : 'OVERDUE'})
+- **Geographic Scope**: ${grantData.location}
+- **Competitive Assessment**: ${grantData.match >= 90 ? 'HIGHLY COMPETITIVE - Premium opportunity' : grantData.match >= 80 ? 'COMPETITIVE - Strong potential' : 'MODERATE - Review alignment'}
+
+**🏆 SUCCESS STRATEGY:**
+This appears to be a **specialized clinical research grant** requiring:
+- Advanced clinical trial methodology
+- Regulatory compliance expertise  
+- Strong institutional partnerships
+- Detailed budget justification
+
+**IMMEDIATE PRIORITIES:**
+1. **Clinical Protocol Development** - Study design and methodology
+2. **Regulatory Compliance** - IRB, ethics, safety protocols
+3. **Budget Strategy** - Personnel, equipment, overhead optimization
+4. **Partnership Documentation** - Institutional agreements
+
+Ready to develop a **winning proposal strategy**? What's your first priority?`;
+      } else {
+        welcomeContent = `**🎯 EXPERT GRANT ADVISOR**
+
+Welcome to your AI Workspace for **${grantData.title}**!
+
+I'm your **dedicated grant writing expert** with comprehensive knowledge of:
+✅ **Grant Strategy** - Competitive positioning and funder priorities
+✅ **Proposal Architecture** - Compelling narrative structure
+✅ **Budget Engineering** - Cost-effective resource allocation
+✅ **Compliance Management** - Requirements and documentation
+
+**📊 OPPORTUNITY ANALYSIS:**
+- **Funding**: ${grantData.amount} (${grantData.funder})
+- **Deadline**: ${grantData.deadline} (${daysUntilDeadline > 0 ? `${daysUntilDeadline} days remaining` : 'Check deadline'})
+- **Eligibility**: ${grantData.location}
+- **Match Assessment**: ${grantData.match}% - ${grantData.match >= 90 ? 'EXCEPTIONAL alignment' : grantData.match >= 80 ? 'STRONG potential' : grantData.match >= 60 ? 'GOOD opportunity' : 'Review requirements'}
+
+**🚀 STRATEGIC APPROACH:**
+Based on **${grantData.category}** focus and **${grantData.funder}** priorities, I recommend:
+
+1. **Competitive Analysis** - Position against typical applicants
+2. **Narrative Development** - Compelling problem-solution framework  
+3. **Evidence Assembly** - Data, partnerships, track record
+4. **Resource Planning** - Budget optimization and justification
+
+**NEXT STEPS:**
+What aspect of your proposal would you like to tackle first? I can help with strategy, writing, budgets, or compliance.`;
+      }
+      
       const welcomeMessage: Message = {
         id: '1',
         sender: 'ai',
-        content: `Welcome to your AI Workspace for **${grantData.title}**! 
-
-I'm your dedicated grant assistant and I have full context of:
-✅ Grant requirements and eligibility criteria
-✅ Funding details (${grantData.amount})
-✅ Application deadline (${grantData.deadline})
-✅ Geographic eligibility (${grantData.location})
-
-**Quick Analysis:**
-- **Match Score**: ${grantData.match}% - ${grantData.match >= 80 ? 'Excellent alignment!' : grantData.match >= 60 ? 'Good potential match' : 'Consider reviewing eligibility'}
-- **Funder**: ${grantData.funder}
-- **Category**: ${grantData.category}
-
-I can help you with:
-🎯 Eligibility assessment
-📝 Proposal writing and structure
-💰 Budget planning guidance
-📋 Required documents checklist
-⏰ Timeline and deadline management
-
-How can I help you with your application today?`,
+        content: welcomeContent,
         timestamp: new Date(Date.now() - 300000),
         type: 'text'
       };
