@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
   Sparkles, 
   Upload, 
@@ -48,11 +49,30 @@ export default function AIGrantExtractionPage() {
   const [success, setSuccess] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [inputMethod, setInputMethod] = useState<'text' | 'pdf'>('text');
   const router = useRouter();
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file && file.type === 'application/pdf') {
+      setSelectedFile(file);
+      setInputMethod('pdf');
+      setError(null);
+    } else if (file) {
+      setError('Please select a PDF file');
+      e.target.value = '';
+    }
+  };
+
   const handleExtract = async () => {
-    if (!grantText.trim()) {
+    if (inputMethod === 'text' && !grantText.trim()) {
       setError('Please paste grant information to extract');
+      return;
+    }
+    
+    if (inputMethod === 'pdf' && !selectedFile) {
+      setError('Please select a PDF file to extract');
       return;
     }
 
@@ -61,13 +81,27 @@ export default function AIGrantExtractionPage() {
     setSuccess(null);
 
     try {
-      const response = await fetch('/api/admin/grants/ai-extract', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ grantText }),
-      });
+      let response;
+      
+      if (inputMethod === 'pdf' && selectedFile) {
+        // Handle PDF upload
+        const formData = new FormData();
+        formData.append('file', selectedFile);
+        
+        response = await fetch('/api/admin/grants/ai-extract', {
+          method: 'POST',
+          body: formData,
+        });
+      } else {
+        // Handle text input
+        response = await fetch('/api/admin/grants/ai-extract', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ grantText }),
+        });
+      }
 
       const data = await response.json();
 
@@ -134,10 +168,12 @@ export default function AIGrantExtractionPage() {
 
   const resetForm = () => {
     setGrantText('');
+    setSelectedFile(null);
     setExtractedData(null);
     setError(null);
     setSuccess(null);
     setShowPreview(false);
+    setInputMethod('text');
   };
 
   return (
@@ -165,29 +201,99 @@ export default function AIGrantExtractionPage() {
             <span>Grant Information Input</span>
           </CardTitle>
           <CardDescription>
-            Paste grant announcement text, HTML content, or any grant-related information below
+            Upload PDF files or paste grant announcement text for AI extraction
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div>
-            <Label htmlFor="grant-text">Grant Information</Label>
-            <Textarea
-              id="grant-text"
-              placeholder="Paste grant announcement, description, or any grant-related content here..."
-              value={grantText}
-              onChange={(e) => setGrantText(e.target.value)}
-              rows={12}
-              className="mt-2"
-            />
-            <p className="text-sm text-gray-500 mt-2">
-              {grantText.length} characters • Supports plain text, HTML, and formatted content
-            </p>
-          </div>
+          <Tabs value={inputMethod} onValueChange={(value) => setInputMethod(value as 'text' | 'pdf')}>
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="text">Paste Text</TabsTrigger>
+              <TabsTrigger value="pdf">Upload PDF</TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="text" className="space-y-4">
+              <div>
+                <Label htmlFor="grant-text">Grant Information</Label>
+                <Textarea
+                  id="grant-text"
+                  placeholder="Paste grant announcement, RFP content, or any grant-related information here..."
+                  value={grantText}
+                  onChange={(e) => setGrantText(e.target.value)}
+                  rows={12}
+                  className="mt-2"
+                />
+                <p className="text-sm text-gray-500 mt-2">
+                  {grantText.length} characters • Supports plain text, HTML, and formatted content
+                </p>
+              </div>
+            </TabsContent>
+            
+            <TabsContent value="pdf" className="space-y-4">
+              <div>
+                <Label htmlFor="pdf-file">Upload PDF File</Label>
+                <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center mt-2">
+                  <input
+                    id="pdf-file"
+                    type="file"
+                    accept=".pdf"
+                    onChange={handleFileChange}
+                    className="hidden"
+                  />
+                  <label htmlFor="pdf-file" className="cursor-pointer">
+                    <div className="space-y-3">
+                      <div className="mx-auto w-16 h-16 bg-primary/10 rounded-lg flex items-center justify-center">
+                        <Upload className="h-8 w-8 text-primary" />
+                      </div>
+                      <div>
+                        <p className="text-lg font-medium text-gray-900">
+                          {selectedFile ? selectedFile.name : 'Click to upload PDF'}
+                        </p>
+                        <p className="text-sm text-gray-500">
+                          Upload RFP documents, grant announcements, or any PDF with grant information
+                        </p>
+                        <p className="text-xs text-gray-400 mt-1">
+                          Supports PDF files up to 10MB
+                        </p>
+                      </div>
+                    </div>
+                  </label>
+                </div>
+                
+                {selectedFile && (
+                  <div className="flex items-center justify-between p-4 bg-green-50 border border-green-200 rounded-lg">
+                    <div className="flex items-center space-x-3">
+                      <CheckCircle className="h-5 w-5 text-green-600" />
+                      <div>
+                        <p className="text-sm font-medium text-green-800">
+                          {selectedFile.name}
+                        </p>
+                        <p className="text-xs text-green-600">
+                          {(selectedFile.size / 1024 / 1024).toFixed(2)} MB • Ready for extraction
+                        </p>
+                      </div>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setSelectedFile(null);
+                        const fileInput = document.getElementById('pdf-file') as HTMLInputElement;
+                        if (fileInput) fileInput.value = '';
+                      }}
+                    >
+                      Remove
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </TabsContent>
+          </Tabs>
 
           <div className="flex items-center space-x-3">
             <Button 
               onClick={handleExtract}
-              disabled={isExtracting || !grantText.trim()}
+              disabled={isExtracting || (inputMethod === 'text' && !grantText.trim()) || (inputMethod === 'pdf' && !selectedFile)}
               className="flex items-center space-x-2"
             >
               {isExtracting ? (
@@ -198,14 +304,16 @@ export default function AIGrantExtractionPage() {
               <span>{isExtracting ? 'Extracting...' : 'Extract Grant Data'}</span>
             </Button>
 
-            <Button 
-              variant="outline"
-              onClick={() => setShowPreview(!showPreview)}
-              disabled={!grantText.trim()}
-            >
-              <Eye className="h-4 w-4 mr-2" />
-              {showPreview ? 'Hide' : 'Preview'} Raw Content
-            </Button>
+            {inputMethod === 'text' && (
+              <Button 
+                variant="outline"
+                onClick={() => setShowPreview(!showPreview)}
+                disabled={!grantText.trim()}
+              >
+                <Eye className="h-4 w-4 mr-2" />
+                {showPreview ? 'Hide' : 'Preview'} Raw Content
+              </Button>
+            )}
 
             <Button 
               variant="ghost"
@@ -217,7 +325,7 @@ export default function AIGrantExtractionPage() {
           </div>
 
           {/* Raw Content Preview */}
-          {showPreview && grantText && (
+          {showPreview && grantText && inputMethod === 'text' && (
             <Card className="bg-gray-50">
               <CardHeader>
                 <CardTitle className="text-sm">Raw Content Preview</CardTitle>

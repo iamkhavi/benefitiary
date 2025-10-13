@@ -600,7 +600,7 @@ export default function AddGrantPage() {
                               {selectedFile ? selectedFile.name : 'Click to upload PDF'}
                             </p>
                             <p className="text-xs text-gray-500">
-                              PDF processing temporarily unavailable - please use text input instead
+                              Upload PDF files up to 10MB. AI will extract grant information automatically.
                             </p>
                           </div>
                         </div>
