@@ -359,7 +359,7 @@ model Grant {
   submissionFormat    String?       // Required submission format (PDF, online, etc.)
   
   // Budget & Financial
-  budgetRequirements  String?       // Budget requirements and restrictions
+  budgetRequirements  Json?         // Budget requirements and restrictions (array or string)
   costShareRequired   Boolean?      @default(false) // Cost sharing required
   costSharePercentage Decimal?      // Required cost share percentage
   indirectCostRate    Decimal?      // Allowed indirect cost rate
