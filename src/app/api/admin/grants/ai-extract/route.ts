@@ -26,37 +26,37 @@ function smartChunkContent(content: string, maxSize: number): string[] {
 
   // Split content into paragraphs
   const paragraphs = content.split(/\n\s*\n/).filter(p => p.trim().length > 0);
-  
+
   // Score paragraphs based on grant-relevant content
   const scoredParagraphs = paragraphs.map(paragraph => {
     const lowerParagraph = paragraph.toLowerCase();
     let score = 0;
-    
+
     // Score based on priority keywords
     priorityKeywords.forEach(keyword => {
       const matches = (lowerParagraph.match(new RegExp(keyword, 'g')) || []).length;
       score += matches * 10;
     });
-    
+
     // Bonus for paragraphs with numbers (likely funding amounts, dates)
     const numberMatches = (paragraph.match(/\$[\d,]+|\d{1,2}\/\d{1,2}\/\d{4}|\d{4}-\d{2}-\d{2}/g) || []).length;
     score += numberMatches * 15;
-    
+
     // Bonus for structured content (lists, bullets)
     if (paragraph.includes('•') || paragraph.includes('-') || /^\d+\./.test(paragraph.trim())) {
       score += 5;
     }
-    
+
     return { paragraph, score, length: paragraph.length };
   });
 
   // Sort by score (highest first)
   scoredParagraphs.sort((a, b) => b.score - a.score);
-  
+
   // Select top paragraphs that fit within size limit
   const selectedParagraphs: string[] = [];
   let currentSize = 0;
-  
+
   for (const item of scoredParagraphs) {
     if (currentSize + item.length <= maxSize) {
       selectedParagraphs.push(item.paragraph);
@@ -73,7 +73,7 @@ function smartChunkContent(content: string, maxSize: number): string[] {
       }
     }
   }
-  
+
   // If we have very few paragraphs, add some context from the beginning
   if (selectedParagraphs.length < 3) {
     const beginningText = content.substring(0, Math.min(2000, maxSize - currentSize));
@@ -81,7 +81,7 @@ function smartChunkContent(content: string, maxSize: number): string[] {
       selectedParagraphs.unshift(beginningText + (beginningText.length < content.length ? '... [TRUNCATED]' : ''));
     }
   }
-  
+
   return selectedParagraphs;
 }
 
@@ -96,7 +96,7 @@ const openai = new OpenAI({
 
 // Test endpoint to verify route is working
 export async function GET() {
-  return NextResponse.json({ 
+  return NextResponse.json({
     message: 'AI Grant Extraction API is working',
     methods: ['POST'],
     timestamp: new Date().toISOString()
@@ -107,7 +107,7 @@ export async function POST(request: NextRequest) {
   console.log('🚀 AI Grant Extraction API called');
   console.log('📝 Request method:', request.method);
   console.log('📝 Request URL:', request.url);
-  
+
   try {
     console.log('🔐 Checking admin access...');
     await requireAdmin();
@@ -128,22 +128,22 @@ export async function POST(request: NextRequest) {
 
       if (file && file.type === 'application/pdf') {
         console.log('📄 PDF file detected:', file.name, `(${(file.size / 1024 / 1024).toFixed(2)} MB)`);
-        
+
         try {
           // Convert file to buffer for pdf-parse (Node.js safe)
           const arrayBuffer = await file.arrayBuffer();
           const buffer = Buffer.from(arrayBuffer);
-          
+
           console.log('🔄 Extracting text from PDF...');
-          
+
           // Use pdf2json - 100% Node.js safe, no DOM dependencies
           const pdfParser = new PDFParser();
-          
+
           const extractedText = await new Promise<string>((resolve, reject) => {
             pdfParser.on('pdfParser_dataError', (errData: any) => {
               reject(new Error(errData.parserError));
             });
-            
+
             pdfParser.on('pdfParser_dataReady', (pdfData: any) => {
               try {
                 // Extract text from all pages
@@ -176,20 +176,20 @@ export async function POST(request: NextRequest) {
                 reject(error);
               }
             });
-            
+
             // Parse the PDF buffer
             pdfParser.parseBuffer(buffer);
           });
-          
+
           grantText = extractedText;
           contentSource = 'pdf';
           originalFileName = file.name;
-          
+
           console.log(`✅ PDF text extracted successfully: ${extractedText.length} characters`);
-          
+
           if (!grantText || grantText.trim().length < 100) {
             return NextResponse.json(
-              { 
+              {
                 error: 'PDF appears to be empty or contains very little text',
                 details: 'The PDF may be image-based, scanned, or corrupted. Please try converting it to text first or use OCR.',
                 extractedLength: grantText.length,
@@ -198,24 +198,24 @@ export async function POST(request: NextRequest) {
               { status: 400 }
             );
           }
-          
+
         } catch (pdfError) {
           console.error('❌ PDF parsing failed:', pdfError);
-          
+
           // Provide helpful error message based on error type
           let errorMessage = 'Failed to parse PDF file';
           let details = 'The PDF file may be corrupted, password-protected, or in an unsupported format.';
-          
+
           const errorMsg = pdfError instanceof Error ? pdfError.message : String(pdfError);
-          
+
           if (errorMsg.includes('Invalid PDF')) {
             details = 'The file appears to be corrupted or not a valid PDF format.';
           } else if (errorMsg.includes('password')) {
             details = 'The PDF is password-protected. Please remove the password and try again.';
           }
-          
+
           return NextResponse.json(
-            { 
+            {
               error: errorMessage,
               details: details,
               suggestion: 'As an alternative, you can copy the text content from your PDF and paste it in the "Paste Text" tab',
@@ -238,7 +238,7 @@ export async function POST(request: NextRequest) {
       const body = await request.json();
       grantText = body.grantText;
       contentSource = 'text';
-      
+
       // Check if this is a force creation (skip duplicate check)
       if (body.forceDuplicate) {
         console.log('🔄 Force duplicate creation requested');
@@ -258,24 +258,24 @@ export async function POST(request: NextRequest) {
     const maxInputTokens = 8000; // Conservative limit for GPT-4 (leaves room for prompt + response)
     const avgCharsPerToken = 4; // Rough estimate: 1 token ≈ 4 characters
     const maxChunkSize = maxInputTokens * avgCharsPerToken; // ~32,000 characters
-    
+
     let processedText = grantText;
     let isChunked = false;
-    
+
     if (grantText.length > maxChunkSize) {
       console.log(`📄 Large document detected (${grantText.length} chars), implementing smart chunking...`);
       isChunked = true;
-      
+
       // Smart chunking: prioritize sections likely to contain grant information
       const sections = smartChunkContent(grantText, maxChunkSize);
       processedText = sections.join('\n\n--- SECTION BREAK ---\n\n');
-      
+
       console.log(`📄 Chunked into ${sections.length} priority sections, total: ${processedText.length} chars`);
     }
 
     // Use OpenAI to extract structured grant information
     console.log(`🤖 Sending ${processedText.length} characters to OpenAI for processing...`);
-    
+
     let completion: any;
     try {
       completion = await Promise.race([
@@ -398,23 +398,23 @@ Example format:
     "missingInfoSuggestions": ["suggestion1", "suggestion2"]
   }
 }`
-        },
-        {
-          role: "user",
-          content: `Extract grant information from this ${contentSource.toUpperCase()} content:\n\n${processedText}`
-        }
+            },
+            {
+              role: "user",
+              content: `Extract grant information from this ${contentSource.toUpperCase()} content:\n\n${processedText}`
+            }
           ],
           temperature: 0.1,
           max_tokens: 3000 // Increased for more comprehensive extraction
         }),
-        new Promise((_, reject) => 
+        new Promise((_, reject) =>
           setTimeout(() => reject(new Error('OpenAI API timeout after 60 seconds')), 60000)
         )
       ]);
     } catch (openaiError) {
       console.error('❌ OpenAI API call failed:', openaiError);
       return NextResponse.json(
-        { 
+        {
           error: 'OpenAI API call failed',
           details: openaiError instanceof Error ? openaiError.message : 'Unknown OpenAI error'
         },
@@ -425,7 +425,7 @@ Example format:
     if (!completion || !completion.choices || completion.choices.length === 0) {
       console.error('❌ OpenAI returned empty response');
       return NextResponse.json(
-        { 
+        {
           error: 'OpenAI returned empty response',
           details: 'No completion choices returned from OpenAI API'
         },
@@ -436,18 +436,18 @@ Example format:
     const rawResponse = completion.choices[0].message.content || '{}';
     console.log('🤖 Raw OpenAI response length:', rawResponse.length);
     console.log('🤖 Raw OpenAI response preview:', rawResponse.substring(0, 200) + '...');
-    
+
     if (rawResponse.length === 0 || rawResponse === '{}') {
       console.error('❌ OpenAI returned empty content');
       return NextResponse.json(
-        { 
+        {
           error: 'OpenAI returned empty content',
           details: 'The AI was unable to extract any information from the provided content'
         },
         { status: 500 }
       );
     }
-    
+
     let extractedData;
     try {
       extractedData = JSON.parse(rawResponse);
@@ -455,21 +455,21 @@ Example format:
     } catch (parseError) {
       console.error('❌ JSON parsing failed:', parseError);
       console.error('❌ Raw response that failed to parse:', rawResponse);
-      
+
       // Try to clean the response and parse again
       const cleanedResponse = rawResponse
         .replace(/```json\s*/g, '')
         .replace(/```\s*/g, '')
         .replace(/^\s*[\r\n]/gm, '')
         .trim();
-      
+
       try {
         extractedData = JSON.parse(cleanedResponse);
         console.log('✅ Grant information extracted after cleaning');
       } catch (secondParseError) {
         console.error('❌ Second JSON parsing attempt failed:', secondParseError);
         return NextResponse.json(
-          { 
+          {
             error: 'Failed to parse AI response as JSON',
             details: `OpenAI returned invalid JSON. Raw response: ${rawResponse.substring(0, 500)}...`,
             parseError: parseError instanceof Error ? parseError.message : 'Unknown parse error'
@@ -521,7 +521,7 @@ Example format:
     const requiredFields = ['title', 'funderName', 'description'];
     const missingRequired = requiredFields.filter(field => !extractedData[field]);
     const hasAllRequired = missingRequired.length === 0;
-    
+
     // Check for critical external references
     const hasCriticalRefs = extractedData.externalReferences?.criticalLinks?.length > 0;
     const hasMissingCriticalInfo = extractedData.externalReferences?.missingCriticalInfo?.length > 0;
@@ -563,7 +563,7 @@ Example format:
   } catch (error) {
     console.error('❌ Grant extraction failed:', error);
     return NextResponse.json(
-      { 
+      {
         error: error instanceof Error ? error.message : 'Failed to extract grant information',
         details: error instanceof Error ? error.stack : undefined
       },

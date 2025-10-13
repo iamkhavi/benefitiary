@@ -51,6 +51,7 @@ export default function AIGrantExtractionPage() {
   const [showPreview, setShowPreview] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [inputMethod, setInputMethod] = useState<'text' | 'pdf'>('text');
+  const [originalContent, setOriginalContent] = useState<string>('');
   const router = useRouter();
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -114,6 +115,13 @@ export default function AIGrantExtractionPage() {
 
       setExtractedData(data.extractedData);
       
+      // Store original content for saving
+      if (inputMethod === 'pdf' && selectedFile) {
+        setOriginalContent(`PDF: ${selectedFile.name}`);
+      } else {
+        setOriginalContent(grantText);
+      }
+      
       if (data.databaseAvailable === false) {
         setSuccess(`Grant information extracted successfully! (Note: Database not available - data not saved)`);
       } else {
@@ -140,26 +148,46 @@ export default function AIGrantExtractionPage() {
 
     setIsSaving(true);
     try {
-      const response = await fetch('/api/admin/grants/ai-extract', {
+      console.log('💾 Saving grant to database...', extractedData);
+      
+      // Save to the grants API, not the AI extraction API
+      const response = await fetch('/api/admin/grants', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ 
-          grantText: JSON.stringify(extractedData),
-          isReExtraction: true 
+        body: JSON.stringify({
+          title: extractedData.title,
+          description: extractedData.description,
+          funderName: extractedData.funderName,
+          category: extractedData.category,
+          fundingAmountMin: extractedData.fundingAmountMin,
+          fundingAmountMax: extractedData.fundingAmountMax,
+          deadline: extractedData.deadline,
+          eligibilityCriteria: extractedData.eligibilityCriteria,
+          applicationUrl: extractedData.applicationUrl,
+          locationEligibility: extractedData.locationEligibility,
+          requiredDocuments: extractedData.requiredDocuments,
+          applicantType: extractedData.applicantType,
+          fundingType: extractedData.fundingType,
+          durationMonths: extractedData.durationMonths,
+          source: 'admin_input',
+          rawContent: originalContent || 'AI extracted content',
+          contentSource: inputMethod === 'pdf' ? 'pdf' : 'text'
         }),
       });
 
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || 'Failed to save changes');
+        throw new Error(data.error || 'Failed to save grant');
       }
 
-      setSuccess('Changes saved successfully!');
+      console.log('✅ Grant saved successfully:', data);
+      setSuccess(`Grant "${data.grant.title}" saved successfully!`);
       
     } catch (err) {
+      console.error('❌ Failed to save grant:', err);
       setError(err instanceof Error ? err.message : 'Failed to save changes');
     } finally {
       setIsSaving(false);
@@ -174,6 +202,7 @@ export default function AIGrantExtractionPage() {
     setSuccess(null);
     setShowPreview(false);
     setInputMethod('text');
+    setOriginalContent('');
   };
 
   return (
