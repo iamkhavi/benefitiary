@@ -7,6 +7,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { 
   Search, 
   Filter,
@@ -29,7 +31,15 @@ export default function AdminGrantsPage() {
   const router = useRouter();
   const [userRole, setUserRole] = useState<string | null>(null);
   const [grants, setGrants] = useState([]);
+  const [filteredGrants, setFilteredGrants] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [categoryFilter, setCategoryFilter] = useState('all');
+  const [sourceFilter, setSourceFilter] = useState('all');
+  const [sortBy, setSortBy] = useState('createdAt');
+  const [sortOrder, setSortOrder] = useState('desc');
+  const [showFilters, setShowFilters] = useState(false);
 
   // Handle grant actions
   const handleViewGrant = (grantId: string) => {
@@ -55,7 +65,8 @@ export default function AdminGrantsPage() {
       }
 
       // Remove the grant from the local state
-      setGrants(grants.filter((grant: any) => grant.id !== grantId));
+      const updatedGrants = grants.filter((grant: any) => grant.id !== grantId);
+      setGrants(updatedGrants);
       
       console.log(`✅ Grant "${grantTitle}" deleted successfully`);
     } catch (error) {
@@ -63,6 +74,62 @@ export default function AdminGrantsPage() {
       alert(`Failed to delete grant: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
+
+  // Filter grants based on search and filter criteria
+  useEffect(() => {
+    let filtered = [...grants];
+
+    // Apply search filter
+    if (searchTerm) {
+      filtered = filtered.filter((grant: any) =>
+        grant.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        grant.funder.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        grant.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        grant.description?.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }
+
+    // Apply status filter
+    if (statusFilter !== 'all') {
+      filtered = filtered.filter((grant: any) => grant.status === statusFilter);
+    }
+
+    // Apply category filter
+    if (categoryFilter !== 'all') {
+      filtered = filtered.filter((grant: any) => grant.category === categoryFilter);
+    }
+
+    // Apply source filter
+    if (sourceFilter !== 'all') {
+      filtered = filtered.filter((grant: any) => grant.source === sourceFilter);
+    }
+
+    // Apply sorting
+    filtered.sort((a: any, b: any) => {
+      let aValue = a[sortBy];
+      let bValue = b[sortBy];
+
+      // Handle different data types
+      if (sortBy === 'deadline' || sortBy === 'createdAt') {
+        aValue = aValue ? new Date(aValue).getTime() : 0;
+        bValue = bValue ? new Date(bValue).getTime() : 0;
+      } else if (sortBy === 'fundingAmountMax') {
+        aValue = aValue || 0;
+        bValue = bValue || 0;
+      } else if (typeof aValue === 'string') {
+        aValue = aValue.toLowerCase();
+        bValue = bValue.toLowerCase();
+      }
+
+      if (sortOrder === 'asc') {
+        return aValue > bValue ? 1 : -1;
+      } else {
+        return aValue < bValue ? 1 : -1;
+      }
+    });
+
+    setFilteredGrants(filtered);
+  }, [grants, searchTerm, statusFilter, categoryFilter, sourceFilter, sortBy, sortOrder]);
 
   useEffect(() => {
     async function checkAccess() {
@@ -212,14 +279,132 @@ export default function AdminGrantsPage() {
             <Input
               placeholder="Search grants..."
               className="pl-10 w-80"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-          <Button variant="outline" size="sm">
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={() => setShowFilters(!showFilters)}
+          >
             <Filter className="h-4 w-4 mr-2" />
             Filter
           </Button>
         </div>
+        {filteredGrants.length > 0 && (
+          <div className="text-sm text-gray-600">
+            Showing {filteredGrants.length} of {grants.length} grants
+          </div>
+        )}
       </div>
+
+      {/* Filter Controls */}
+      {showFilters && (
+        <Card>
+          <CardContent className="p-4">
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="statusFilter">Status</Label>
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="All Statuses" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Statuses</SelectItem>
+                    <SelectItem value="active">Active</SelectItem>
+                    <SelectItem value="inactive">Inactive</SelectItem>
+                    <SelectItem value="expired">Expired</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="categoryFilter">Category</Label>
+                <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="All Categories" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Categories</SelectItem>
+                    <SelectItem value="COMMUNITY_DEVELOPMENT">Community Development</SelectItem>
+                    <SelectItem value="EDUCATION">Education</SelectItem>
+                    <SelectItem value="HEALTH">Health</SelectItem>
+                    <SelectItem value="ENVIRONMENT">Environment</SelectItem>
+                    <SelectItem value="ARTS_CULTURE">Arts & Culture</SelectItem>
+                    <SelectItem value="RESEARCH">Research</SelectItem>
+                    <SelectItem value="TECHNOLOGY">Technology</SelectItem>
+                    <SelectItem value="OTHER">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="sourceFilter">Source</Label>
+                <Select value={sourceFilter} onValueChange={setSourceFilter}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="All Sources" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Sources</SelectItem>
+                    <SelectItem value="scraped">Scraped</SelectItem>
+                    <SelectItem value="manual">Manual Entry</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="sortBy">Sort By</Label>
+                <Select value={sortBy} onValueChange={setSortBy}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Sort by..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="title">Title</SelectItem>
+                    <SelectItem value="funder">Funder</SelectItem>
+                    <SelectItem value="deadline">Deadline</SelectItem>
+                    <SelectItem value="fundingAmountMax">Funding Amount</SelectItem>
+                    <SelectItem value="createdAt">Date Added</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="sortOrder">Order</Label>
+                <Select value={sortOrder} onValueChange={setSortOrder}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Order..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="asc">Ascending</SelectItem>
+                    <SelectItem value="desc">Descending</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            
+            <div className="flex items-center justify-between mt-4 pt-4 border-t">
+              <div className="text-sm text-gray-600">
+                {filteredGrants.length} grants match your filters
+              </div>
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => {
+                  setSearchTerm('');
+                  setStatusFilter('all');
+                  setCategoryFilter('all');
+                  setSourceFilter('all');
+                  setSortBy('createdAt');
+                  setSortOrder('desc');
+                }}
+              >
+                Clear Filters
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Grants Table */}
       <Card>
@@ -227,7 +412,28 @@ export default function AdminGrantsPage() {
           <CardTitle>All Grants</CardTitle>
         </CardHeader>
         <CardContent>
-          {grants.length === 0 ? (
+          {filteredGrants.length === 0 && grants.length > 0 ? (
+            <div className="text-center py-12">
+              <Search className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 mb-2">No grants match your search</h3>
+              <p className="text-gray-500 mb-6">
+                Try adjusting your search terms or filters to find what you're looking for.
+              </p>
+              <Button 
+                variant="outline"
+                onClick={() => {
+                  setSearchTerm('');
+                  setStatusFilter('all');
+                  setCategoryFilter('all');
+                  setSourceFilter('all');
+                  setSortBy('createdAt');
+                  setSortOrder('desc');
+                }}
+              >
+                Clear Search & Filters
+              </Button>
+            </div>
+          ) : grants.length === 0 ? (
             <div className="text-center py-12">
               <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
               <h3 className="text-lg font-medium text-gray-900 mb-2">No grants found</h3>
@@ -269,7 +475,7 @@ export default function AdminGrantsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {grants.map((grant: any) => (
+                  {filteredGrants.map((grant: any) => (
                     <tr key={grant.id} className="border-b hover:bg-gray-50">
                       <td className="py-4 px-4">
                         <div>
