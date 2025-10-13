@@ -22,23 +22,23 @@ import {
 import { useRouter } from 'next/navigation';
 
 interface ExtractedGrant {
-  title: string;
-  funderName: string;
-  description: string;
-  eligibilityCriteria: string;
-  deadline: string;
-  fundingAmountMin: number;
-  fundingAmountMax: number;
-  applicationUrl: string;
-  locationEligibility: string[];
-  category: string;
-  applicantType: string;
-  fundingType: string;
-  durationMonths: number;
-  requiredDocuments: string[];
-  evaluationCriteria: string[];
-  programGoals: string[];
-  expectedOutcomes: string[];
+  title?: string;
+  funderName?: string;
+  description?: string;
+  eligibilityCriteria?: string;
+  deadline?: string;
+  fundingAmountMin?: number;
+  fundingAmountMax?: number;
+  applicationUrl?: string;
+  locationEligibility?: string[];
+  category?: string;
+  applicantType?: string;
+  fundingType?: string;
+  durationMonths?: number;
+  requiredDocuments?: string[];
+  evaluationCriteria?: string[];
+  programGoals?: string[];
+  expectedOutcomes?: string[];
   contactEmail?: string;
   fundingCycle?: string;
 }
@@ -107,6 +107,7 @@ export default function AIGrantExtractionPage() {
       }
 
       const data = await response.json();
+      console.log('🤖 AI Extraction Response:', data);
 
       if (!response.ok) {
         if (data.configurationRequired) {
@@ -115,6 +116,13 @@ export default function AIGrantExtractionPage() {
         throw new Error(data.error || 'Failed to extract grant information');
       }
 
+      // Validate that we have extracted data
+      if (!data.extractedData) {
+        console.error('❌ No extractedData in response:', data);
+        throw new Error('No data was extracted from the content. Please try with different content or check if the content contains grant information.');
+      }
+
+      console.log('✅ Setting extracted data:', data.extractedData);
       setExtractedData(data.extractedData);
       
       // Store original content for saving
@@ -127,7 +135,7 @@ export default function AIGrantExtractionPage() {
       if (data.databaseAvailable === false) {
         setSuccess(`Grant information extracted successfully! (Note: Database not available - data not saved)`);
       } else {
-        setSuccess(`Grant "${data.grant.title}" extracted and saved successfully!`);
+        setSuccess(`Grant "${data.extractedData?.title || 'information'}" extracted successfully!`);
       }
       
     } catch (err) {
@@ -146,7 +154,16 @@ export default function AIGrantExtractionPage() {
   };
 
   const handleSaveChanges = async () => {
-    if (!extractedData) return;
+    if (!extractedData) {
+      setError('No extracted data available to save');
+      return;
+    }
+
+    // Basic validation
+    if (!extractedData.title?.trim()) {
+      setError('Grant title is required. Please add a title before saving.');
+      return;
+    }
 
     setIsSaving(true);
     setError(null);
@@ -156,7 +173,7 @@ export default function AIGrantExtractionPage() {
       
       // Prepare the payload with proper data types and validation
       const payload = {
-        title: extractedData.title?.trim() || 'Untitled Grant',
+        title: extractedData.title.trim(),
         description: extractedData.description?.trim() || '',
         funderName: extractedData.funderName?.trim() || 'Unknown Funder',
         category: extractedData.category || 'COMMUNITY_DEVELOPMENT', // Use valid enum value
@@ -168,17 +185,17 @@ export default function AIGrantExtractionPage() {
         // Convert arrays to comma-separated strings as expected by API
         locationEligibility: Array.isArray(extractedData.locationEligibility) 
           ? extractedData.locationEligibility.filter(Boolean).join(', ') 
-          : (extractedData.locationEligibility || ''),
+          : (typeof extractedData.locationEligibility === 'string' ? extractedData.locationEligibility : ''),
         requiredDocuments: Array.isArray(extractedData.requiredDocuments)
           ? extractedData.requiredDocuments.filter(Boolean).join(', ')
-          : (extractedData.requiredDocuments || ''),
+          : (typeof extractedData.requiredDocuments === 'string' ? extractedData.requiredDocuments : ''),
         // Add fields the API expects with proper defaults
         applicationMethod: 'Online Portal',
-        contactEmail: extractedData.contactEmail || '',
-        fundingCycle: extractedData.fundingCycle || 'Annual',
+        contactEmail: extractedData.contactEmail?.trim() || '',
+        fundingCycle: extractedData.fundingCycle?.trim() || 'Annual',
         regionFocus: Array.isArray(extractedData.locationEligibility) 
-          ? extractedData.locationEligibility[0] || 'Global'
-          : 'Global',
+          ? (extractedData.locationEligibility[0] || 'Global')
+          : (extractedData.locationEligibility || 'Global'),
         source: 'AI Extraction'
       };
 
@@ -574,7 +591,7 @@ export default function AIGrantExtractionPage() {
             </div>
 
             {/* Location Eligibility */}
-            {extractedData.locationEligibility && extractedData.locationEligibility.length > 0 && (
+            {extractedData.locationEligibility && Array.isArray(extractedData.locationEligibility) && extractedData.locationEligibility.length > 0 && (
               <div>
                 <Label>Location Eligibility</Label>
                 <div className="flex flex-wrap gap-2 mt-2">
