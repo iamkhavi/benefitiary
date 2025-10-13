@@ -2,7 +2,34 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/auth-helpers';
 import { prisma } from '@/lib/prisma';
 import OpenAI from 'openai';
-// PDF processing temporarily disabled due to server compatibility issues
+// Clean PDF text extraction using Node.js-safe pdf-parse
+const pdf = require('pdf-parse');
+
+async function extractTextFromPDF(buffer: Buffer): Promise<{ text: string; numpages: number }> {
+  try {
+    console.log('🔄 Parsing PDF with server-side compatibility...');
+    
+    const options = {
+      // Disable problematic features
+      normalizeWhitespace: false,
+      disableCombineTextItems: false,
+      max: 0 // No page limit
+    };
+    
+    const data = await pdf(buffer, options);
+    
+    console.log(`✅ PDF parsing successful: ${data.text.length} characters from ${data.numpages} pages`);
+    
+    return {
+      text: data.text,
+      numpages: data.numpages || 1
+    };
+    
+  } catch (error) {
+    console.error('❌ PDF parsing failed:', error);
+    throw error;
+  }
+}
 
 // Smart content chunking for large documents
 function smartChunkContent(content: string, maxSize: number): string[] {
@@ -129,19 +156,67 @@ export async function POST(request: NextRequest) {
       if (file && file.type === 'application/pdf') {
         console.log('📄 PDF file detected:', file.name, `(${(file.size / 1024 / 1024).toFixed(2)} MB)`);
         
-        return NextResponse.json(
-          { 
-            error: 'PDF processing temporarily unavailable',
-            details: 'PDF parsing is currently disabled due to server compatibility issues. Please copy the text content from your PDF and use the text input method instead.',
-            suggestion: 'Open your PDF, select all text (Ctrl+A), copy it (Ctrl+C), then paste it in the "Paste Text" tab',
-            fileInfo: {
-              name: file.name,
-              size: `${(file.size / 1024 / 1024).toFixed(2)} MB`,
-              type: file.type
-            }
-          },
-          { status: 400 }
-        );
+        try {
+          // Convert file to buffer for pdf-parse
+          const arrayBuffer = await file.arrayBuffer();
+          const buffer = Buffer.from(arrayBuffer);
+          
+          console.log('🔄 Parsing PDF content...');
+          
+          // Use server-compatible PDF parsing
+          const pdfData = await extractTextFromPDF(buffer);
+          
+          grantText = pdfData.text;
+          contentSource = 'pdf';
+          originalFileName = file.name;
+          
+          console.log(`✅ PDF parsed successfully: ${grantText.length} characters extracted from ${pdfData.numpages} pages`);
+          
+          if (!grantText || grantText.trim().length < 100) {
+            return NextResponse.json(
+              { 
+                error: 'PDF appears to be empty or contains very little text',
+                details: 'The PDF may be image-based, scanned, or corrupted. Please try converting it to text first or use OCR.',
+                extractedLength: grantText.length,
+                pagesProcessed: pdfData.numpages,
+                suggestion: 'Try copying text directly from the PDF and using the "Paste Text" option, or ensure the PDF contains selectable text'
+              },
+              { status: 400 }
+            );
+          }
+          
+        } catch (pdfError) {
+          console.error('❌ PDF parsing failed:', pdfError);
+          
+          // Provide helpful error message based on error type
+          let errorMessage = 'Failed to parse PDF file';
+          let details = 'The PDF file may be corrupted, password-protected, or in an unsupported format.';
+          
+          const errorMsg = pdfError instanceof Error ? pdfError.message : String(pdfError);
+          
+          if (errorMsg.includes('Invalid PDF')) {
+            details = 'The file appears to be corrupted or not a valid PDF format.';
+          } else if (errorMsg.includes('password')) {
+            details = 'The PDF is password-protected. Please remove the password and try again.';
+          } else if (errorMsg.includes('DOMMatrix') || errorMsg.includes('canvas')) {
+            details = 'PDF processing encountered a server compatibility issue. This is a temporary technical limitation.';
+          }
+          
+          return NextResponse.json(
+            { 
+              error: errorMessage,
+              details: details,
+              suggestion: 'As an alternative, you can copy the text content from your PDF and paste it in the "Paste Text" tab',
+              technicalDetails: pdfError instanceof Error ? pdfError.message : 'Unknown PDF parsing error',
+              fileInfo: {
+                name: file.name,
+                size: `${(file.size / 1024 / 1024).toFixed(2)} MB`,
+                type: file.type
+              }
+            },
+            { status: 400 }
+          );
+        }
       } else if (textContent) {
         grantText = textContent;
         contentSource = 'text';
