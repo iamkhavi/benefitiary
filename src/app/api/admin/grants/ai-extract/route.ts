@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/auth-helpers';
 import { prisma } from '@/lib/prisma';
 import OpenAI from 'openai';
-// PDF parsing will be handled differently to avoid server-side DOM issues
+const pdfParse = require('pdf-parse');
 
 // Smart content chunking for large documents
 function smartChunkContent(content: string, maxSize: number): string[] {
@@ -120,17 +120,44 @@ export async function POST(request: NextRequest) {
       const textContent = formData.get('grantText') as string;
 
       if (file && file.type === 'application/pdf') {
-        console.log('📄 PDF file detected:', file.name);
-        // For now, return an error asking user to convert PDF to text
-        // This avoids server-side DOM issues with pdf-parse
-        return NextResponse.json(
-          { 
-            error: 'PDF processing temporarily unavailable',
-            details: 'Please copy the text content from your PDF and paste it in the text input instead. We are working on improving PDF processing.',
-            suggestion: 'Use the "Paste Text" option and copy-paste the content from your PDF'
-          },
-          { status: 400 }
-        );
+        console.log('📄 PDF file detected:', file.name, `(${(file.size / 1024 / 1024).toFixed(2)} MB)`);
+        
+        try {
+          // Convert file to buffer for pdf-parse
+          const arrayBuffer = await file.arrayBuffer();
+          const buffer = Buffer.from(arrayBuffer);
+          
+          console.log('🔄 Parsing PDF content...');
+          const pdfData = await pdfParse(buffer);
+          
+          grantText = pdfData.text;
+          contentSource = 'pdf';
+          originalFileName = file.name;
+          
+          console.log(`✅ PDF parsed successfully: ${grantText.length} characters extracted`);
+          
+          if (!grantText || grantText.trim().length < 100) {
+            return NextResponse.json(
+              { 
+                error: 'PDF appears to be empty or contains very little text',
+                details: 'The PDF may be image-based or corrupted. Please try converting it to text first.',
+                extractedLength: grantText.length
+              },
+              { status: 400 }
+            );
+          }
+          
+        } catch (pdfError) {
+          console.error('❌ PDF parsing failed:', pdfError);
+          return NextResponse.json(
+            { 
+              error: 'Failed to parse PDF file',
+              details: 'The PDF file may be corrupted, password-protected, or in an unsupported format. Please try converting it to text first.',
+              suggestion: 'Use the "Paste Text" option and copy-paste the content from your PDF'
+            },
+            { status: 400 }
+          );
+        }
       } else if (textContent) {
         grantText = textContent;
         contentSource = 'text';
@@ -227,11 +254,19 @@ PROGRAM DETAILS:
 - expectedOutcomes: Array of anticipated results and impact metrics
 
 RFP SPECIFIC INFORMATION (if available):
-- rfpNumber: Official RFP/FOA number if mentioned
-- budgetRequirements: Budget requirements and restrictions
-- proposalSections: Required proposal sections
-- reportingSchedule: Required reporting schedule
-- performanceMetrics: Required performance metrics/KPIs
+- rfpNumber: Official RFP/FOA/NOFO number if mentioned (string)
+- budgetRequirements: Budget requirements, cost-sharing, indirect costs, allowable expenses (string)
+- proposalSections: Required proposal sections and page limits (array)
+- reportingSchedule: Required reporting schedule and deliverables (array)
+- performanceMetrics: Required performance metrics, KPIs, and success indicators (array)
+
+SPECIAL RFP PROCESSING NOTES:
+- RFPs often contain detailed technical requirements - extract all relevant program specifications
+- Look for submission requirements, format specifications, and evaluation criteria
+- Pay attention to pre-proposal requirements, letters of intent, or concept notes
+- Extract any partnership requirements or collaboration expectations
+- Note any capacity building or training components
+- Identify target beneficiaries and geographic focus areas
 
 ADDITIONAL CONTEXT:
 - website: Funder's main website URL if mentioned
