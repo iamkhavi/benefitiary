@@ -174,7 +174,13 @@ export default function AddGrantPage() {
         });
       }
 
-      const data = await response.json();
+      let data;
+      try {
+        data = await response.json();
+      } catch (jsonError) {
+        console.error('❌ Failed to parse response as JSON:', jsonError);
+        throw new Error(`Server returned invalid response. Status: ${response.status} ${response.statusText}`);
+      }
 
       if (!response.ok) {
         throw new Error(data.error || 'Failed to extract grant information');
@@ -728,7 +734,10 @@ export default function AddGrantPage() {
                               <p><strong>File:</strong> {extractedData.contentInfo.fileName}</p>
                             )}
                             {extractedData.contentInfo.wasChunked && (
-                              <p><strong>Note:</strong> Large document was processed in chunks, but complete content is stored for AI workspace use.</p>
+                              <p><strong>Smart Processing:</strong> Large document was intelligently chunked to prioritize grant-essential information. Complete content is stored for AI workspace use.</p>
+                            )}
+                            {extractedData.contentInfo.chunkingStrategy && (
+                              <p><strong>Processing Strategy:</strong> {extractedData.contentInfo.chunkingStrategy.replace('_', ' ')}</p>
                             )}
                             {extractedData.fieldCompleteness?.confidenceScore && (
                               <p><strong>Extraction Confidence:</strong> {extractedData.fieldCompleteness.confidenceScore}%</p>
