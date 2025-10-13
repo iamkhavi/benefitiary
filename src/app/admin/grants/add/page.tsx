@@ -138,7 +138,7 @@ export default function AddGrantPage() {
     }
   };
 
-  const handleAIExtraction = async () => {
+  const handleAIExtraction = async (forceDuplicate = false) => {
     if (uploadMethod === 'text' && !aiText.trim()) {
       alert('Please enter grant text');
       return;
@@ -158,6 +158,9 @@ export default function AddGrantPage() {
         // Handle PDF upload
         const formData = new FormData();
         formData.append('file', selectedFile);
+        if (forceDuplicate) {
+          formData.append('forceDuplicate', 'true');
+        }
         
         response = await fetch('/api/admin/grants/ai-extract', {
           method: 'POST',
@@ -170,7 +173,10 @@ export default function AddGrantPage() {
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ grantText: aiText }),
+          body: JSON.stringify({ 
+            grantText: aiText,
+            forceDuplicate: forceDuplicate 
+          }),
         });
       }
 
@@ -187,6 +193,20 @@ export default function AddGrantPage() {
       }
 
       console.log('✅ AI extraction successful:', data);
+
+      // Handle duplicate warning
+      if (data.duplicateWarning) {
+        const proceed = confirm(
+          `⚠️ Potential Duplicate Detected!\n\n` +
+          `"${data.duplicateWarning.title}" from ${data.duplicateWarning.funderName}\n` +
+          `Already exists (created: ${new Date(data.duplicateWarning.createdAt).toLocaleDateString()})\n\n` +
+          `Do you want to continue with this extraction? You can review and decide whether to save it.`
+        );
+        
+        if (!proceed) {
+          return; // User chose not to proceed
+        }
+      }
 
       // Show content info if available
       if (data.contentInfo) {
@@ -234,7 +254,15 @@ export default function AddGrantPage() {
       
     } catch (error) {
       console.error('❌ AI extraction failed:', error);
-      alert(`AI extraction failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      
+      // Show user-friendly error message
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      if (errorMessage.includes('Duplicate')) {
+        // Don't show alert for duplicate - user already saw confirmation dialog
+        console.log('User cancelled duplicate grant creation');
+      } else {
+        alert(`AI extraction failed: ${errorMessage}`);
+      }
     } finally {
       setAiProcessing(false);
     }
@@ -245,16 +273,48 @@ export default function AddGrantPage() {
     setIsLoading(true);
     
     try {
-      // Simulate API call - replace with actual grant creation
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      console.log('💾 Saving grant to database...', formData);
       
-      console.log('Grant data to save:', formData);
+      // Create the actual grant save API call
+      const response = await fetch('/api/admin/grants', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          title: formData.title,
+          description: formData.description,
+          funderName: formData.funder,
+          category: formData.category,
+          fundingAmountMin: formData.fundingAmountMin ? parseInt(formData.fundingAmountMin) : null,
+          fundingAmountMax: formData.fundingAmountMax ? parseInt(formData.fundingAmountMax) : null,
+          deadline: formData.deadline || null,
+          eligibilityCriteria: formData.eligibilityCriteria,
+          applicationUrl: formData.applicationUrl,
+          contactEmail: formData.contactEmail,
+          locationEligibility: formData.locationEligibility.split(',').map(s => s.trim()).filter(s => s),
+          requiredDocuments: formData.requiredDocuments.split(',').map(s => s.trim()).filter(s => s),
+          // Include extracted data if available
+          rawContent: extractedData ? (uploadMethod === 'text' ? aiText : 'PDF content') : null,
+          contentSource: extractedData ? (uploadMethod === 'text' ? 'text' : 'pdf') : 'manual',
+          source: 'admin_input'
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to save grant');
+      }
+
+      const result = await response.json();
+      console.log('✅ Grant saved successfully:', result);
       
       // Redirect back to grants management
       router.push('/admin/grants');
       
     } catch (error) {
-      console.error('Failed to save grant:', error);
+      console.error('❌ Failed to save grant:', error);
+      alert(`Failed to save grant: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsLoading(false);
     }
@@ -568,7 +628,7 @@ export default function AddGrantPage() {
                 )}
                 
                 <Button 
-                  onClick={handleAIExtraction} 
+                  onClick={() => handleAIExtraction()} 
                   disabled={(uploadMethod === 'text' && !aiText.trim()) || (uploadMethod === 'pdf' && !selectedFile) || aiProcessing}
                   className="w-full"
                 >

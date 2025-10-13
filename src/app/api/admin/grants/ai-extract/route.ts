@@ -140,6 +140,11 @@ export async function POST(request: NextRequest) {
       const body = await request.json();
       grantText = body.grantText;
       contentSource = 'text';
+      
+      // Check if this is a force creation (skip duplicate check)
+      if (body.forceDuplicate) {
+        console.log('🔄 Force duplicate creation requested');
+      }
     }
 
     if (!grantText || grantText.trim().length === 0) {
@@ -351,100 +356,42 @@ Example format:
       }
     }
 
-    // Try to save to database, fall back to returning extracted data only
-    let grant = null;
-    let funder = null;
+    // Check for potential duplicates but don't save yet - just warn the user
+    let duplicateWarning = null;
 
     try {
-      // Get or create funder
-      funder = await prisma.funder.findFirst({
-        where: { name: extractedData.funderName }
-      });
-
-      if (!funder && extractedData.funderName) {
-        funder = await prisma.funder.create({
-          data: {
-            name: extractedData.funderName,
-            type: 'PRIVATE_FOUNDATION', // Default, can be updated later
-            website: extractedData.website || null,
-            contactEmail: extractedData.contactEmail || null,
-            logoUrl: null // Will be populated later
-          }
-        });
-        console.log(`✅ Created new funder: ${funder.name}`);
-      }
-
-      // Create the grant with complete information
-      grant = await prisma.grant.create({
-        data: {
-          title: extractedData.title || 'Untitled Grant',
-          description: extractedData.description,
-          eligibilityCriteria: extractedData.eligibilityCriteria,
-          deadline: extractedData.deadline ? new Date(extractedData.deadline) : null,
-          fundingAmountMin: extractedData.fundingAmountMin || null,
-          fundingAmountMax: extractedData.fundingAmountMax || null,
-          applicationUrl: extractedData.applicationUrl,
-          locationEligibility: extractedData.locationEligibility || [],
-          category: extractedData.category || 'COMMUNITY_DEVELOPMENT',
-          applicantType: extractedData.applicantType,
-          fundingType: (extractedData.fundingType && extractedData.fundingType !== 'LOAN') ? extractedData.fundingType : 'GRANT',
-          durationMonths: extractedData.durationMonths,
-          requiredDocuments: extractedData.requiredDocuments || [],
-          evaluationCriteria: extractedData.evaluationCriteria || [],
-          programGoals: extractedData.programGoals || [],
-          expectedOutcomes: extractedData.expectedOutcomes || [],
-          
-          // Store complete raw content and metadata
-          rawContent: grantText, // Store the COMPLETE original content
-          contentSource: contentSource,
-          originalFileName: originalFileName || null,
-          
-          // Additional RFP fields if extracted
-          rfpNumber: extractedData.rfpNumber || null,
-          budgetRequirements: extractedData.budgetRequirements || null,
-          proposalSections: extractedData.proposalSections || [],
-          reportingSchedule: extractedData.reportingSchedule || [],
-          performanceMetrics: extractedData.performanceMetrics || [],
-          
-          funderId: funder?.id,
-          source: 'admin_input',
-          scrapedFrom: 'admin_ai_extraction',
-          contentHash: Buffer.from((extractedData.title || 'untitled') + (extractedData.funderName || 'unknown')).toString('base64'),
-          status: 'ACTIVE',
-          aiSummary: `AI-extracted grant: ${extractedData.title} from ${extractedData.funderName}`,
-          contactEmail: extractedData.contactEmail || null
-        }
-      });
-
-      console.log(`✅ Created grant: ${grant.title}`);
-
-    } catch (dbError) {
-      console.log('⚠️ Database not available, returning extracted data only');
-      console.error('Database error:', dbError);
-      
-      // Return extracted data even if we can't save to database
-      return NextResponse.json({
-        success: true,
-        message: 'Grant information extracted successfully (database not available)',
-        grant: {
-          id: 'temp_' + Date.now(),
-          title: extractedData.title,
-          funderName: extractedData.funderName,
-          category: extractedData.category,
-          fundingAmountMin: extractedData.fundingAmountMin,
-          fundingAmountMax: extractedData.fundingAmountMax
+      const existingGrant = await prisma.grant.findFirst({
+        where: {
+          OR: [
+            // Check by title and funder combination
+            {
+              AND: [
+                { title: { equals: extractedData.title, mode: 'insensitive' } },
+                { funder: { name: { equals: extractedData.funderName, mode: 'insensitive' } } }
+              ]
+            },
+            // Check by content hash
+            {
+              contentHash: Buffer.from((extractedData.title || 'untitled') + (extractedData.funderName || 'unknown')).toString('base64')
+            }
+          ]
         },
-        extractedData,
-        databaseAvailable: false,
-        contentInfo: {
-          source: contentSource,
-          originalLength: grantText.length,
-          fileName: originalFileName,
-          processedLength: processedText.length,
-          wasChunked: isChunked,
-          chunkingStrategy: isChunked ? 'smart_priority' : 'none'
+        include: {
+          funder: true
         }
       });
+
+      if (existingGrant) {
+        console.log(`⚠️ Potential duplicate detected: ${existingGrant.title} from ${existingGrant.funder?.name}`);
+        duplicateWarning = {
+          id: existingGrant.id,
+          title: existingGrant.title,
+          funderName: existingGrant.funder?.name,
+          createdAt: existingGrant.createdAt
+        };
+      }
+    } catch (dbError) {
+      console.log('⚠️ Could not check for duplicates:', dbError);
     }
 
     // Analyze field completeness
@@ -456,8 +403,10 @@ Example format:
     const hasCriticalRefs = extractedData.externalReferences?.criticalLinks?.length > 0;
     const hasMissingCriticalInfo = extractedData.externalReferences?.missingCriticalInfo?.length > 0;
 
-    let message = 'Grant extracted and saved successfully';
-    if (!hasAllRequired && hasCriticalRefs) {
+    let message = 'Grant information extracted successfully';
+    if (duplicateWarning) {
+      message = 'Grant extracted - potential duplicate detected';
+    } else if (!hasAllRequired && hasCriticalRefs) {
       message = 'Grant extracted with missing information - critical details may be in external links';
     } else if (!hasAllRequired) {
       message = 'Grant extracted with some missing information';
@@ -468,15 +417,8 @@ Example format:
     return NextResponse.json({
       success: true,
       message,
-      grant: {
-        id: grant.id,
-        title: grant.title,
-        funderName: funder?.name,
-        category: grant.category,
-        fundingAmountMin: grant.fundingAmountMin,
-        fundingAmountMax: grant.fundingAmountMax
-      },
       extractedData,
+      duplicateWarning,
       fieldAnalysis: {
         hasAllRequired,
         missingRequired,

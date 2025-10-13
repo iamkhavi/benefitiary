@@ -31,6 +31,39 @@ export default function AdminGrantsPage() {
   const [grants, setGrants] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  // Handle grant actions
+  const handleViewGrant = (grantId: string) => {
+    router.push(`/grants/${grantId}`);
+  };
+
+  const handleEditGrant = (grantId: string) => {
+    router.push(`/admin/grants/edit/${grantId}`);
+  };
+
+  const handleDeleteGrant = async (grantId: string, grantTitle: string) => {
+    const confirmed = confirm(`Are you sure you want to delete "${grantTitle}"? This action cannot be undone.`);
+    
+    if (!confirmed) return;
+
+    try {
+      const response = await fetch(`/api/admin/grants/${grantId}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to delete grant');
+      }
+
+      // Remove the grant from the local state
+      setGrants(grants.filter((grant: any) => grant.id !== grantId));
+      
+      console.log(`✅ Grant "${grantTitle}" deleted successfully`);
+    } catch (error) {
+      console.error('❌ Failed to delete grant:', error);
+      alert(`Failed to delete grant: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  };
+
   useEffect(() => {
     async function checkAccess() {
       if (isPending) return;
@@ -264,13 +297,29 @@ export default function AdminGrantsPage() {
                       </td>
                       <td className="py-4 px-4">
                         <div className="flex items-center space-x-2">
-                          <Button variant="ghost" size="sm">
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            onClick={() => handleViewGrant(grant.id)}
+                            title="View Grant Details"
+                          >
                             <Eye className="h-4 w-4" />
                           </Button>
-                          <Button variant="ghost" size="sm">
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            onClick={() => handleEditGrant(grant.id)}
+                            title="Edit Grant"
+                          >
                             <Edit className="h-4 w-4" />
                           </Button>
-                          <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-700">
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="text-red-600 hover:text-red-700"
+                            onClick={() => handleDeleteGrant(grant.id, grant.title)}
+                            title="Delete Grant"
+                          >
                             <Trash2 className="h-4 w-4" />
                           </Button>
                         </div>
