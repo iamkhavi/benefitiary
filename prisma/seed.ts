@@ -5,52 +5,61 @@ const prisma = new PrismaClient();
 async function main() {
   console.log('🌱 Seeding database...');
 
-  // Create scraping sources
+  // Create scraping sources - CORRECTED URLs for actual grant opportunities
   const sources = [
-    {
-      url: 'https://www.gatesfoundation.org/about/committed-grants',
-      type: 'FOUNDATION' as const,
-      category: 'Global Health & Development',
-      region: 'Global',
-      notes: 'Gates Foundation committed grants - scraper needs real implementation',
-      frequency: 'WEEKLY' as const,
-      status: 'INACTIVE' as const // Set to INACTIVE until real scraper is implemented
-    },
     {
       url: 'https://www.grants.gov/web/grants/search-grants.html',
       type: 'GOV' as const,
       category: 'Government Grants',
       region: 'United States',
-      notes: 'US Government grants portal - needs API integration',
+      notes: 'US Government grants portal - live funding opportunities via API',
       frequency: 'DAILY' as const,
-      status: 'INACTIVE' as const // Set to INACTIVE until API integration is implemented
+      status: 'ACTIVE' as const // Grants.gov API is implemented
     },
     {
-      url: 'https://www.fordfoundation.org/work/our-grants/',
+      url: 'https://www.fordfoundation.org/work/funding-opportunities/',
       type: 'FOUNDATION' as const,
       category: 'Social Justice & Human Rights',
       region: 'Global',
-      notes: 'Ford Foundation grants - scraper needs real implementation',
+      notes: 'Ford Foundation funding opportunities - open applications and RFPs',
       frequency: 'WEEKLY' as const,
-      status: 'INACTIVE' as const // Set to INACTIVE until real scraper is implemented
+      status: 'ACTIVE' as const
     },
     {
-      url: 'https://www.rockefellerfoundation.org/grants/',
+      url: 'https://www.macfound.org/programs/',
       type: 'FOUNDATION' as const,
-      category: 'Innovation & Resilience',
+      category: 'Research & Innovation',
       region: 'Global',
-      notes: 'Rockefeller Foundation - scraper needs real implementation',
+      notes: 'MacArthur Foundation programs and fellowship opportunities',
       frequency: 'WEEKLY' as const,
-      status: 'INACTIVE' as const // Set to INACTIVE until real scraper is implemented
+      status: 'ACTIVE' as const
     },
     {
-      url: 'https://www.globalgiving.org/projects/',
-      type: 'NGO' as const,
-      category: 'Community Development',
-      region: 'Global',
-      notes: 'GlobalGiving platform - grassroots projects (scraper not yet implemented)',
+      url: 'https://www.rwjf.org/en/grants/funding-opportunities.html',
+      type: 'FOUNDATION' as const,
+      category: 'Health & Healthcare',
+      region: 'United States',
+      notes: 'Robert Wood Johnson Foundation - health-focused funding opportunities',
       frequency: 'WEEKLY' as const,
-      status: 'INACTIVE' as const // Set to INACTIVE until real scraper is implemented
+      status: 'ACTIVE' as const
+    },
+    {
+      url: 'https://www.nsf.gov/funding/',
+      type: 'GOV' as const,
+      category: 'Science & Research',
+      region: 'United States',
+      notes: 'National Science Foundation funding opportunities and solicitations',
+      frequency: 'WEEKLY' as const,
+      status: 'ACTIVE' as const
+    },
+    {
+      url: 'https://wellcome.org/grant-funding',
+      type: 'FOUNDATION' as const,
+      category: 'Health & Medical Research',
+      region: 'Global',
+      notes: 'Wellcome Trust funding schemes - health and medical research',
+      frequency: 'WEEKLY' as const,
+      status: 'ACTIVE' as const
     }
   ];
 
@@ -64,13 +73,13 @@ async function main() {
 
   console.log('✅ Created scraping sources');
 
-  // Create some sample funders
+  // Create funders matching the corrected sources
   const funders = [
     {
-      name: 'Bill & Melinda Gates Foundation',
-      type: 'PRIVATE_FOUNDATION' as const,
-      website: 'https://www.gatesfoundation.org',
-      contactEmail: 'info@gatesfoundation.org'
+      name: 'US Government',
+      type: 'GOVERNMENT' as const,
+      website: 'https://www.grants.gov',
+      contactEmail: 'support@grants.gov'
     },
     {
       name: 'Ford Foundation',
@@ -79,16 +88,28 @@ async function main() {
       contactEmail: 'office-secretary@fordfoundation.org'
     },
     {
-      name: 'Rockefeller Foundation',
+      name: 'MacArthur Foundation',
       type: 'PRIVATE_FOUNDATION' as const,
-      website: 'https://www.rockefellerfoundation.org',
-      contactEmail: 'info@rockfound.org'
+      website: 'https://www.macfound.org',
+      contactEmail: 'info@macfound.org'
     },
     {
-      name: 'US Department of Health and Human Services',
+      name: 'Robert Wood Johnson Foundation',
+      type: 'PRIVATE_FOUNDATION' as const,
+      website: 'https://www.rwjf.org',
+      contactEmail: 'mail@rwjf.org'
+    },
+    {
+      name: 'National Science Foundation',
       type: 'GOVERNMENT' as const,
-      website: 'https://www.hhs.gov',
-      contactEmail: 'info@hhs.gov'
+      website: 'https://www.nsf.gov',
+      contactEmail: 'info@nsf.gov'
+    },
+    {
+      name: 'Wellcome Trust',
+      type: 'PRIVATE_FOUNDATION' as const,
+      website: 'https://wellcome.org',
+      contactEmail: 'contact@wellcome.org'
     }
   ];
 

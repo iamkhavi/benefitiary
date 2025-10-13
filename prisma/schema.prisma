@@ -26,6 +26,7 @@ model User {
 
   // Relations
   organization   Organization?
+  organizationProfile OrganizationProfile?
   preferences    UserPreferences?
   accounts       Account[]
   sessions       Session[]
@@ -233,13 +234,56 @@ enum GrantCategory {
 
 // Business Logic Tables
 
-// Funders model
+// Enhanced Funders model for comprehensive grant writing support
 model Funder {
   id           String      @id @default(cuid())
   name         String
   type         FunderType
   website      String?
   contactEmail String?
+  logoUrl      String?     // Funder logo for beautiful grant cards
+  
+  // Mission & Strategic Information
+  mission              String?     // Organization mission statement
+  vision               String?     // Vision statement
+  values               Json?       // Array of core values
+  strategicPriorities  Json?       // Array of current strategic priorities
+  focusAreas           Json?       // Array of focus areas/themes
+  
+  // Funding Patterns & Preferences
+  annualBudget         Decimal?    // Total annual giving budget
+  typicalGrantMin      Decimal?    // Typical minimum grant size
+  typicalGrantMax      Decimal?    // Typical maximum grant size
+  averageGrantSize     Decimal?    // Average grant size
+  totalGrantsPerYear   Int?        // Number of grants awarded annually
+  
+  // Geographic & Demographic Preferences
+  geographicFocus      Json?       // Array of preferred regions/countries
+  populationFocus      Json?       // Target populations (youth, women, etc.)
+  organizationTypes    Json?       // Preferred grantee types (NGO, academic, etc.)
+  
+  // Application & Review Process
+  applicationProcess   String?     // Description of application process
+  reviewCriteria       Json?       // Array of evaluation criteria
+  reviewTimeline       String?     // Typical review timeline
+  successRate          Decimal?    // Percentage of applications funded
+  competitionLevel     String?     // HIGH, MEDIUM, LOW
+  
+  // Key Personnel & Contacts
+  programOfficers      Json?       // Array of program officer contacts
+  boardMembers         Json?       // Array of board member info
+  keyDecisionMakers    Json?       // Key people in funding decisions
+  
+  // Policies & Requirements
+  indirectCostPolicy   String?     // Indirect cost policies
+  reportingRequirements String?    // Required reporting and milestones
+  partnershipRequirements String? // Required partnerships or collaborations
+  technicalAssistance Boolean?    @default(false) // Provides TA to grantees
+  
+  // Historical Data
+  pastRecipients       Json?       // Array of past grant recipients
+  fundingHistory       Json?       // Historical funding patterns
+  
   createdAt    DateTime    @default(now())
   updatedAt    DateTime    @updatedAt
 
@@ -249,7 +293,7 @@ model Funder {
   @@map("funders")
 }
 
-// Grants model (Enhanced for full functionality)
+// Enhanced Grants model for comprehensive proposal writing support
 model Grant {
   id                  String        @id @default(cuid())
   funderId            String?
@@ -285,6 +329,71 @@ model Grant {
   rfaPdfUrl          String?       // Link to RFP document
   sourceUpdatedAt    DateTime?     // When source last changed
   status             String?       @default("ACTIVE") // ACTIVE, EXPIRED, CLOSED
+  
+  // COMPREHENSIVE RFP & PROPOSAL WRITING FIELDS
+  
+  // Complete Raw Content Storage
+  rawContent          String?       // Complete original content (text/PDF content)
+  contentSource       String?       // Source type: "text", "pdf", "url", "manual"
+  originalFileName    String?       // Original filename if uploaded
+  
+  // Detailed RFP Information
+  rfpNumber           String?       // Official RFP/FOA number
+  programAnnouncement String?       // Full program announcement text
+  backgroundContext   String?       // Background and context for the grant
+  programGoals        Json?         // Array of program goals and objectives
+  expectedOutcomes    Json?         // Array of expected outcomes/deliverables
+  keyActivities       Json?         // Array of key activities/components
+  
+  // Evaluation & Scoring
+  evaluationCriteria  Json?         // Detailed evaluation criteria with weights
+  scoringRubric       Json?         // Scoring rubric and point allocations
+  reviewProcess       String?       // Description of review process
+  selectionCriteria   String?       // Selection criteria and preferences
+  
+  // Proposal Requirements
+  proposalSections    Json?         // Required proposal sections and descriptions
+  pageLimit           Int?          // Maximum page limit
+  wordLimit           Int?          // Maximum word limit
+  formatRequirements  String?       // Formatting requirements (font, spacing, etc.)
+  submissionFormat    String?       // Required submission format (PDF, online, etc.)
+  
+  // Budget & Financial
+  budgetRequirements  String?       // Budget requirements and restrictions
+  costShareRequired   Boolean?      @default(false) // Cost sharing required
+  costSharePercentage Decimal?      // Required cost share percentage
+  indirectCostRate    Decimal?      // Allowed indirect cost rate
+  budgetCategories    Json?         // Allowed budget categories
+  
+  // Collaboration & Partnerships
+  partnershipRequired Boolean?      @default(false) // Partnership required
+  requiredPartners    Json?         // Array of required partner types
+  preferredPartners   Json?         // Array of preferred partners
+  collaborationLevel  String?       // Level of collaboration expected
+  
+  // Reporting & Compliance
+  reportingSchedule   Json?         // Required reporting schedule
+  performanceMetrics  Json?         // Required performance metrics/KPIs
+  complianceRequirements String?    // Compliance and regulatory requirements
+  auditRequirements   String?       // Audit and financial oversight requirements
+  
+  // Historical Success Data
+  pastAwardees        Json?         // Array of past award recipients
+  successfulProposals Json?         // Examples of successful proposals
+  commonMistakes      Json?         // Array of common application mistakes
+  tipsForSuccess      Json?         // Array of tips for successful applications
+  
+  // Technical Assistance & Support
+  technicalAssistance Boolean?      @default(false) // TA provided
+  informationSessions Json?         // Array of information session details
+  contactPersons      Json?         // Array of contact persons for questions
+  faqUrl              String?       // Link to FAQ page
+  
+  // Competition & Context
+  expectedApplications Int?         // Expected number of applications
+  awardsAvailable     Int?          // Number of awards available
+  competitionLevel    String?       // HIGH, MEDIUM, LOW competition
+  fundingHistory      Json?         // Historical funding amounts and recipients
   
   createdAt           DateTime      @default(now())
   updatedAt           DateTime      @updatedAt
@@ -525,7 +634,7 @@ enum AuditAction {
 // AI AND DOCUMENT MANAGEMENT MODELS
 // ============================================================================
 
-// Grant RFP Documents (for AI context and analysis)
+// Enhanced Grant RFP Documents with detailed analysis for proposal writing
 model GrantRFP {
   id            String   @id @default(cuid())
   grantId       String?
@@ -540,6 +649,29 @@ model GrantRFP {
   summary       String?  // AI-generated summary
   vectorReady   Boolean  @default(false) // For future vector search
   processingStatus String? @default("pending") // pending, processing, completed, failed
+  
+  // ENHANCED RFP ANALYSIS FIELDS
+  
+  // Document Structure Analysis
+  documentSections    Json?    // Extracted sections and their content
+  requirementsList    Json?    // Extracted list of all requirements
+  evaluationCriteria  Json?    // Extracted evaluation criteria
+  budgetGuidelines    Json?    // Extracted budget guidelines
+  timelineRequirements Json?   // Extracted timeline and milestone requirements
+  
+  // AI-Powered Analysis
+  keyThemes           Json?    // AI-identified key themes and priorities
+  successFactors      Json?    // AI-identified success factors
+  riskFactors         Json?    // AI-identified risk factors
+  proposalStrategy    String?  // AI-generated proposal strategy recommendations
+  competitiveAdvantage String? // AI-suggested competitive advantages to highlight
+  
+  // Proposal Writing Assistance
+  proposalOutline     Json?    // AI-generated proposal outline
+  sectionTemplates    Json?    // Templates for each required section
+  writingTips         Json?    // Section-specific writing tips
+  commonPitfalls      Json?    // Common pitfalls to avoid
+  
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
@@ -548,6 +680,62 @@ model GrantRFP {
   uploadedBy User?  @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
 
   @@map("grant_rfp")
+}
+
+// New model for storing organization profiles for better grant matching
+model OrganizationProfile {
+  id                    String   @id @default(cuid())
+  userId                String   @unique
+  
+  // Mission & Vision
+  mission               String?  // Organization mission statement
+  vision                String?  // Organization vision
+  values                Json?    // Array of organizational values
+  
+  // Organizational Details
+  foundedYear           Int?     // Year organization was founded
+  legalStatus           String?  // 501c3, LLC, etc.
+  taxId                 String?  // Tax ID/EIN number
+  registrationNumber    String?  // Registration number if applicable
+  
+  // Financial Information
+  annualBudget          Decimal? // Annual operating budget
+  fundingHistory        Json?    // Array of past funding received
+  currentFunding        Json?    // Array of current funding sources
+  financialHealth       String?  // STRONG, MODERATE, WEAK
+  
+  // Capacity & Experience
+  staffCount            Int?     // Number of staff members
+  volunteerCount        Int?     // Number of volunteers
+  boardSize             Int?     // Number of board members
+  keyPersonnel          Json?    // Array of key personnel and their roles
+  pastProjects          Json?    // Array of past projects and outcomes
+  
+  // Track Record
+  grantsReceived        Json?    // Array of grants received with details
+  grantsApplied         Json?    // Array of grants applied to (success/failure)
+  successRate           Decimal? // Grant application success rate
+  totalFundingReceived  Decimal? // Total funding received to date
+  
+  // Capabilities & Assets
+  coreCompetencies      Json?    // Array of core competencies
+  technicalCapabilities Json?   // Array of technical capabilities
+  partnerships          Json?    // Array of current partnerships
+  infrastructure        Json?    // Physical and technical infrastructure
+  
+  // Impact & Outcomes
+  impactMetrics         Json?    // Array of impact metrics and data
+  beneficiariesServed   Int?     // Number of beneficiaries served
+  geographicReach       Json?    // Array of geographic areas served
+  outcomeStories        Json?    // Array of success stories and case studies
+  
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("organization_profiles")
 }
 
 // AI Grant Sessions (persistent chat workspaces per grant)

@@ -98,15 +98,21 @@ export default function AdminGrantsPage() {
           <Badge className="bg-red-100 text-red-800">Admin Only</Badge>
         </div>
         <div className="flex items-center space-x-3">
+          <Link href="/admin/grants/ai-extract">
+            <Button className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700">
+              <Zap className="h-4 w-4 mr-2" />
+              AI Extract Grant
+            </Button>
+          </Link>
           <Link href="/admin/grants/add">
-            <Button>
+            <Button variant="outline">
               <Plus className="h-4 w-4 mr-2" />
-              Add Grant
+              Add Manually
             </Button>
           </Link>
           <Link href="/admin/scraping">
             <Button variant="outline">
-              <Zap className="h-4 w-4 mr-2" />
+              <Database className="h-4 w-4 mr-2" />
               Scraping Status
             </Button>
           </Link>
@@ -196,15 +202,21 @@ export default function AdminGrantsPage() {
                 Get started by adding your first grant manually or running the scrapers.
               </p>
               <div className="flex items-center justify-center space-x-3">
+                <Link href="/admin/grants/ai-extract">
+                  <Button className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700">
+                    <Zap className="h-4 w-4 mr-2" />
+                    AI Extract Grant
+                  </Button>
+                </Link>
                 <Link href="/admin/grants/add">
-                  <Button>
+                  <Button variant="outline">
                     <Plus className="h-4 w-4 mr-2" />
-                    Add Grant Manually
+                    Add Manually
                   </Button>
                 </Link>
                 <Link href="/admin/scraping">
                   <Button variant="outline">
-                    <Zap className="h-4 w-4 mr-2" />
+                    <Database className="h-4 w-4 mr-2" />
                     Run Scrapers
                   </Button>
                 </Link>

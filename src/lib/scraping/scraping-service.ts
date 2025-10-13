@@ -63,7 +63,7 @@ export class ScrapingService {
 
       // Determine scraper type based on URL
       const scraperType = this.getScraperType(source.url);
-      
+
       // Run the scraping
       const result = await this.orchestrator.scrapeSource(scraperType, source.url);
 
@@ -84,7 +84,7 @@ export class ScrapingService {
       // Update source last scraped time
       await prisma.scrapedSource.update({
         where: { id: source.id },
-        data: { 
+        data: {
           lastScrapedAt: new Date(),
           failCount: 0,
           lastError: null
@@ -116,16 +116,19 @@ export class ScrapingService {
   }
 
   private getScraperType(url: string): string {
-    if (url.includes('gatesfoundation.org')) return 'gates-foundation';
+    // Government sources
     if (url.includes('grants.gov')) return 'grants-gov';
+    if (url.includes('nsf.gov')) return 'grants-gov'; // NSF can use same gov scraper
+
+    // Foundation sources
     if (url.includes('fordfoundation.org')) return 'ford-foundation';
-    if (url.includes('rockefellerfoundation.org')) return 'ford-foundation'; // Use Ford scraper as template
-    if (url.includes('globalgiving.org')) return 'ford-foundation'; // Use Ford scraper as template
-    if (url.includes('httpbin.org')) return 'gates-foundation'; // Use gates as fallback
-    
-    // Default to gates-foundation scraper for unknown URLs
-    console.log(`No specific scraper for ${url}, using gates-foundation as fallback`);
-    return 'gates-foundation';
+    if (url.includes('macfound.org')) return 'ford-foundation'; // MacArthur uses similar structure
+    if (url.includes('rwjf.org')) return 'ford-foundation'; // RWJF uses similar structure
+    if (url.includes('wellcome.org')) return 'ford-foundation'; // Wellcome uses similar structure
+
+    // Default fallback
+    console.log(`No specific scraper for ${url}, using ford-foundation as fallback`);
+    return 'ford-foundation';
   }
 
   async getScrapingStatus() {
