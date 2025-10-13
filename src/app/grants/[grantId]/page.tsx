@@ -415,7 +415,7 @@ export default function GrantDetailPage() {
               {grant.funder?.website && (
                 <div>
                   <p className="text-sm font-medium text-gray-600">Funder Website</p>
-                  <Link 
+                  <a 
                     href={grant.funder.website} 
                     target="_blank" 
                     rel="noopener noreferrer"
@@ -423,7 +423,7 @@ export default function GrantDetailPage() {
                   >
                     <span>{grant.funder.website}</span>
                     <ExternalLink className="h-4 w-4" />
-                  </Link>
+                  </a>
                 </div>
               )}
               {(grant.contactEmail || grant.funder?.contactEmail) && (
@@ -460,12 +460,16 @@ export default function GrantDetailPage() {
             </div>
 
             {grant.applicationUrl && (
-              <Link href={grant.applicationUrl} target="_blank" rel="noopener noreferrer">
+              <a 
+                href={grant.applicationUrl} 
+                target="_blank" 
+                rel="noopener noreferrer"
+              >
                 <Button size="lg" className="flex items-center space-x-2">
                   <ExternalLink className="h-5 w-5" />
-                  <span>Apply Now</span>
+                  <span>More Information</span>
                 </Button>
-              </Link>
+              </a>
             )}
           </div>
         </CardContent>

@@ -43,59 +43,117 @@ interface UploadedFile {
 }
 
 export default function AIWorkspacePage({ params }: { params: { grantId: string } }) {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: '1',
-      sender: 'ai',
-      content: `Welcome to your AI Workspace for the **Maternal Health Innovation Challenge 2025**! 
-
-I'm your dedicated grant assistant and I have full context of:
-✅ Grant requirements and eligibility criteria
-✅ Your organization profile (HealthCare Kenya)
-✅ Application deadlines and requirements
-
-**Quick Analysis:**
-- **Match Score**: 95% - Excellent alignment!
-- **Key Strengths**: Healthcare focus, Kenya location, innovation emphasis
-- **Potential Gap**: Need to verify 3+ years maternal health experience
-
-How can I help you with your application today?`,
-      timestamp: new Date(Date.now() - 300000),
-      type: 'text'
-    }
-  ]);
-  
+  const [messages, setMessages] = useState<Message[]>([]);
   const [inputMessage, setInputMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [showSidebar, setShowSidebar] = useState(false);
   const [showCanvas, setShowCanvas] = useState(false);
+  const [grantData, setGrantData] = useState<any>(null);
+  const [loadingGrant, setLoadingGrant] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Mock grant data - in real app, this would come from API
-  const grantData = {
-    id: params.grantId,
-    title: "Maternal Health Innovation Challenge 2025",
-    funder: "Gates Foundation",
-    amount: "$100,000 - $750,000",
-    deadline: "Apr 15, 2025",
-    location: "Sub-Saharan Africa, South Asia",
-    category: "Healthcare",
-    match: 95,
-    description: "Supporting breakthrough innovations to reduce maternal mortality in Sub-Saharan Africa and South Asia.",
-    eligibility: [
-      "Registered nonprofits or social enterprises",
-      "3+ years experience in maternal health",
-      "Partnerships with local health systems",
-      "Measurable impact metrics"
-    ],
-    requiredDocs: [
-      "Concept Note (5 pages max)",
-      "Budget breakdown",
-      "Impact metrics and evidence",
-      "Partnership letters"
-    ]
+  // Initialize welcome message when grant data loads
+  useEffect(() => {
+    if (grantData && messages.length === 0) {
+      const welcomeMessage: Message = {
+        id: '1',
+        sender: 'ai',
+        content: `Welcome to your AI Workspace for **${grantData.title}**! 
+
+I'm your dedicated grant assistant and I have full context of:
+✅ Grant requirements and eligibility criteria
+✅ Funding details (${grantData.amount})
+✅ Application deadline (${grantData.deadline})
+✅ Geographic eligibility (${grantData.location})
+
+**Quick Analysis:**
+- **Match Score**: ${grantData.match}% - ${grantData.match >= 80 ? 'Excellent alignment!' : grantData.match >= 60 ? 'Good potential match' : 'Consider reviewing eligibility'}
+- **Funder**: ${grantData.funder}
+- **Category**: ${grantData.category}
+
+I can help you with:
+🎯 Eligibility assessment
+📝 Proposal writing and structure
+💰 Budget planning guidance
+📋 Required documents checklist
+⏰ Timeline and deadline management
+
+How can I help you with your application today?`,
+        timestamp: new Date(Date.now() - 300000),
+        type: 'text'
+      };
+      setMessages([welcomeMessage]);
+    }
+  }, [grantData, messages.length]);
+
+  // Load grant data
+  useEffect(() => {
+    async function fetchGrant() {
+      try {
+        const response = await fetch(`/api/grants/${params.grantId}`);
+        if (response.ok) {
+          const data = await response.json();
+          setGrantData({
+            id: data.grant.id,
+            title: data.grant.title,
+            funder: data.grant.funder?.name || 'Unknown Funder',
+            amount: formatAmount(data.grant.fundingAmountMin, data.grant.fundingAmountMax),
+            deadline: data.grant.deadline ? new Date(data.grant.deadline).toLocaleDateString() : 'Rolling',
+            location: Array.isArray(data.grant.locationEligibility) 
+              ? data.grant.locationEligibility.join(', ') 
+              : data.grant.locationEligibility || 'Not specified',
+            category: data.grant.category?.replace(/_/g, ' ') || 'General',
+            match: Math.floor(Math.random() * 20) + 80, // Mock match score for now
+            description: data.grant.description || 'No description available',
+            eligibility: data.grant.eligibilityCriteria 
+              ? data.grant.eligibilityCriteria.split('\n').filter(Boolean)
+              : ['Eligibility criteria not specified'],
+            requiredDocs: Array.isArray(data.grant.requiredDocuments)
+              ? data.grant.requiredDocuments
+              : data.grant.requiredDocuments 
+                ? data.grant.requiredDocuments.split(',').map((doc: string) => doc.trim())
+                : ['Required documents not specified']
+          });
+        }
+      } catch (error) {
+        console.error('Failed to load grant:', error);
+        // Keep mock data as fallback
+        setGrantData({
+          id: params.grantId,
+          title: "Grant Information",
+          funder: "Loading...",
+          amount: "Amount not available",
+          deadline: "Deadline not available",
+          location: "Location not specified",
+          category: "General",
+          match: 0,
+          description: "Grant information is currently unavailable.",
+          eligibility: ["Unable to load eligibility criteria"],
+          requiredDocs: ["Unable to load required documents"]
+        });
+      } finally {
+        setLoadingGrant(false);
+      }
+    }
+
+    fetchGrant();
+  }, [params.grantId]);
+
+  const formatAmount = (min?: number, max?: number) => {
+    if (!min && !max) return 'Amount not specified';
+    
+    const formatNumber = (num: number) => {
+      if (num >= 1000000) return `$${(num / 1000000).toFixed(1)}M`;
+      if (num >= 1000) return `$${(num / 1000).toFixed(0)}K`;
+      return `$${num.toLocaleString()}`;
+    };
+
+    if (min && max && min !== max) {
+      return `${formatNumber(min)} - ${formatNumber(max)}`;
+    }
+    return formatNumber(min || max || 0);
   };
 
   const scrollToBottom = () => {
@@ -122,18 +180,60 @@ How can I help you with your application today?`,
     setInputMessage('');
     setIsLoading(true);
 
-    // Simulate AI response
-    setTimeout(() => {
+    try {
+      // Call the real AI API
+      const response = await fetch('/api/ai/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          grantId: params.grantId,
+          message: messageToSend,
+          sessionId: null // Will be managed by the API
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to get AI response');
+      }
+
+      const data = await response.json();
+      
       const aiResponse: Message = {
+        id: data.aiMessage.id,
+        sender: 'ai',
+        content: data.aiMessage.content,
+        timestamp: new Date(data.aiMessage.createdAt),
+        type: 'text',
+        metadata: data.aiMessage.metadata
+      };
+      
+      setMessages(prev => [...prev, aiResponse]);
+    } catch (error) {
+      console.error('AI Chat Error:', error);
+      
+      // Fallback to mock response if API fails
+      const fallbackResponse: Message = {
         id: (Date.now() + 1).toString(),
         sender: 'ai',
-        content: generateAIResponse(messageToSend),
+        content: `I apologize, but I'm having trouble connecting to the AI service right now. Here's a general response:
+
+**Grant Analysis**: Based on your question about "${messageToSend}", I recommend:
+
+1. **Review Requirements**: Double-check all eligibility criteria
+2. **Prepare Documentation**: Gather required documents early
+3. **Contact Support**: Reach out to the funder for clarification
+
+Please try again in a moment, or contact support if the issue persists.`,
         timestamp: new Date(),
         type: 'text'
       };
-      setMessages(prev => [...prev, aiResponse]);
+      
+      setMessages(prev => [...prev, fallbackResponse]);
+    } finally {
       setIsLoading(false);
-    }, 1500);
+    }
   };
 
   const handleQuickAction = (_actionId: string, prompt: string) => {
@@ -218,6 +318,17 @@ I'm analyzing this document and will incorporate it into our conversation contex
   const removeFile = (fileId: string) => {
     setUploadedFiles(prev => prev.filter(f => f.id !== fileId));
   };
+
+  if (loadingGrant || !grantData) {
+    return (
+      <div className="h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading AI Workspace...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="h-screen flex flex-col bg-gray-50">

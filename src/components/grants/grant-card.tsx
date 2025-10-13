@@ -209,12 +209,17 @@ export function GrantCard({ grant, className }: GrantCardProps) {
             </div>
 
             {grant.applicationUrl && (
-              <Link href={grant.applicationUrl} target="_blank" rel="noopener noreferrer" className="w-full">
+              <a 
+                href={grant.applicationUrl} 
+                target="_blank" 
+                rel="noopener noreferrer" 
+                className="w-full"
+              >
                 <Button variant="ghost" size="sm" className="w-full text-primary">
                   <ExternalLink className="h-4 w-4 mr-1" />
-                  Apply Now
+                  More Information
                 </Button>
-              </Link>
+              </a>
             )}
           </div>
         </div>
