@@ -148,6 +148,7 @@ export async function POST(request: NextRequest) {
               try {
                 // Extract text from all pages
                 let fullText = '';
+                console.log(`📄 PDF has ${pdfData.Pages?.length || 0} pages`);
                 if (pdfData.Pages) {
                   pdfData.Pages.forEach((page: any) => {
                     if (page.Texts) {
@@ -155,7 +156,13 @@ export async function POST(request: NextRequest) {
                         if (text.R) {
                           text.R.forEach((run: any) => {
                             if (run.T) {
-                              fullText += decodeURIComponent(run.T) + ' ';
+                              try {
+                                // Try to decode URI component, fallback to raw text if malformed
+                                fullText += decodeURIComponent(run.T) + ' ';
+                              } catch (uriError) {
+                                // If URI decoding fails, use the raw text
+                                fullText += run.T + ' ';
+                              }
                             }
                           });
                         }
