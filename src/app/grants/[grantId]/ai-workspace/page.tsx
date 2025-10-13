@@ -498,7 +498,8 @@ I'm analyzing this document and will incorporate it into our conversation contex
         )}>
           <ProposalEditor 
             showCanvas={showCanvas} 
-            onClose={() => setShowCanvas(false)} 
+            onClose={() => setShowCanvas(false)}
+            grantId={params.grantId}
           />
         </div>
 
