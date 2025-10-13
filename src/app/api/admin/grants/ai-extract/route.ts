@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireAdmin } from '@/lib/auth-helpers';
 import { prisma } from '@/lib/prisma';
 import OpenAI from 'openai';
-const pdf = require('pdf-parse');
+// PDF parsing will be handled differently to avoid server-side DOM issues
 
 // Smart content chunking for large documents
 function smartChunkContent(content: string, maxSize: number): string[] {
@@ -120,13 +120,17 @@ export async function POST(request: NextRequest) {
       const textContent = formData.get('grantText') as string;
 
       if (file && file.type === 'application/pdf') {
-        console.log('📄 Processing PDF file:', file.name);
-        const buffer = Buffer.from(await file.arrayBuffer());
-        const pdfData = await pdf(buffer);
-        grantText = pdfData.text;
-        contentSource = 'pdf';
-        originalFileName = file.name;
-        console.log(`✅ Extracted ${pdfData.text.length} characters from PDF`);
+        console.log('📄 PDF file detected:', file.name);
+        // For now, return an error asking user to convert PDF to text
+        // This avoids server-side DOM issues with pdf-parse
+        return NextResponse.json(
+          { 
+            error: 'PDF processing temporarily unavailable',
+            details: 'Please copy the text content from your PDF and paste it in the text input instead. We are working on improving PDF processing.',
+            suggestion: 'Use the "Paste Text" option and copy-paste the content from your PDF'
+          },
+          { status: 400 }
+        );
       } else if (textContent) {
         grantText = textContent;
         contentSource = 'text';

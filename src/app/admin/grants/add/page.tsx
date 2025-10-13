@@ -488,7 +488,7 @@ export default function AddGrantPage() {
                     />
                     <span className="text-sm">Paste Text</span>
                   </label>
-                  <label className="flex items-center space-x-2">
+                  <label className="flex items-center space-x-2 opacity-50">
                     <input
                       type="radio"
                       name="uploadMethod"
@@ -496,8 +496,9 @@ export default function AddGrantPage() {
                       checked={uploadMethod === 'pdf'}
                       onChange={(e) => setUploadMethod(e.target.value as 'text' | 'pdf')}
                       className="text-primary"
+                      disabled
                     />
-                    <span className="text-sm">Upload PDF</span>
+                    <span className="text-sm">Upload PDF (Coming Soon)</span>
                   </label>
                 </div>
               </div>
@@ -539,7 +540,7 @@ export default function AddGrantPage() {
                               {selectedFile ? selectedFile.name : 'Click to upload PDF'}
                             </p>
                             <p className="text-xs text-gray-500">
-                              Supports RFPs, grant announcements, and large documents (10+ pages)
+                              PDF processing temporarily unavailable - please use text input instead
                             </p>
                           </div>
                         </div>
