@@ -54,85 +54,7 @@ export default function AIWorkspacePage({ params }: { params: { grantId: string 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Initialize welcome message when grant data loads
-  useEffect(() => {
-    if (grantData && messages.length === 0) {
-      const isSpecializedGrant = grantData.title?.includes('ATM-AVI') || grantData.title?.includes('Clinical') || grantData.title?.includes('Research');
-      const deadline = new Date(grantData.deadline);
-      const daysUntilDeadline = Math.ceil((deadline.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
-      
-      let welcomeContent = '';
-      
-      if (isSpecializedGrant) {
-        welcomeContent = `**🧬 EXPERT GRANT ADVISOR - Clinical Research Specialist**
-
-Welcome to your AI Workspace for **${grantData.title}**!
-
-I'm your **expert grant writing advisor** with deep expertise in:
-✅ **Clinical Research Protocols** - Study design, regulatory compliance
-✅ **Pharmaceutical Partnerships** - Industry collaboration best practices  
-✅ **Regulatory Pathways** - FDA, EMA, NMPA approval processes
-✅ **Budget Optimization** - Cost-effective research planning
-
-**🎯 GRANT INTELLIGENCE ANALYSIS:**
-- **Funding**: ${grantData.amount} (${grantData.funder})
-- **Deadline**: ${grantData.deadline} (${daysUntilDeadline > 0 ? `${daysUntilDeadline} days remaining` : 'OVERDUE'})
-- **Geographic Scope**: ${grantData.location}
-- **Competitive Assessment**: ${grantData.match >= 90 ? 'HIGHLY COMPETITIVE - Premium opportunity' : grantData.match >= 80 ? 'COMPETITIVE - Strong potential' : 'MODERATE - Review alignment'}
-
-**🏆 SUCCESS STRATEGY:**
-This appears to be a **specialized clinical research grant** requiring:
-- Advanced clinical trial methodology
-- Regulatory compliance expertise  
-- Strong institutional partnerships
-- Detailed budget justification
-
-**IMMEDIATE PRIORITIES:**
-1. **Clinical Protocol Development** - Study design and methodology
-2. **Regulatory Compliance** - IRB, ethics, safety protocols
-3. **Budget Strategy** - Personnel, equipment, overhead optimization
-4. **Partnership Documentation** - Institutional agreements
-
-Ready to develop a **winning proposal strategy**? What's your first priority?`;
-      } else {
-        welcomeContent = `**🎯 EXPERT GRANT ADVISOR**
-
-Welcome to your AI Workspace for **${grantData.title}**!
-
-I'm your **dedicated grant writing expert** with comprehensive knowledge of:
-✅ **Grant Strategy** - Competitive positioning and funder priorities
-✅ **Proposal Architecture** - Compelling narrative structure
-✅ **Budget Engineering** - Cost-effective resource allocation
-✅ **Compliance Management** - Requirements and documentation
-
-**📊 OPPORTUNITY ANALYSIS:**
-- **Funding**: ${grantData.amount} (${grantData.funder})
-- **Deadline**: ${grantData.deadline} (${daysUntilDeadline > 0 ? `${daysUntilDeadline} days remaining` : 'Check deadline'})
-- **Eligibility**: ${grantData.location}
-- **Match Assessment**: ${grantData.match}% - ${grantData.match >= 90 ? 'EXCEPTIONAL alignment' : grantData.match >= 80 ? 'STRONG potential' : grantData.match >= 60 ? 'GOOD opportunity' : 'Review requirements'}
-
-**🚀 STRATEGIC APPROACH:**
-Based on **${grantData.category}** focus and **${grantData.funder}** priorities, I recommend:
-
-1. **Competitive Analysis** - Position against typical applicants
-2. **Narrative Development** - Compelling problem-solution framework  
-3. **Evidence Assembly** - Data, partnerships, track record
-4. **Resource Planning** - Budget optimization and justification
-
-**NEXT STEPS:**
-What aspect of your proposal would you like to tackle first? I can help with strategy, writing, budgets, or compliance.`;
-      }
-      
-      const welcomeMessage: Message = {
-        id: '1',
-        sender: 'ai',
-        content: welcomeContent,
-        timestamp: new Date(Date.now() - 300000),
-        type: 'text'
-      };
-      setMessages([welcomeMessage]);
-    }
-  }, [grantData, messages.length]);
+  // No automatic welcome message - let user initiate conversation
 
   // Load grant data
   useEffect(() => {
@@ -258,36 +180,27 @@ What aspect of your proposal would you like to tackle first? I can help with str
       const data = await response.json();
       
       const aiResponse: Message = {
-        id: data.aiMessage.id,
+        id: data.sessionId + '_' + Date.now(),
         sender: 'ai',
-        content: data.aiMessage.content,
-        timestamp: new Date(data.aiMessage.createdAt),
-        type: 'text',
-        metadata: data.aiMessage.metadata
+        content: data.response,
+        timestamp: new Date(),
+        type: 'text'
       };
       
       setMessages(prev => [...prev, aiResponse]);
     } catch (error) {
       console.error('AI Chat Error:', error);
       
-      // Fallback to mock response if API fails
-      const fallbackResponse: Message = {
-        id: (Date.now() + 1).toString(),
+      // Simple error message
+      const errorMessage: Message = {
+        id: Date.now().toString() + '_error',
         sender: 'ai',
-        content: `I apologize, but I'm having trouble connecting to the AI service right now. Here's a general response:
-
-**Grant Analysis**: Based on your question about "${messageToSend}", I recommend:
-
-1. **Review Requirements**: Double-check all eligibility criteria
-2. **Prepare Documentation**: Gather required documents early
-3. **Contact Support**: Reach out to the funder for clarification
-
-Please try again in a moment, or contact support if the issue persists.`,
+        content: 'An error occurred, please try again later.',
         timestamp: new Date(),
         type: 'text'
       };
       
-      setMessages(prev => [...prev, fallbackResponse]);
+      setMessages(prev => [...prev, errorMessage]);
     } finally {
       setIsLoading(false);
     }
@@ -297,50 +210,7 @@ Please try again in a moment, or contact support if the issue persists.`,
     handleSendMessage(prompt);
   };
 
-  const generateAIResponse = (userInput: string): string => {
-    const responses = [
-      `Based on your question about "${userInput}", here's what I found in the grant requirements:
-
-**Eligibility Check**: Your organization appears to meet most criteria. However, I need clarification on your maternal health experience duration.
-
-**Recommendation**: 
-1. Prepare a detailed portfolio of your maternal health work
-2. Highlight any partnerships with local health facilities
-3. Quantify your impact metrics (lives saved, mothers helped, etc.)
-
-Would you like me to help draft a specific section of your proposal?`,
-      
-      `Great question! Let me analyze this against the Gates Foundation's priorities:
-
-**Key Alignment Points**:
-- ✅ Innovation focus matches your tech approach
-- ✅ Geographic eligibility (Kenya is included)
-- ✅ Target demographic alignment
-
-**Next Steps**:
-1. Review the concept note template
-2. Prepare your budget breakdown
-3. Gather partnership letters
-
-I can help you with any of these. What would you like to work on first?`,
-      
-      `I've reviewed the grant requirements for this specific question. Here's my assessment:
-
-**Strengths to Highlight**:
-- Your community-based approach
-- Local partnerships and trust
-- Measurable health outcomes
-
-**Areas to Address**:
-- Scale potential and sustainability
-- Technology integration strategy
-- Long-term impact measurement
-
-Would you like me to help you structure a response that addresses these points?`
-    ];
-    
-    return responses[Math.floor(Math.random() * responses.length)];
-  };
+  // Removed mock AI response function - using real Maya API
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
@@ -413,7 +283,7 @@ Maya is analyzing this document...`,
         const errorMessage: Message = {
           id: Date.now().toString() + '_error',
           sender: 'ai',
-          content: `I had trouble analyzing ${file.name}, but I can still help you work with this document. Could you tell me what type of document this is and what specific information you'd like me to help you with?`,
+          content: 'An error occurred while analyzing the file, please try again later.',
           timestamp: new Date(),
           type: 'text'
         };
@@ -610,31 +480,8 @@ Maya is analyzing this document...`,
                       : "bg-white border border-gray-200"
                   )}
                 >
-                  <div className="prose prose-sm max-w-none">
-                    {message.content.split('\n').map((line, index) => {
-                      if (line.startsWith('**') && line.endsWith('**')) {
-                        return (
-                          <p key={index} className="font-semibold mb-2">
-                            {line.replace(/\*\*/g, '')}
-                          </p>
-                        );
-                      }
-                      if (line.startsWith('✅') || line.startsWith('❌') || line.startsWith('📎')) {
-                        return (
-                          <p key={index} className="mb-1">
-                            {line}
-                          </p>
-                        );
-                      }
-                      if (line.trim() === '') {
-                        return <br key={index} />;
-                      }
-                      return (
-                        <p key={index} className="mb-2">
-                          {line}
-                        </p>
-                      );
-                    })}
+                  <div className="text-sm leading-relaxed whitespace-pre-wrap">
+                    {message.content}
                   </div>
                   <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-100">
                     <span className="text-xs text-gray-500">

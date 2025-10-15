@@ -120,7 +120,9 @@ export class MayaAgent {
 - Explain your reasoning clearly
 - Ask clarifying questions when you need more information
 - Be encouraging but realistic about challenges
-- **PROACTIVELY ASK FOR RESOURCES** when they would help create better proposals
+- PROACTIVELY ASK FOR RESOURCES when they would help create better proposals
+- Use simple, clean formatting - avoid excessive markdown, headers, or symbols
+- Keep responses focused and conversational, not overwhelming
 
 **WHEN TO ASK FOR ADDITIONAL RESOURCES:**
 - **CVs/Resumes**: When discussing team qualifications or project leadership
@@ -472,24 +474,11 @@ ${org?.name || 'Our organization'} has demonstrated capacity to successfully man
    * Simple fallback when OpenAI fails
    */
   private generateFallbackResponse(userMessage: string): MayaResponse {
-    const org = this.userContext?.organization;
-    const grant = this.grantContext;
-
-    const fallbackContent = `I apologize, but I'm experiencing some technical difficulties right now. 
-
-However, based on what I know about ${org?.name || 'your organization'} and the ${grant?.title || 'grant opportunity'} you're interested in, I can still help you.
-
-Could you please rephrase your question? I want to make sure I give you the most relevant advice for your ${org?.orgType?.replace(/_/g, ' ') || 'organization'} pursuing this ${grant?.category?.replace(/_/g, ' ') || 'funding'} opportunity.`;
-
     return {
-      content: fallbackContent,
-      confidence: 0.6,
-      reasoning: 'Fallback response using available context',
-      suggestions: [
-        'Try rephrasing your question',
-        'Ask about specific grant requirements',
-        'Discuss your organization\'s eligibility'
-      ]
+      content: 'An error occurred, please try again later.',
+      confidence: 0.1,
+      reasoning: 'Fallback response due to API error',
+      suggestions: []
     };
   }
 
@@ -551,18 +540,10 @@ ${fileContent.substring(0, 3000)}${fileContent.length > 3000 ? '...[truncated]' 
     } catch (error) {
       console.error('Maya file analysis error:', error);
       return {
-        content: `I've received your file "${fileName}" but I'm having trouble analyzing it right now. 
-
-However, I can see it's a ${fileType} file. Could you tell me what type of document this is (CV, budget, previous proposal, etc.) and what specific information you'd like me to help you with from this document?
-
-I'm here to help you use this information effectively in your grant application!`,
-        confidence: 0.6,
-        reasoning: 'Fallback response for file analysis',
-        suggestions: [
-          'Describe what type of document you uploaded',
-          'Share key information from the document',
-          'Ask specific questions about how to use this information'
-        ]
+        content: 'An error occurred while analyzing the file, please try again later.',
+        confidence: 0.1,
+        reasoning: 'Fallback response for file analysis error',
+        suggestions: []
       };
     }
   }
