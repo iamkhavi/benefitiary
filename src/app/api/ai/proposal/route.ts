@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { createMayaAgent } from '@/lib/ai/maya-agent';
 
 export async function POST(request: NextRequest) {
   try {
@@ -39,40 +40,31 @@ export async function POST(request: NextRequest) {
 
 async function handleAIAssist(grantId: string, section: string, userId: string) {
   try {
-    // Get grant context
-    const grant = await prisma.grant.findUnique({
-      where: { id: grantId },
-      include: { funder: true }
-    });
+    // Create Maya agent with context
+    const maya = await createMayaAgent(userId, grantId);
 
-    if (!grant) {
-      return NextResponse.json({ error: 'Grant not found' }, { status: 404 });
-    }
+    // Generate proposal section using Maya
+    const mayaResponse = await maya.generateProposalSection(section);
 
-    // Get user organization context
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      include: { organization: true }
-    });
-
-    // Generate AI content based on section and context
-    const aiContent = await generateSectionContent(section, grant, user?.organization);
-
-    // Track AI usage
+    // Track AI usage (estimate tokens for Maya)
+    const estimatedTokens = Math.ceil(mayaResponse.content.length / 4); // Rough estimate
     await prisma.aIUsage.create({
       data: {
         userId: userId,
         taskType: 'PROPOSAL_GENERATION',
-        tokensUsed: aiContent.tokensUsed,
-        costUsd: calculateCost(aiContent.tokensUsed)
+        tokensUsed: estimatedTokens,
+        costUsd: calculateCost(estimatedTokens)
       }
     });
 
     return NextResponse.json({
       success: true,
-      content: aiContent.content,
+      content: mayaResponse.content,
       section: section,
-      tokensUsed: aiContent.tokensUsed
+      confidence: mayaResponse.confidence,
+      reasoning: mayaResponse.reasoning,
+      suggestions: mayaResponse.suggestions,
+      tokensUsed: estimatedTokens
     });
 
   } catch (error) {

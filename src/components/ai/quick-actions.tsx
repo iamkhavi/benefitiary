@@ -82,6 +82,38 @@ export function QuickActions({ onActionClick }: QuickActionsProps) {
       icon: Lightbulb,
       prompt: 'Help me brainstorm innovative approaches and solutions that would make our proposal stand out for this grant.',
       color: 'text-orange-600'
+    },
+    {
+      id: 'clarify-budget',
+      title: 'Budget Questions',
+      description: 'Get specific questions about budget planning',
+      icon: DollarSign,
+      prompt: 'CLARIFY:budget',
+      color: 'text-green-600'
+    },
+    {
+      id: 'clarify-team',
+      title: 'Team Questions', 
+      description: 'Get specific questions about team composition',
+      icon: Users,
+      prompt: 'CLARIFY:team',
+      color: 'text-blue-600'
+    },
+    {
+      id: 'need-cvs',
+      title: 'Need CVs?',
+      description: 'Ask Maya what team documents would help',
+      icon: FileText,
+      prompt: 'What team member CVs or resumes would help strengthen our proposal? What specific qualifications should I highlight?',
+      color: 'text-purple-600'
+    },
+    {
+      id: 'need-budget',
+      title: 'Need Budget Info?',
+      description: 'Ask Maya what financial documents would help',
+      icon: DollarSign,
+      prompt: 'What budget information or financial documents would help you create a stronger budget section for our proposal?',
+      color: 'text-emerald-600'
     }
   ];
 

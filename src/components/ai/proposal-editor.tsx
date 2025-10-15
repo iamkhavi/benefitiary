@@ -41,8 +41,10 @@ import {
   User,
   Sparkles,
   Eye,
-  EyeOff
+  EyeOff,
+  FileDown
 } from 'lucide-react';
+import { downloadProposalPDF } from '@/lib/pdf-export';
 import { cn } from '@/lib/utils';
 
 interface ProposalEditorProps {
@@ -298,13 +300,27 @@ export function ProposalEditor({ showCanvas, onClose, grantId }: ProposalEditorP
     console.log('Saving to API...', content);
   };
 
-  const exportToPDF = () => {
+  const exportToPDF = async () => {
     if (!editor) return;
     
-    const content = editor.getHTML();
-    console.log('Exporting to PDF...', content);
-    // In production, implement PDF generation
-    alert('PDF export functionality would be implemented here');
+    try {
+      const content = editor.getHTML();
+      
+      // Get grant and organization info for PDF metadata
+      const grantResponse = await fetch(`/api/grants/${grantId}`);
+      const grantData = await grantResponse.json();
+      
+      const title = `Grant Proposal - ${grantData.grant?.title || 'Untitled'}`;
+      const organizationName = 'Your Organization'; // This should come from user context
+      const grantTitle = grantData.grant?.title || 'Grant Opportunity';
+      const funderName = grantData.grant?.funder?.name || 'Funding Organization';
+      
+      await downloadProposalPDF(title, organizationName, grantTitle, funderName, content);
+      
+    } catch (error) {
+      console.error('PDF export error:', error);
+      alert('Failed to export PDF. Please try again.');
+    }
   };
 
   if (!editor) {
@@ -380,7 +396,7 @@ export function ProposalEditor({ showCanvas, onClose, grantId }: ProposalEditorP
             )}
             
             <Button variant="outline" size="sm" onClick={exportToPDF}>
-              <Download className="h-4 w-4 mr-2" />
+              <FileDown className="h-4 w-4 mr-2" />
               Export PDF
             </Button>
             

@@ -214,10 +214,25 @@ What aspect of your proposal would you like to tackle first? I can help with str
     const messageToSend = message || inputMessage;
     if (!messageToSend.trim()) return;
 
+    // Check if this is a clarifying question request
+    let requestBody: any = {
+      grantId: params.grantId,
+      sessionId: null // Will be managed by the API
+    };
+
+    if (messageToSend.startsWith('CLARIFY:')) {
+      const topic = messageToSend.replace('CLARIFY:', '');
+      requestBody.action = 'clarify';
+      requestBody.topic = topic;
+      requestBody.message = `Get clarifying questions about ${topic}`;
+    } else {
+      requestBody.message = messageToSend;
+    }
+
     const userMessage: Message = {
       id: Date.now().toString(),
       sender: 'user',
-      content: messageToSend,
+      content: messageToSend.startsWith('CLARIFY:') ? `Asked for guidance about ${messageToSend.replace('CLARIFY:', '')}` : messageToSend,
       timestamp: new Date(),
       type: 'text'
     };
@@ -233,11 +248,7 @@ What aspect of your proposal would you like to tackle first? I can help with str
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          grantId: params.grantId,
-          message: messageToSend,
-          sessionId: null // Will be managed by the API
-        }),
+        body: JSON.stringify(requestBody),
       });
 
       if (!response.ok) {
@@ -331,11 +342,11 @@ Would you like me to help you structure a response that addresses these points?`
     return responses[Math.floor(Math.random() * responses.length)];
   };
 
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
     if (!files) return;
 
-    Array.from(files).forEach(file => {
+    Array.from(files).forEach(async (file) => {
       const uploadedFile: UploadedFile = {
         id: Date.now().toString() + Math.random(),
         name: file.name,
@@ -352,12 +363,78 @@ Would you like me to help you structure a response that addresses these points?`
         sender: 'ai',
         content: `📎 **File uploaded**: ${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)
 
-I'm analyzing this document and will incorporate it into our conversation context. You can now ask me questions about this file or reference it in your proposal development.`,
+Maya is analyzing this document...`,
         timestamp: new Date(),
         type: 'system'
       };
       
       setMessages(prev => [...prev, systemMessage]);
+
+      try {
+        // Read file content
+        const fileContent = await readFileContent(file);
+        
+        // Send to Maya for analysis
+        const response = await fetch('/api/ai/chat', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            grantId: params.grantId,
+            action: 'analyze_file',
+            fileData: {
+              fileName: file.name,
+              content: fileContent,
+              fileType: file.type
+            },
+            sessionId: null
+          }),
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          
+          const analysisMessage: Message = {
+            id: data.sessionId + '_analysis',
+            sender: 'ai',
+            content: data.response,
+            timestamp: new Date(),
+            type: 'text'
+          };
+          
+          setMessages(prev => [...prev, analysisMessage]);
+        } else {
+          throw new Error('Failed to analyze file');
+        }
+      } catch (error) {
+        console.error('File analysis error:', error);
+        
+        const errorMessage: Message = {
+          id: Date.now().toString() + '_error',
+          sender: 'ai',
+          content: `I had trouble analyzing ${file.name}, but I can still help you work with this document. Could you tell me what type of document this is and what specific information you'd like me to help you with?`,
+          timestamp: new Date(),
+          type: 'text'
+        };
+        
+        setMessages(prev => [...prev, errorMessage]);
+      }
+    });
+  };
+
+  // Helper function to read file content
+  const readFileContent = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const content = e.target?.result as string;
+        // Limit content size to avoid API limits
+        const maxLength = 10000;
+        resolve(content.length > maxLength ? content.substring(0, maxLength) + '...[truncated]' : content);
+      };
+      reader.onerror = reject;
+      reader.readAsText(file);
     });
   };
 
