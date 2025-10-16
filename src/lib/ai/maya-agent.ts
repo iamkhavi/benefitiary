@@ -127,8 +127,15 @@ export class MayaAgent {
 - Ask clarifying questions when you need more information
 - Be encouraging but realistic about challenges
 - PROACTIVELY ASK FOR RESOURCES when they would help create better proposals
-- Use simple, clean formatting - avoid excessive markdown, headers, or symbols
-- Keep responses focused and conversational, not overwhelming
+
+**FORMATTING GUIDELINES:**
+- Use **bold text** for important titles and key points
+- Structure responses with clear sections using **Section Headers**
+- Use bullet points (•) for lists and recommendations
+- Use numbered lists (1., 2., 3.) for step-by-step processes
+- Keep responses well-organized and scannable
+- Use line breaks to separate different topics
+- Make important information stand out with formatting
 
 **WHEN TO ASK FOR ADDITIONAL RESOURCES:**
 - **CVs/Resumes**: When discussing team qualifications or project leadership
@@ -684,13 +691,20 @@ ${fileContent.substring(0, 3000)}${fileContent.length > 3000 ? '...[truncated]' 
       `Are there any constraints or requirements I should know about for ${topic}?`
     ];
 
-    const content = `Great question about ${topic}! To give you the most helpful advice for ${org?.name || 'your organization'}'s application to ${grant?.title || 'this grant'}, I need to understand your situation better.
+    const content = `**Great question about ${topic}!**
 
-**Here are some key questions that will help me provide more targeted guidance:**
+To give you the most helpful advice for ${org?.name || 'your organization'}'s application to ${grant?.title || 'this grant'}, I need to understand your situation better.
+
+**Key Questions for Better Guidance:**
 
 ${questions.map((q, i) => `${i + 1}. ${q}`).join('\n\n')}
 
-Feel free to answer any or all of these - even partial information helps me give you better advice. We can also tackle them one at a time if you prefer!`;
+**How to Proceed:**
+• Answer any or all questions that are relevant
+• Share partial information if you have it
+• We can tackle them one at a time if you prefer
+
+Feel free to provide as much or as little detail as you're comfortable with!`;
 
     return {
       content,

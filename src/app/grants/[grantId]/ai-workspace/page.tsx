@@ -42,10 +42,100 @@ interface UploadedFile {
   url: string;
 }
 
+// Component for rendering formatted message content
+function MessageContent({ content }: { content: string }) {
+  // Parse and format Maya's structured responses
+  const formatContent = (text: string) => {
+    // Split by lines for processing
+    const lines = text.split('\n');
+    const elements: JSX.Element[] = [];
+    let currentIndex = 0;
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      
+      // Skip empty lines but add spacing
+      if (line.trim() === '') {
+        elements.push(<div key={`space-${currentIndex++}`} className="h-2" />);
+        continue;
+      }
+
+      // Headers (lines starting with **)
+      if (line.match(/^\*\*(.+)\*\*$/)) {
+        const headerText = line.replace(/^\*\*(.+)\*\*$/, '$1');
+        elements.push(
+          <h4 key={`header-${currentIndex++}`} className="font-semibold text-gray-900 mb-2 mt-3 first:mt-0">
+            {headerText}
+          </h4>
+        );
+        continue;
+      }
+
+      // Bullet points (lines starting with • or -)
+      if (line.match(/^[•\-]\s/)) {
+        const bulletText = line.replace(/^[•\-]\s/, '');
+        elements.push(
+          <div key={`bullet-${currentIndex++}`} className="flex items-start space-x-2 mb-1">
+            <span className="text-purple-600 mt-1">•</span>
+            <span className="flex-1">{formatInlineText(bulletText)}</span>
+          </div>
+        );
+        continue;
+      }
+
+      // Numbered lists (lines starting with numbers)
+      if (line.match(/^\d+\.\s/)) {
+        const match = line.match(/^(\d+)\.\s(.+)$/);
+        if (match) {
+          const [, number, text] = match;
+          elements.push(
+            <div key={`numbered-${currentIndex++}`} className="flex items-start space-x-2 mb-1">
+              <span className="text-purple-600 font-medium min-w-[1.5rem]">{number}.</span>
+              <span className="flex-1">{formatInlineText(text)}</span>
+            </div>
+          );
+          continue;
+        }
+      }
+
+      // Regular paragraphs
+      elements.push(
+        <p key={`para-${currentIndex++}`} className="mb-2 last:mb-0">
+          {formatInlineText(line)}
+        </p>
+      );
+    }
+
+    return elements;
+  };
+
+  // Format inline text with bold, italic, etc.
+  const formatInlineText = (text: string) => {
+    // Handle bold text (**text**)
+    const parts = text.split(/(\*\*[^*]+\*\*)/g);
+    
+    return parts.map((part, index) => {
+      if (part.match(/^\*\*[^*]+\*\*$/)) {
+        const boldText = part.replace(/^\*\*([^*]+)\*\*$/, '$1');
+        return <strong key={index} className="font-semibold text-gray-900">{boldText}</strong>;
+      }
+      return part;
+    });
+  };
+
+  return (
+    <div className="space-y-1">
+      {formatContent(content)}
+    </div>
+  );
+}
+
 export default function AIWorkspacePage({ params }: { params: { grantId: string } }) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputMessage, setInputMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isStreaming, setIsStreaming] = useState(false);
+  const [streamingMessageId, setStreamingMessageId] = useState<string | null>(null);
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [showSidebar, setShowSidebar] = useState(false);
   const [showCanvas, setShowCanvas] = useState(false);
@@ -162,7 +252,8 @@ export default function AIWorkspacePage({ params }: { params: { grantId: string 
     // Check if this is a clarifying question request
     let requestBody: any = {
       grantId: params.grantId,
-      sessionId: sessionId // Use existing session ID
+      sessionId: sessionId, // Use existing session ID
+      stream: true // Enable streaming
     };
 
     if (messageToSend.startsWith('CLARIFY:')) {
@@ -187,7 +278,7 @@ export default function AIWorkspacePage({ params }: { params: { grantId: string 
     setIsLoading(true);
 
     try {
-      // Call the real AI API
+      // Call the streaming AI API
       const response = await fetch('/api/ai/chat', {
         method: 'POST',
         headers: {
@@ -200,59 +291,13 @@ export default function AIWorkspacePage({ params }: { params: { grantId: string 
         throw new Error('Failed to get AI response');
       }
 
-      const data = await response.json();
-      
-      // Update session ID if it's new
-      if (data.sessionId && data.sessionId !== sessionId) {
-        setSessionId(data.sessionId);
-      }
-
-      // Handle canvas integration for proposal content
-      if (data.contentType === 'proposal_section' && data.extractedContent) {
-        // Show canvas if not already visible
-        if (!showCanvas) {
-          setShowCanvas(true);
-        }
-
-        // Send content to canvas
-        handleCanvasUpdate(data.extractedContent);
-
-        // Show summary message in chat
-        const summaryMessage: Message = {
-          id: data.messageId || (data.sessionId + '_' + Date.now()),
-          sender: 'ai',
-          content: `✅ **${data.extractedContent.title} Generated**
-
-I've created the ${data.extractedContent.section} section and added it to your proposal canvas. You can now:
-
-• Review and edit the content on the canvas
-• Add specific details about your organization
-• Include relevant data and metrics
-
-**Next Steps:**
-${data.suggestions?.map((s: string) => `• ${s}`).join('\n') || '• Review the generated content\n• Add organization-specific details\n• Move on to the next section'}
-
-Would you like me to help with another section or make any adjustments to this one?`,
-          timestamp: new Date(),
-          type: 'text',
-          metadata: { 
-            isCanvasUpdate: true,
-            section: data.extractedContent.section 
-          }
-        };
-        
-        setMessages(prev => [...prev, summaryMessage]);
+      // Handle streaming response
+      if (response.headers.get('content-type')?.includes('text/event-stream')) {
+        await handleStreamingResponse(response);
       } else {
-        // Regular chat message
-        const aiResponse: Message = {
-          id: data.messageId || (data.sessionId + '_' + Date.now()),
-          sender: 'ai',
-          content: data.response,
-          timestamp: new Date(),
-          type: 'text'
-        };
-        
-        setMessages(prev => [...prev, aiResponse]);
+        // Fallback to regular JSON response
+        const data = await response.json();
+        handleRegularResponse(data);
       }
     } catch (error) {
       console.error('AI Chat Error:', error);
@@ -269,6 +314,165 @@ Would you like me to help with another section or make any adjustments to this o
       setMessages(prev => [...prev, errorMessage]);
     } finally {
       setIsLoading(false);
+      setIsStreaming(false);
+      setStreamingMessageId(null);
+    }
+  };
+
+  const handleStreamingResponse = async (response: Response) => {
+    const reader = response.body?.getReader();
+    if (!reader) return;
+
+    setIsStreaming(true);
+    let streamingMessage: Message | null = null;
+    let metadata: any = null;
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunk = new TextDecoder().decode(value);
+        const lines = chunk.split('\n');
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            try {
+              const data = JSON.parse(line.slice(6));
+              
+              if (data.type === 'metadata') {
+                // Store metadata and update session
+                metadata = data;
+                if (data.sessionId && data.sessionId !== sessionId) {
+                  setSessionId(data.sessionId);
+                }
+
+                // Create initial streaming message
+                streamingMessage = {
+                  id: data.messageId || (data.sessionId + '_' + Date.now()),
+                  sender: 'ai',
+                  content: '',
+                  timestamp: new Date(),
+                  type: 'text'
+                };
+
+                setStreamingMessageId(streamingMessage.id);
+                setMessages(prev => [...prev, streamingMessage!]);
+              } else if (data.type === 'content' && streamingMessage) {
+                // Update streaming message content
+                setMessages(prev => 
+                  prev.map(msg => 
+                    msg.id === streamingMessage!.id 
+                      ? { ...msg, content: msg.content + data.chunk }
+                      : msg
+                  )
+                );
+              } else if (data.type === 'complete' && metadata) {
+                // Handle completion and canvas integration
+                if (metadata.contentType === 'proposal_section' && metadata.extractedContent) {
+                  // Show canvas if not already visible
+                  if (!showCanvas) {
+                    setShowCanvas(true);
+                  }
+
+                  // Send content to canvas
+                  handleCanvasUpdate(metadata.extractedContent);
+
+                  // Update the message to show canvas integration summary
+                  const summaryContent = `**✅ ${metadata.extractedContent.title} Generated**
+
+I've created the ${metadata.extractedContent.section} section and added it to your document canvas.
+
+**What You Can Do Now:**
+• Review and edit the content on the canvas
+• Add specific details about your organization
+• Include relevant data and metrics
+
+**Next Steps:**
+${metadata.suggestions?.map((s: string) => `• ${s}`).join('\n') || '• Review the generated content\n• Add organization-specific details\n• Move on to the next section'}
+
+Would you like me to help with another section or make any adjustments to this one?`;
+
+                  setMessages(prev => 
+                    prev.map(msg => 
+                      msg.id === streamingMessage!.id 
+                        ? { 
+                            ...msg, 
+                            content: summaryContent,
+                            metadata: { 
+                              isCanvasUpdate: true,
+                              section: metadata.extractedContent.section 
+                            }
+                          }
+                        : msg
+                    )
+                  );
+                }
+              }
+            } catch (e) {
+              console.error('Error parsing streaming data:', e);
+            }
+          }
+        }
+      }
+    } finally {
+      reader.releaseLock();
+    }
+  };
+
+  const handleRegularResponse = (data: any) => {
+    // Update session ID if it's new
+    if (data.sessionId && data.sessionId !== sessionId) {
+      setSessionId(data.sessionId);
+    }
+
+    // Handle canvas integration for proposal content
+    if (data.contentType === 'proposal_section' && data.extractedContent) {
+      // Show canvas if not already visible
+      if (!showCanvas) {
+        setShowCanvas(true);
+      }
+
+      // Send content to canvas
+      handleCanvasUpdate(data.extractedContent);
+
+      // Show summary message in chat
+      const summaryMessage: Message = {
+        id: data.messageId || (data.sessionId + '_' + Date.now()),
+        sender: 'ai',
+        content: `**✅ ${data.extractedContent.title} Generated**
+
+I've created the ${data.extractedContent.section} section and added it to your document canvas.
+
+**What You Can Do Now:**
+• Review and edit the content on the canvas
+• Add specific details about your organization
+• Include relevant data and metrics
+
+**Next Steps:**
+${data.suggestions?.map((s: string) => `• ${s}`).join('\n') || '• Review the generated content\n• Add organization-specific details\n• Move on to the next section'}
+
+Would you like me to help with another section or make any adjustments to this one?`,
+        timestamp: new Date(),
+        type: 'text',
+        metadata: { 
+          isCanvasUpdate: true,
+          section: data.extractedContent.section 
+        }
+      };
+      
+      setMessages(prev => [...prev, summaryMessage]);
+    } else {
+      // Regular chat message
+      const aiResponse: Message = {
+        id: data.messageId || (data.sessionId + '_' + Date.now()),
+        sender: 'ai',
+        content: data.response,
+        timestamp: new Date(),
+        type: 'text'
+      };
+      
+      setMessages(prev => [...prev, aiResponse]);
     }
   };
 
@@ -328,27 +532,20 @@ Maya is analyzing this document...`,
               content: fileContent,
               fileType: file.type
             },
-            sessionId: sessionId
+            sessionId: sessionId,
+            stream: true // Enable streaming for file analysis too
           }),
         });
 
         if (response.ok) {
-          const data = await response.json();
-          
-          // Update session ID if it's new
-          if (data.sessionId && data.sessionId !== sessionId) {
-            setSessionId(data.sessionId);
+          // Handle streaming response for file analysis
+          if (response.headers.get('content-type')?.includes('text/event-stream')) {
+            await handleStreamingResponse(response);
+          } else {
+            // Fallback to regular JSON response
+            const data = await response.json();
+            handleRegularResponse(data);
           }
-
-          const analysisMessage: Message = {
-            id: data.messageId || (data.sessionId + '_analysis'),
-            sender: 'ai',
-            content: data.response,
-            timestamp: new Date(),
-            type: 'text'
-          };
-          
-          setMessages(prev => [...prev, analysisMessage]);
         } else {
           throw new Error('Failed to analyze file');
         }
@@ -666,8 +863,8 @@ Maya is analyzing this document...`,
                       : "bg-white border border-gray-200"
                   )}
                 >
-                  <div className="text-sm leading-relaxed whitespace-pre-wrap">
-                    {message.content}
+                  <div className="text-sm leading-relaxed">
+                    <MessageContent content={message.content} />
                   </div>
                   <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-100">
                     <span className="text-xs text-gray-500">
@@ -694,7 +891,7 @@ Maya is analyzing this document...`,
               </>
             )}
             
-            {isLoading && (
+            {(isLoading || isStreaming) && (
               <div className="flex space-x-3">
                 <Avatar className="h-8 w-8">
                   <AvatarFallback className="bg-purple-100 text-purple-600">
@@ -708,7 +905,9 @@ Maya is analyzing this document...`,
                       <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }} />
                       <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
                     </div>
-                    <span className="text-sm text-gray-500">AI is thinking...</span>
+                    <span className="text-sm text-gray-500">
+                      {isStreaming ? 'Maya is typing...' : 'Maya is thinking...'}
+                    </span>
                   </div>
                 </div>
               </div>
