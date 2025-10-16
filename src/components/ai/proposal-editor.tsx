@@ -51,6 +51,12 @@ interface ProposalEditorProps {
   showCanvas: boolean;
   onClose: () => void;
   grantId?: string;
+  extractedContent?: {
+    section: string;
+    title: string;
+    content: string;
+  } | null;
+  onContentUpdate?: () => void;
 }
 
 interface AIWritingSession {
@@ -59,7 +65,7 @@ interface AIWritingSession {
   progress: number;
 }
 
-export function ProposalEditor({ showCanvas, onClose, grantId }: ProposalEditorProps) {
+export function ProposalEditor({ showCanvas, onClose, grantId, extractedContent, onContentUpdate }: ProposalEditorProps) {
   const [isAIWriting, setIsAIWriting] = useState<AIWritingSession>({
     isActive: false,
     currentSection: '',
@@ -121,35 +127,11 @@ export function ProposalEditor({ showCanvas, onClose, grantId }: ProposalEditorP
           if (node.type.name === 'heading') {
             return 'Enter a heading...';
           }
-          return 'Start writing your proposal here. The AI will assist you in real-time...';
+          return 'Start writing your document here...';
         },
       }),
     ],
-    content: `
-      <div style="text-align: center; margin-bottom: 2rem;">
-        <h1>Grant Proposal</h1>
-        <p style="color: #6B7280; margin: 0.5rem 0;">Collaborative AI-Assisted Document</p>
-        <p style="color: #9CA3AF; font-size: 0.875rem;">Application Date: ${new Date().toLocaleDateString()}</p>
-      </div>
-
-      <h2>Executive Summary</h2>
-      <p>Provide a compelling overview of your project, highlighting the problem you're addressing, your innovative solution, and the expected impact...</p>
-
-      <h2>Project Description</h2>
-      <p>Detail your project methodology, approach, and the innovative aspects that set it apart from existing solutions...</p>
-
-      <h2>Budget Overview</h2>
-      <p>Present a clear breakdown of your budget, including major cost categories and their justifications...</p>
-
-      <h2>Expected Impact & Outcomes</h2>
-      <p>Describe the anticipated results, measurable outcomes, and long-term benefits of your project...</p>
-
-      <h2>Project Timeline</h2>
-      <p>Outline key milestones, deliverables, and the overall project schedule...</p>
-
-      <h2>Team & Organizational Capacity</h2>
-      <p>Highlight your team's expertise, organizational strengths, and capacity to successfully execute this project...</p>
-    `,
+    content: '',
     editorProps: {
       attributes: {
         class: 'prose prose-sm sm:prose lg:prose-lg xl:prose-xl mx-auto focus:outline-none min-h-[800px] p-8',
@@ -232,6 +214,65 @@ export function ProposalEditor({ showCanvas, onClose, grantId }: ProposalEditorP
       editor.commands.setContent(savedContent);
     }
   }, [editor, grantId]);
+
+  // Handle extracted content from Maya
+  useEffect(() => {
+    if (!editor || !extractedContent) return;
+
+    const insertExtractedContent = () => {
+      const { section, title, content } = extractedContent;
+      
+      // Find the section heading in the document
+      const doc = editor.state.doc;
+      let sectionPos = -1;
+      let targetPos = -1;
+      
+      doc.descendants((node, pos) => {
+        if (node.type.name === 'heading' && 
+            node.textContent.toLowerCase().includes(section.toLowerCase())) {
+          sectionPos = pos;
+          // Find the paragraph after this heading
+          const nextPos = pos + node.nodeSize;
+          const nextNode = doc.nodeAt(nextPos);
+          if (nextNode && nextNode.type.name === 'paragraph') {
+            targetPos = nextPos;
+          }
+          return false;
+        }
+      });
+
+      if (targetPos !== -1) {
+        // Replace the placeholder paragraph with the new content
+        const paragraphNode = doc.nodeAt(targetPos);
+        if (paragraphNode) {
+          const endPos = targetPos + paragraphNode.nodeSize;
+          
+          editor.chain()
+            .focus()
+            .setTextSelection({ from: targetPos, to: endPos })
+            .insertContent(`<p>${content}</p>`)
+            .run();
+        }
+      } else {
+        // If section not found, append at the end
+        editor.chain()
+          .focus()
+          .setTextSelection(doc.content.size)
+          .insertContent(`<h2>${title}</h2><p>${content}</p>`)
+          .run();
+      }
+
+      // Trigger AI writing animation
+      simulateAIWriting(section, '');
+      
+      // Clear the extracted content
+      if (onContentUpdate) {
+        onContentUpdate();
+      }
+    };
+
+    insertExtractedContent();
+  }, [editor, extractedContent, onContentUpdate]);
 
   const handleAIAssist = async (section: string) => {
     if (!grantId) {
@@ -342,7 +383,7 @@ export function ProposalEditor({ showCanvas, onClose, grantId }: ProposalEditorP
           <div className="flex items-center space-x-4">
             <h3 className="text-lg font-semibold text-gray-900 flex items-center">
               <FileText className="h-5 w-5 mr-2 text-blue-600" />
-              Collaborative Proposal
+              Document Canvas
             </h3>
             
             {/* Collaborators */}
@@ -554,12 +595,43 @@ export function ProposalEditor({ showCanvas, onClose, grantId }: ProposalEditorP
             </div>
           )}
 
+          {/* Empty State Placeholder */}
+          {(!editor?.getText() || editor.getText().trim() === '') && (
+            <div className="absolute inset-0 flex items-center justify-center p-8">
+              <div className="text-center max-w-md">
+                <div className="mb-6">
+                  <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <FileText className="w-8 h-8 text-gray-400" />
+                  </div>
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">
+                    Your Document Will Appear Here
+                  </h3>
+                  <p className="text-gray-500 text-sm leading-relaxed">
+                    Ask Maya to generate content, or start typing to create your proposal, report, or any document you need for your funding application.
+                  </p>
+                </div>
+                
+                <div className="space-y-2">
+                  <div className="text-xs text-gray-400 uppercase tracking-wide font-medium">
+                    Try asking Maya:
+                  </div>
+                  <div className="space-y-1 text-sm text-gray-600">
+                    <div>"Draft an executive summary"</div>
+                    <div>"Create a project timeline"</div>
+                    <div>"Write a budget overview"</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           <EditorContent 
             editor={editor} 
             className={cn(
               "tiptap-editor",
               "min-h-[297mm] p-8",
-              "focus-within:outline-none"
+              "focus-within:outline-none",
+              (!editor?.getText() || editor.getText().trim() === '') && "opacity-0"
             )}
           />
         </Card>

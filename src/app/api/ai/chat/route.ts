@@ -22,8 +22,8 @@ export async function POST(request: NextRequest) {
     const { grantId, message, sessionId, action, fileData, topic } = await request.json();
 
     if (!grantId || (!message && action !== 'analyze_file' && action !== 'clarify')) {
-      return NextResponse.json({ 
-        error: 'Missing required fields: grantId and message (or action)' 
+      return NextResponse.json({
+        error: 'Missing required fields: grantId and message (or action)'
       }, { status: 400 });
     }
 
@@ -37,8 +37,8 @@ export async function POST(request: NextRequest) {
     if (action === 'analyze_file' && fileData) {
       // File analysis request
       mayaResponse = await maya.analyzeUploadedFile(
-        fileData.fileName, 
-        fileData.content, 
+        fileData.fileName,
+        fileData.content,
         fileData.fileType
       );
       userMessage = `Uploaded file: ${fileData.fileName}`;
@@ -61,7 +61,9 @@ export async function POST(request: NextRequest) {
       response: mayaResponse.content,
       confidence: mayaResponse.confidence,
       suggestions: mayaResponse.suggestions,
-      reasoning: mayaResponse.reasoning
+      reasoning: mayaResponse.reasoning,
+      contentType: mayaResponse.contentType,
+      extractedContent: mayaResponse.extractedContent
     });
 
   } catch (error) {
@@ -77,7 +79,7 @@ export async function POST(request: NextRequest) {
 
 // Health check endpoint
 export async function GET() {
-  return NextResponse.json({ 
+  return NextResponse.json({
     status: 'Maya is ready to help with grant consultation',
     model: 'gpt-4',
     features: ['conversation_memory', 'context_awareness', 'expert_advice']

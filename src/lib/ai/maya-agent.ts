@@ -19,6 +19,12 @@ interface MayaResponse {
   confidence: number;
   reasoning?: string;
   suggestions?: string[];
+  contentType?: 'chat' | 'proposal_section' | 'document_extract';
+  extractedContent?: {
+    section: string;
+    title: string;
+    content: string;
+  };
 }
 
 export class MayaAgent {
@@ -201,16 +207,37 @@ Focus on making this section stand out while maintaining accuracy and profession
       const content = response.content as string;
 
       return {
-        content,
+        content: `I've generated the ${section} section for your proposal. You can see it on the canvas to the left, where you can review and edit it further.`,
         confidence: 0.9,
         reasoning: `Generated ${section} section using organization and grant context`,
-        suggestions: [`Review and customize the ${section} content`, 'Add specific metrics and data', 'Include relevant citations or references']
+        suggestions: [`Review and customize the ${section} content`, 'Add specific metrics and data', 'Include relevant citations or references'],
+        contentType: 'proposal_section',
+        extractedContent: {
+          section: section,
+          title: this.getSectionTitle(section),
+          content: content
+        }
       };
 
     } catch (error) {
       console.error('Maya proposal generation error:', error);
       return this.generateFallbackProposalContent(section);
     }
+  }
+
+  /**
+   * Get proper section title for proposal sections
+   */
+  private getSectionTitle(section: string): string {
+    const titles = {
+      'executive': 'Executive Summary',
+      'project': 'Project Description',
+      'budget': 'Budget Overview',
+      'impact': 'Expected Impact & Outcomes',
+      'timeline': 'Project Timeline',
+      'team': 'Team & Organizational Capacity'
+    };
+    return titles[section as keyof typeof titles] || section.charAt(0).toUpperCase() + section.slice(1);
   }
 
   /**
@@ -292,14 +319,20 @@ ${org?.name || 'Our organization'} has demonstrated capacity to successfully man
       `[This section requires development based on your specific ${section} requirements and organizational context.]`;
 
     return {
-      content,
+      content: `I've generated the ${section} section for your proposal. You can see it on the canvas to the left, where you can review and edit it further.`,
       confidence: 0.7,
       reasoning: 'Fallback proposal content using available context',
       suggestions: [
         'Customize this content with specific details',
         'Add relevant data and metrics',
         'Include supporting evidence and examples'
-      ]
+      ],
+      contentType: 'proposal_section',
+      extractedContent: {
+        section: section,
+        title: this.getSectionTitle(section),
+        content: content
+      }
     };
   }
 
@@ -390,6 +423,47 @@ ${org?.name || 'Our organization'} has demonstrated capacity to successfully man
   }
 
   /**
+   * Detect if user is requesting proposal content generation
+   */
+  private detectProposalRequest(userMessage: string): { isProposalRequest: boolean; section?: string } {
+    const message = userMessage.toLowerCase();
+    
+    // Check for explicit section requests
+    const sectionKeywords = {
+      'executive': ['executive summary', 'executive', 'summary', 'overview'],
+      'project': ['project description', 'project', 'methodology', 'approach'],
+      'budget': ['budget', 'cost', 'financial', 'funding breakdown'],
+      'impact': ['impact', 'outcomes', 'results', 'benefits'],
+      'timeline': ['timeline', 'schedule', 'milestones', 'phases'],
+      'team': ['team', 'staff', 'personnel', 'qualifications', 'capacity']
+    };
+
+    // Check for proposal generation keywords
+    const proposalKeywords = [
+      'write', 'draft', 'create', 'generate', 'help me write',
+      'can you write', 'please write', 'draft a', 'create a'
+    ];
+
+    const hasProposalKeyword = proposalKeywords.some(keyword => message.includes(keyword));
+    
+    if (hasProposalKeyword) {
+      // Find which section they're asking for
+      for (const [section, keywords] of Object.entries(sectionKeywords)) {
+        if (keywords.some(keyword => message.includes(keyword))) {
+          return { isProposalRequest: true, section };
+        }
+      }
+      
+      // General proposal request
+      if (message.includes('proposal') || message.includes('application')) {
+        return { isProposalRequest: true };
+      }
+    }
+
+    return { isProposalRequest: false };
+  }
+
+  /**
    * Chat with Maya - main conversation method
    */
   async chat(userMessage: string): Promise<MayaResponse> {
@@ -398,7 +472,15 @@ ${org?.name || 'Our organization'} has demonstrated capacity to successfully man
     }
 
     try {
-      // Build conversation messages
+      // Check if this is a proposal content request
+      const proposalRequest = this.detectProposalRequest(userMessage);
+      
+      if (proposalRequest.isProposalRequest && proposalRequest.section) {
+        // Generate proposal section content
+        return await this.generateProposalSection(proposalRequest.section);
+      }
+
+      // Build conversation messages for regular chat
       const messages = [
         new SystemMessage(this.generateSystemPrompt()),
         // Add conversation history
@@ -439,7 +521,8 @@ ${org?.name || 'Our organization'} has demonstrated capacity to successfully man
         content,
         confidence: 0.85, // Maya is confident in her expertise
         reasoning: 'Response generated using organization and grant context with conversation memory',
-        suggestions: this.extractSuggestions(content)
+        suggestions: this.extractSuggestions(content),
+        contentType: 'chat'
       };
 
     } catch (error) {
@@ -478,7 +561,8 @@ ${org?.name || 'Our organization'} has demonstrated capacity to successfully man
       content: 'An error occurred, please try again later.',
       confidence: 0.1,
       reasoning: 'Fallback response due to API error',
-      suggestions: []
+      suggestions: [],
+      contentType: 'chat'
     };
   }
 
@@ -534,7 +618,8 @@ ${fileContent.substring(0, 3000)}${fileContent.length > 3000 ? '...[truncated]' 
           'Review the analysis and incorporate relevant information',
           'Consider uploading additional supporting documents',
           'Use the insights to strengthen your proposal sections'
-        ]
+        ],
+        contentType: 'chat'
       };
 
     } catch (error) {
@@ -543,7 +628,8 @@ ${fileContent.substring(0, 3000)}${fileContent.length > 3000 ? '...[truncated]' 
         content: 'An error occurred while analyzing the file, please try again later.',
         confidence: 0.1,
         reasoning: 'Fallback response for file analysis error',
-        suggestions: []
+        suggestions: [],
+        contentType: 'chat'
       };
     }
   }
@@ -614,7 +700,8 @@ Feel free to answer any or all of these - even partial information helps me give
         'Answer the questions that are most relevant to your situation',
         'Share any documents or information you have related to these questions',
         'Let me know if you need help with any specific aspect'
-      ]
+      ],
+      contentType: 'chat'
     };
   }
 

@@ -53,6 +53,7 @@ export default function AIWorkspacePage({ params }: { params: { grantId: string 
   const [loadingGrant, setLoadingGrant] = useState(true);
   const [loadingMessages, setLoadingMessages] = useState(true);
   const [sessionId, setSessionId] = useState<string | null>(null);
+  const [canvasContent, setCanvasContent] = useState<any>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -205,16 +206,54 @@ export default function AIWorkspacePage({ params }: { params: { grantId: string 
       if (data.sessionId && data.sessionId !== sessionId) {
         setSessionId(data.sessionId);
       }
-      
-      const aiResponse: Message = {
-        id: data.messageId || (data.sessionId + '_' + Date.now()),
-        sender: 'ai',
-        content: data.response,
-        timestamp: new Date(),
-        type: 'text'
-      };
-      
-      setMessages(prev => [...prev, aiResponse]);
+
+      // Handle canvas integration for proposal content
+      if (data.contentType === 'proposal_section' && data.extractedContent) {
+        // Show canvas if not already visible
+        if (!showCanvas) {
+          setShowCanvas(true);
+        }
+
+        // Send content to canvas
+        handleCanvasUpdate(data.extractedContent);
+
+        // Show summary message in chat
+        const summaryMessage: Message = {
+          id: data.messageId || (data.sessionId + '_' + Date.now()),
+          sender: 'ai',
+          content: `✅ **${data.extractedContent.title} Generated**
+
+I've created the ${data.extractedContent.section} section and added it to your proposal canvas. You can now:
+
+• Review and edit the content on the canvas
+• Add specific details about your organization
+• Include relevant data and metrics
+
+**Next Steps:**
+${data.suggestions?.map((s: string) => `• ${s}`).join('\n') || '• Review the generated content\n• Add organization-specific details\n• Move on to the next section'}
+
+Would you like me to help with another section or make any adjustments to this one?`,
+          timestamp: new Date(),
+          type: 'text',
+          metadata: { 
+            isCanvasUpdate: true,
+            section: data.extractedContent.section 
+          }
+        };
+        
+        setMessages(prev => [...prev, summaryMessage]);
+      } else {
+        // Regular chat message
+        const aiResponse: Message = {
+          id: data.messageId || (data.sessionId + '_' + Date.now()),
+          sender: 'ai',
+          content: data.response,
+          timestamp: new Date(),
+          type: 'text'
+        };
+        
+        setMessages(prev => [...prev, aiResponse]);
+      }
     } catch (error) {
       console.error('AI Chat Error:', error);
       
@@ -235,6 +274,10 @@ export default function AIWorkspacePage({ params }: { params: { grantId: string 
 
   const handleQuickAction = (_actionId: string, prompt: string) => {
     handleSendMessage(prompt);
+  };
+
+  const handleCanvasUpdate = (extractedContent: any) => {
+    setCanvasContent(extractedContent);
   };
 
   // Removed mock AI response function - using real Maya API
@@ -481,6 +524,8 @@ Maya is analyzing this document...`,
             showCanvas={showCanvas} 
             onClose={() => setShowCanvas(false)}
             grantId={params.grantId}
+            extractedContent={canvasContent}
+            onContentUpdate={() => setCanvasContent(null)}
           />
         </div>
 
@@ -488,7 +533,114 @@ Maya is analyzing this document...`,
         <div className="w-full md:w-96 lg:w-80 xl:w-96 flex flex-col bg-white">
           {/* Messages */}
           <div className="flex-1 overflow-y-auto p-6 space-y-6">
-            {messages.map((message) => (
+            {messages.length === 0 && !isLoading ? (
+              /* Maya Default State */
+              <div className="h-full flex flex-col items-center justify-center text-center px-4">
+                {/* Maya Avatar SVG */}
+                <div className="mb-6">
+                  <div className="w-20 h-20 bg-gradient-to-br from-purple-500 to-purple-600 rounded-full flex items-center justify-center shadow-lg">
+                    <svg
+                      className="w-10 h-10 text-white"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={1.5}
+                        d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
+                      />
+                    </svg>
+                  </div>
+                </div>
+
+                {/* Welcome Message */}
+                <div className="mb-8">
+                  <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                    👋 Hi! I'm Maya, your AI funding consultant
+                  </h3>
+                  <p className="text-gray-600 text-sm leading-relaxed max-w-sm">
+                    I'm here to help you navigate grant opportunities, write compelling proposals, and maximize your funding success.
+                  </p>
+                </div>
+
+                {/* Quick Action Buttons */}
+                <div className="space-y-3 w-full max-w-xs">
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start text-left h-auto py-3 px-4"
+                    onClick={() => handleSendMessage("Tell me about this grant opportunity")}
+                  >
+                    <div className="flex items-center space-x-3">
+                      <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
+                        <FileText className="h-4 w-4 text-blue-600" />
+                      </div>
+                      <div>
+                        <div className="font-medium text-sm">Tell me about this grant</div>
+                        <div className="text-xs text-gray-500">Overview and key details</div>
+                      </div>
+                    </div>
+                  </Button>
+
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start text-left h-auto py-3 px-4"
+                    onClick={() => handleSendMessage("Am I eligible for this grant?")}
+                  >
+                    <div className="flex items-center space-x-3">
+                      <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
+                        <Sparkles className="h-4 w-4 text-green-600" />
+                      </div>
+                      <div>
+                        <div className="font-medium text-sm">Am I eligible?</div>
+                        <div className="text-xs text-gray-500">Eligibility analysis</div>
+                      </div>
+                    </div>
+                  </Button>
+
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start text-left h-auto py-3 px-4"
+                    onClick={() => handleSendMessage("Help me get started with my application")}
+                  >
+                    <div className="flex items-center space-x-3">
+                      <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center">
+                        <Bot className="h-4 w-4 text-purple-600" />
+                      </div>
+                      <div>
+                        <div className="font-medium text-sm">Help me get started</div>
+                        <div className="text-xs text-gray-500">Step-by-step guidance</div>
+                      </div>
+                    </div>
+                  </Button>
+
+                  <Button
+                    variant="outline"
+                    className="w-full justify-start text-left h-auto py-3 px-4"
+                    onClick={() => handleSendMessage("Draft an executive summary for my proposal")}
+                  >
+                    <div className="flex items-center space-x-3">
+                      <div className="w-8 h-8 bg-orange-100 rounded-lg flex items-center justify-center">
+                        <Download className="h-4 w-4 text-orange-600" />
+                      </div>
+                      <div>
+                        <div className="font-medium text-sm">Draft executive summary</div>
+                        <div className="text-xs text-gray-500">Jump into proposal writing</div>
+                      </div>
+                    </div>
+                  </Button>
+                </div>
+
+                {/* Subtle hint */}
+                <p className="text-xs text-gray-400 mt-6">
+                  Or just type your question below
+                </p>
+              </div>
+            ) : (
+              /* Regular Messages */
+              <>
+                {messages.map((message) => (
               <div
                 key={message.id}
                 className={cn(
@@ -538,7 +690,9 @@ Maya is analyzing this document...`,
                   </Avatar>
                 )}
               </div>
-            ))}
+                ))}
+              </>
+            )}
             
             {isLoading && (
               <div className="flex space-x-3">
