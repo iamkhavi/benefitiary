@@ -129,13 +129,13 @@ export class MayaAgent {
 - PROACTIVELY ASK FOR RESOURCES when they would help create better proposals
 
 **FORMATTING GUIDELINES:**
-- Use **bold text** for important titles and key points
-- Structure responses with clear sections using **Section Headers**
-- Use bullet points (•) for lists and recommendations
-- Use numbered lists (1., 2., 3.) for step-by-step processes
-- Keep responses well-organized and scannable
-- Use line breaks to separate different topics
-- Make important information stand out with formatting
+- Use bold text sparingly for section headers and key achievements only
+- Structure responses with clear sections and natural flow
+- Use bullet points for lists and recommendations
+- Use numbered lists for step-by-step processes
+- Keep responses conversational yet professional
+- Avoid excessive markdown - let content speak for itself
+- Focus on clarity and readability over formatting
 
 **WHEN TO ASK FOR ADDITIONAL RESOURCES:**
 - **CVs/Resumes**: When discussing team qualifications or project leadership
@@ -173,7 +173,7 @@ Remember: You're a proactive consultant who asks for what you need to do the bes
   /**
    * Generate proposal section content
    */
-  async generateProposalSection(section: string, existingContent?: string): Promise<MayaResponse> {
+  async generateProposalSection(section: string, existingContent?: string, userMessage?: string): Promise<MayaResponse> {
     if (!this.context) {
       throw new Error('Maya agent not initialized. Call initialize() first.');
     }
@@ -213,11 +213,14 @@ Focus on making this section stand out while maintaining accuracy and profession
       const response = await this.llm.invoke(messages);
       const content = response.content as string;
 
+      // Generate dynamic contextual feedback using OpenAI
+      const feedbackResponse = await this.generateContextualFeedback(section, content, userMessage || `Generate ${section} section`);
+
       return {
-        content: `I've generated the ${section} section for your proposal. You can see it on the canvas to the left, where you can review and edit it further.`,
+        content: feedbackResponse.content,
         confidence: 0.9,
         reasoning: `Generated ${section} section using organization and grant context`,
-        suggestions: [`Review and customize the ${section} content`, 'Add specific metrics and data', 'Include relevant citations or references'],
+        suggestions: feedbackResponse.suggestions,
         contentType: 'proposal_section',
         extractedContent: {
           section: section,
@@ -228,7 +231,7 @@ Focus on making this section stand out while maintaining accuracy and profession
 
     } catch (error) {
       console.error('Maya proposal generation error:', error);
-      return this.generateFallbackProposalContent(section);
+      return await this.generateFallbackProposalContent(section);
     }
   }
 
@@ -246,6 +249,82 @@ Focus on making this section stand out while maintaining accuracy and profession
     };
     return titles[section as keyof typeof titles] || section.charAt(0).toUpperCase() + section.slice(1);
   }
+
+  /**
+   * Generate contextual feedback using OpenAI based on what actually happened
+   */
+  private async generateContextualFeedback(section: string, generatedContent: string, originalUserRequest: string): Promise<{ content: string; suggestions: string[] }> {
+    const org = this.userContext?.organization;
+    const grant = this.grantContext;
+    
+    const feedbackPrompt = `You just generated a ${section} section for ${org?.name || 'the user'}'s grant proposal to ${grant?.funder?.name || 'a funder'}. 
+
+**Context:**
+- User's original request: "${originalUserRequest}"
+- Section generated: ${this.getSectionTitle(section)}
+- Content length: ${generatedContent.split(/\s+/).length} words
+- Grant: ${grant?.title || 'Grant opportunity'}
+- Organization: ${org?.name || 'User organization'} (${org?.orgType?.replace(/_/g, ' ') || 'organization'})
+
+**What you accomplished:**
+You created content for their document canvas that addresses their specific request.
+
+**Your task:**
+Write a natural, conversational response that:
+1. Acknowledges what you just accomplished in a personalized way
+2. Highlights 2-3 specific strengths of what you created
+3. Suggests 3-4 concrete next steps that make sense for their situation
+4. Maintains your expert consultant persona - confident but supportive
+
+**Formatting:**
+- Use **bold** for key points and section headers
+- Use bullet points (•) for lists
+- Keep it conversational and specific to their context
+- Avoid generic "I have created..." language
+- Make it feel like advice from an experienced consultant
+
+Write your response now:`;
+
+    try {
+      const messages = [
+        new SystemMessage(this.generateSystemPrompt()),
+        new HumanMessage(feedbackPrompt)
+      ];
+
+      const response = await this.llm.invoke(messages);
+      const content = response.content as string;
+
+      // Extract suggestions from the response (look for bullet points or numbered items)
+      const suggestions = this.extractSuggestions(content);
+
+      return {
+        content,
+        suggestions
+      };
+
+    } catch (error) {
+      console.error('Error generating contextual feedback:', error);
+      
+      // Fallback to a simple but still contextual response
+      return {
+        content: `Perfect! I've added the ${this.getSectionTitle(section)} to your document canvas. The content is tailored specifically for ${org?.name || 'your organization'}'s application to ${grant?.funder?.name || 'this funder'}.
+
+**What's Next:**
+• Review the content on your canvas and add any specific details
+• Consider how this section connects with your other proposal sections
+• Let me know if you'd like to work on another section or refine this one
+
+What would you like to tackle next?`,
+        suggestions: [
+          'Review and customize the generated content',
+          'Add specific organizational details',
+          'Work on the next proposal section'
+        ]
+      };
+    }
+  }
+
+
 
   /**
    * Generate system prompt specifically for proposal writing
@@ -292,7 +371,7 @@ Generate content that positions this organization as the ideal recipient for thi
   /**
    * Fallback proposal content when AI fails
    */
-  private generateFallbackProposalContent(section: string): MayaResponse {
+  private async generateFallbackProposalContent(section: string): Promise<MayaResponse> {
     const org = this.userContext?.organization;
     const grant = this.grantContext;
 
@@ -325,15 +404,14 @@ ${org?.name || 'Our organization'} has demonstrated capacity to successfully man
     const content = fallbackContent[section as keyof typeof fallbackContent] || 
       `[This section requires development based on your specific ${section} requirements and organizational context.]`;
 
+    // Generate dynamic contextual feedback even for fallback
+    const feedbackResponse = await this.generateContextualFeedback(section, content, 'Generate proposal section');
+
     return {
-      content: `I've generated the ${section} section for your proposal. You can see it on the canvas to the left, where you can review and edit it further.`,
+      content: feedbackResponse.content,
       confidence: 0.7,
       reasoning: 'Fallback proposal content using available context',
-      suggestions: [
-        'Customize this content with specific details',
-        'Add relevant data and metrics',
-        'Include supporting evidence and examples'
-      ],
+      suggestions: feedbackResponse.suggestions,
       contentType: 'proposal_section',
       extractedContent: {
         section: section,
@@ -412,6 +490,31 @@ ${org?.name || 'Our organization'} has demonstrated capacity to successfully man
   }
 
   /**
+   * Clean up response formatting to avoid excessive markdown
+   */
+  private cleanResponseFormatting(content: string): string {
+    // Remove excessive asterisks and clean up formatting
+    let cleaned = content;
+    
+    // Fix multiple consecutive asterisks
+    cleaned = cleaned.replace(/\*{3,}/g, '**');
+    
+    // Ensure proper spacing around headers
+    cleaned = cleaned.replace(/\*\*([^*]+)\*\*(?!\s)/g, '**$1**\n');
+    
+    // Clean up bullet points - ensure consistent formatting
+    cleaned = cleaned.replace(/^[\s]*[-*]\s*/gm, '• ');
+    
+    // Remove excessive line breaks
+    cleaned = cleaned.replace(/\n{3,}/g, '\n\n');
+    
+    // Trim whitespace
+    cleaned = cleaned.trim();
+    
+    return cleaned;
+  }
+
+  /**
    * Generate resource request suggestions
    */
   private generateResourceRequests(resourceNeeds: string[]): string {
@@ -483,8 +586,8 @@ ${org?.name || 'Our organization'} has demonstrated capacity to successfully man
       const proposalRequest = this.detectProposalRequest(userMessage);
       
       if (proposalRequest.isProposalRequest && proposalRequest.section) {
-        // Generate proposal section content
-        return await this.generateProposalSection(proposalRequest.section);
+        // Generate proposal section content with original user message for context
+        return await this.generateProposalSection(proposalRequest.section, undefined, userMessage);
       }
 
       // Build conversation messages for regular chat
@@ -504,11 +607,14 @@ ${org?.name || 'Our organization'} has demonstrated capacity to successfully man
       const response = await this.llm.invoke(messages);
       let content = response.content as string;
 
+      // Clean up any excessive formatting
+      content = this.cleanResponseFormatting(content);
+
       // Analyze if Maya should ask for additional resources
       const resourceNeeds = this.analyzeResourceNeeds(userMessage, this.context.messages);
       const resourceRequests = this.generateResourceRequests(resourceNeeds);
       
-      // Add resource requests to Maya's response if needed
+      // Add resource requests to Maya's response if needed (but keep it natural)
       if (resourceRequests && !content.toLowerCase().includes('upload') && !content.toLowerCase().includes('document')) {
         content += resourceRequests;
       }

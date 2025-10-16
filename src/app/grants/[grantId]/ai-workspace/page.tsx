@@ -42,6 +42,8 @@ interface UploadedFile {
   url: string;
 }
 
+// Maya's response is now fully dynamic from OpenAI - no hardcoded summaries needed
+
 // Component for rendering formatted message content
 function MessageContent({ content }: { content: string }) {
   // Parse and format Maya's structured responses
@@ -111,6 +113,26 @@ function MessageContent({ content }: { content: string }) {
 
   // Format inline text with bold, italic, etc.
   const formatInlineText = (text: string) => {
+    // Handle progress indicators (Document is X% complete)
+    if (text.includes('% complete')) {
+      const match = text.match(/(\d+)% complete/);
+      if (match) {
+        const percentage = parseInt(match[1]);
+        return (
+          <div className="flex items-center space-x-2">
+            <span>{text.replace(/\d+% complete/, '')}</span>
+            <div className="flex-1 max-w-32 bg-gray-200 rounded-full h-2">
+              <div 
+                className="bg-gradient-to-r from-purple-500 to-purple-600 h-2 rounded-full transition-all duration-500"
+                style={{ width: `${percentage}%` }}
+              />
+            </div>
+            <span className="text-sm font-medium text-purple-600">{percentage}%</span>
+          </div>
+        );
+      }
+    }
+
     // Handle bold text (**text**)
     const parts = text.split(/(\*\*[^*]+\*\*)/g);
     
@@ -378,20 +400,8 @@ export default function AIWorkspacePage({ params }: { params: { grantId: string 
                   // Send content to canvas
                   handleCanvasUpdate(metadata.extractedContent);
 
-                  // Update the message to show canvas integration summary
-                  const summaryContent = `**✅ ${metadata.extractedContent.title} Generated**
-
-I've created the ${metadata.extractedContent.section} section and added it to your document canvas.
-
-**What You Can Do Now:**
-• Review and edit the content on the canvas
-• Add specific details about your organization
-• Include relevant data and metrics
-
-**Next Steps:**
-${metadata.suggestions?.map((s: string) => `• ${s}`).join('\n') || '• Review the generated content\n• Add organization-specific details\n• Move on to the next section'}
-
-Would you like me to help with another section or make any adjustments to this one?`;
+                  // Use Maya's dynamic response directly
+                  const summaryContent = data.response;
 
                   setMessages(prev => 
                     prev.map(msg => 
@@ -436,23 +446,11 @@ Would you like me to help with another section or make any adjustments to this o
       // Send content to canvas
       handleCanvasUpdate(data.extractedContent);
 
-      // Show summary message in chat
+      // Show Maya's dynamic response directly
       const summaryMessage: Message = {
         id: data.messageId || (data.sessionId + '_' + Date.now()),
         sender: 'ai',
-        content: `**✅ ${data.extractedContent.title} Generated**
-
-I've created the ${data.extractedContent.section} section and added it to your document canvas.
-
-**What You Can Do Now:**
-• Review and edit the content on the canvas
-• Add specific details about your organization
-• Include relevant data and metrics
-
-**Next Steps:**
-${data.suggestions?.map((s: string) => `• ${s}`).join('\n') || '• Review the generated content\n• Add organization-specific details\n• Move on to the next section'}
-
-Would you like me to help with another section or make any adjustments to this one?`,
+        content: data.response,
         timestamp: new Date(),
         type: 'text',
         metadata: { 
