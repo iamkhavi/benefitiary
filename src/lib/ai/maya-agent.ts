@@ -621,7 +621,7 @@ Feel free to answer any or all of these - even partial information helps me give
   /**
    * Save conversation to database
    */
-  async saveConversation(userMessage: string, mayaResponse: MayaResponse): Promise<string> {
+  async saveConversation(userMessage: string, mayaResponse: MayaResponse): Promise<{ sessionId: string; messageId: string }> {
     if (!this.context) {
       throw new Error('No context available for saving');
     }
@@ -647,6 +647,9 @@ Feel free to answer any or all of these - even partial information helps me give
       }
     });
 
+    // Update context with session ID
+    this.context.sessionId = session.id;
+
     // Save user message
     await prisma.aIMessage.create({
       data: {
@@ -661,7 +664,7 @@ Feel free to answer any or all of these - even partial information helps me give
     });
 
     // Save Maya's response
-    await prisma.aIMessage.create({
+    const aiMessage = await prisma.aIMessage.create({
       data: {
         sessionId: session.id,
         sender: 'AI',
@@ -676,7 +679,10 @@ Feel free to answer any or all of these - even partial information helps me give
       }
     });
 
-    return session.id;
+    return {
+      sessionId: session.id,
+      messageId: aiMessage.id
+    };
   }
 }
 

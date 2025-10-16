@@ -52,11 +52,12 @@ export async function POST(request: NextRequest) {
     }
 
     // Save conversation to database
-    const newSessionId = await maya.saveConversation(userMessage, mayaResponse);
+    const { sessionId: newSessionId, messageId } = await maya.saveConversation(userMessage, mayaResponse);
 
     // Return response
     return NextResponse.json({
       sessionId: newSessionId,
+      messageId: messageId,
       response: mayaResponse.content,
       confidence: mayaResponse.confidence,
       suggestions: mayaResponse.suggestions,

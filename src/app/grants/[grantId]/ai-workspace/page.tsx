@@ -51,18 +51,21 @@ export default function AIWorkspacePage({ params }: { params: { grantId: string 
   const [showCanvas, setShowCanvas] = useState(false);
   const [grantData, setGrantData] = useState<any>(null);
   const [loadingGrant, setLoadingGrant] = useState(true);
+  const [loadingMessages, setLoadingMessages] = useState(true);
+  const [sessionId, setSessionId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // No automatic welcome message - let user initiate conversation
+  // Load conversation history on component mount
 
-  // Load grant data
+  // Load grant data and conversation history
   useEffect(() => {
-    async function fetchGrant() {
+    async function fetchGrantAndMessages() {
       try {
-        const response = await fetch(`/api/grants/${params.grantId}`);
-        if (response.ok) {
-          const data = await response.json();
+        // Load grant data
+        const grantResponse = await fetch(`/api/grants/${params.grantId}`);
+        if (grantResponse.ok) {
+          const data = await grantResponse.json();
           setGrantData({
             id: data.grant.id,
             title: data.grant.title,
@@ -85,8 +88,26 @@ export default function AIWorkspacePage({ params }: { params: { grantId: string 
                 : ['Required documents not specified']
           });
         }
+
+        // Load conversation history
+        const messagesResponse = await fetch(`/api/ai/messages/${params.grantId}`);
+        if (messagesResponse.ok) {
+          const messagesData = await messagesResponse.json();
+          if (messagesData.session && messagesData.messages) {
+            setSessionId(messagesData.session.id);
+            const loadedMessages: Message[] = messagesData.messages.map((msg: any) => ({
+              id: msg.id,
+              sender: msg.sender === 'USER' ? 'user' : 'ai',
+              content: msg.content,
+              timestamp: new Date(msg.createdAt),
+              type: msg.messageType === 'FILE' ? 'file' : msg.messageType === 'SYSTEM' ? 'system' : 'text',
+              metadata: msg.metadata
+            }));
+            setMessages(loadedMessages);
+          }
+        }
       } catch (error) {
-        console.error('Failed to load grant:', error);
+        console.error('Failed to load grant and messages:', error);
         // Keep mock data as fallback
         setGrantData({
           id: params.grantId,
@@ -103,10 +124,11 @@ export default function AIWorkspacePage({ params }: { params: { grantId: string 
         });
       } finally {
         setLoadingGrant(false);
+        setLoadingMessages(false);
       }
     }
 
-    fetchGrant();
+    fetchGrantAndMessages();
   }, [params.grantId]);
 
   const formatAmount = (min?: number, max?: number) => {
@@ -139,7 +161,7 @@ export default function AIWorkspacePage({ params }: { params: { grantId: string 
     // Check if this is a clarifying question request
     let requestBody: any = {
       grantId: params.grantId,
-      sessionId: null // Will be managed by the API
+      sessionId: sessionId // Use existing session ID
     };
 
     if (messageToSend.startsWith('CLARIFY:')) {
@@ -179,8 +201,13 @@ export default function AIWorkspacePage({ params }: { params: { grantId: string 
 
       const data = await response.json();
       
+      // Update session ID if it's new
+      if (data.sessionId && data.sessionId !== sessionId) {
+        setSessionId(data.sessionId);
+      }
+      
       const aiResponse: Message = {
-        id: data.sessionId + '_' + Date.now(),
+        id: data.messageId || (data.sessionId + '_' + Date.now()),
         sender: 'ai',
         content: data.response,
         timestamp: new Date(),
@@ -258,15 +285,20 @@ Maya is analyzing this document...`,
               content: fileContent,
               fileType: file.type
             },
-            sessionId: null
+            sessionId: sessionId
           }),
         });
 
         if (response.ok) {
           const data = await response.json();
           
+          // Update session ID if it's new
+          if (data.sessionId && data.sessionId !== sessionId) {
+            setSessionId(data.sessionId);
+          }
+
           const analysisMessage: Message = {
-            id: data.sessionId + '_analysis',
+            id: data.messageId || (data.sessionId + '_analysis'),
             sender: 'ai',
             content: data.response,
             timestamp: new Date(),
@@ -312,12 +344,14 @@ Maya is analyzing this document...`,
     setUploadedFiles(prev => prev.filter(f => f.id !== fileId));
   };
 
-  if (loadingGrant || !grantData) {
+  if (loadingGrant || loadingMessages || !grantData) {
     return (
       <div className="h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading AI Workspace...</p>
+          <p className="text-gray-600">
+            {loadingGrant ? 'Loading AI Workspace...' : 'Loading conversation history...'}
+          </p>
         </div>
       </div>
     );
