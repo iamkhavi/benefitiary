@@ -844,53 +844,47 @@ Maya is analyzing this document...`,
               /* Regular Messages */
               <>
                 {messages.map((message) => (
-              <div
-                key={message.id}
-                className={cn(
-                  "flex space-x-3",
-                  message.sender === 'user' ? "justify-end" : "justify-start"
-                )}
-              >
-                {message.sender === 'ai' && (
-                  <Avatar className="h-8 w-8">
-                    <AvatarFallback className="bg-purple-100 text-purple-600">
-                      <Bot className="h-4 w-4" />
-                    </AvatarFallback>
-                  </Avatar>
-                )}
-                
-                <div
-                  className={cn(
-                    "max-w-2xl rounded-lg px-4 py-3",
-                    message.sender === 'user'
-                      ? "bg-primary text-white"
-                      : message.type === 'system'
-                      ? "bg-blue-50 border border-blue-200"
-                      : "bg-white border border-gray-200"
-                  )}
-                >
-                  <div className="text-sm leading-relaxed">
-                    <MessageContent content={message.content} />
-                  </div>
-                  <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-100">
-                    <span className="text-xs text-gray-500">
-                      {message.timestamp.toLocaleTimeString()}
-                    </span>
-                    {message.sender === 'ai' && (
-                      <div className="flex items-center space-x-1">
-                        <Zap className="h-3 w-3 text-yellow-500" />
-                        <span className="text-xs text-gray-500">AI</span>
+              <div key={message.id} className="mb-6">
+                {message.sender === 'ai' ? (
+                  /* Maya Response - Kiro Style */
+                  <div className="flex items-start space-x-3">
+                    <Avatar className="h-8 w-8 mt-1">
+                      <AvatarFallback className="bg-purple-100 text-purple-600">
+                        <Bot className="h-4 w-4" />
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center space-x-2 mb-2">
+                        <span className="font-medium text-gray-900">Maya</span>
+                        <span className="text-xs text-gray-500">
+                          {message.timestamp.toLocaleTimeString()}
+                        </span>
                       </div>
-                    )}
+                      <div className="text-sm text-gray-800 leading-relaxed">
+                        <MessageContent content={message.content} />
+                      </div>
+                    </div>
                   </div>
-                </div>
-
-                {message.sender === 'user' && (
-                  <Avatar className="h-8 w-8">
-                    <AvatarFallback className="bg-gray-100 text-gray-600">
-                      <User className="h-4 w-4" />
-                    </AvatarFallback>
-                  </Avatar>
+                ) : (
+                  /* User Message - Clean Style */
+                  <div className="flex items-start space-x-3 justify-end">
+                    <div className="flex-1 min-w-0 text-right">
+                      <div className="flex items-center justify-end space-x-2 mb-2">
+                        <span className="text-xs text-gray-500">
+                          {message.timestamp.toLocaleTimeString()}
+                        </span>
+                        <span className="font-medium text-gray-900">You</span>
+                      </div>
+                      <div className="text-sm text-gray-800 leading-relaxed text-right">
+                        {message.content}
+                      </div>
+                    </div>
+                    <Avatar className="h-8 w-8 mt-1">
+                      <AvatarFallback className="bg-gray-100 text-gray-600">
+                        <User className="h-4 w-4" />
+                      </AvatarFallback>
+                    </Avatar>
+                  </div>
                 )}
               </div>
                 ))}
@@ -898,22 +892,27 @@ Maya is analyzing this document...`,
             )}
             
             {(isLoading || isStreaming) && (
-              <div className="flex space-x-3">
-                <Avatar className="h-8 w-8">
-                  <AvatarFallback className="bg-purple-100 text-purple-600">
-                    <Bot className="h-4 w-4" />
-                  </AvatarFallback>
-                </Avatar>
-                <div className="bg-white border border-gray-200 rounded-lg px-4 py-3">
-                  <div className="flex items-center space-x-2">
-                    <div className="flex space-x-1">
-                      <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" />
-                      <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }} />
-                      <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
+              <div className="mb-6">
+                <div className="flex items-start space-x-3">
+                  <Avatar className="h-8 w-8 mt-1">
+                    <AvatarFallback className="bg-purple-100 text-purple-600">
+                      <Bot className="h-4 w-4" />
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center space-x-2 mb-2">
+                      <span className="font-medium text-gray-900">Maya</span>
+                      <span className="text-xs text-gray-500">
+                        {isStreaming ? 'typing...' : 'thinking...'}
+                      </span>
                     </div>
-                    <span className="text-sm text-gray-500">
-                      {isStreaming ? 'Maya is typing...' : 'Maya is thinking...'}
-                    </span>
+                    <div className="flex items-center space-x-2">
+                      <div className="flex space-x-1">
+                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" />
+                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }} />
+                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -929,7 +928,7 @@ Maya is analyzing this document...`,
               onValueChange={setInputMessage}
               isLoading={isLoading || isStreaming}
               onSubmit={handleSendMessage}
-              className="w-full"
+              className="w-full [&_textarea]:text-gray-900 [&_textarea]:caret-gray-900"
             >
               {/* Show uploaded files */}
               {uploadedFiles.length > 0 && (

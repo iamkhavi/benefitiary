@@ -120,12 +120,15 @@ export class MayaAgent {
 - Category: ${grant?.category?.replace(/_/g, ' ') || 'Not specified'}
 
 **YOUR CONSULTATION STYLE:**
-- Speak naturally and conversationally, like a trusted advisor
+- ALWAYS acknowledge and validate the user's request in the first 1-2 sentences
+- Show you understand what they're asking for before providing guidance
+- Speak with warmth and empathy, like a supportive mentor who genuinely cares
+- Be encouraging and optimistic while remaining strategically realistic
 - Reference the specific organization and grant in your advice
-- Provide actionable, concrete recommendations
-- Explain your reasoning clearly
-- Ask clarifying questions when you need more information
-- Be encouraging but realistic about challenges
+- Provide actionable, concrete recommendations with positive framing
+- Explain your reasoning clearly but gently
+- Ask clarifying questions with curiosity, not judgment
+- Celebrate their efforts and acknowledge the courage it takes to seek funding
 - PROACTIVELY ASK FOR RESOURCES when they would help create better proposals
 
 **YOUR CAPABILITIES:**
@@ -202,7 +205,7 @@ Remember: You're a proactive consultant who asks for what you need to do the bes
       'team': 'Highlight team expertise, organizational capacity, and qualifications'
     };
 
-    const sectionPrompt = sectionPrompts[section as keyof typeof sectionPrompts] || 
+    const sectionPrompt = sectionPrompts[section as keyof typeof sectionPrompts] ||
       `Generate content for the ${section} section of the proposal`;
 
     try {
@@ -271,40 +274,106 @@ Focus on making this section stand out while maintaining accuracy and profession
   private assessGrantFit(): { fitScore: number; concerns: string[]; recommendations: string[] } {
     const org = this.userContext?.organization;
     const grant = this.grantContext;
-    
+
     const concerns: string[] = [];
     const recommendations: string[] = [];
     let fitScore = 85; // Start optimistic
-    
+
     // Check industry alignment
     if (org?.industries && grant?.category) {
       const orgIndustries = org.industries.map((i: string) => i.toLowerCase());
       const grantCategory = grant.category.toLowerCase().replace(/_/g, ' ');
-      
-      const hasAlignment = orgIndustries.some((industry: string) => 
+
+      const hasAlignment = orgIndustries.some((industry: string) =>
         grantCategory.includes(industry) || industry.includes(grantCategory.split(' ')[0])
       );
-      
+
       if (!hasAlignment) {
         fitScore -= 20;
         concerns.push(`Your organization focuses on ${orgIndustries.join(', ')} while this grant targets ${grantCategory}`);
         recommendations.push('Consider how to bridge your expertise with the funder\'s priorities');
       }
     }
-    
+
     // Check organization size vs grant size
     if (org?.orgSize && grant?.fundingAmountMax) {
       const isSmallOrg = ['SOLO_1', 'MICRO_2_10'].includes(org.orgSize);
       const isLargeGrant = grant.fundingAmountMax > 100000;
-      
+
       if (isSmallOrg && isLargeGrant) {
         fitScore -= 15;
         concerns.push('This is a large grant for a small organization - funders may question capacity');
         recommendations.push('Emphasize partnerships or phased implementation to demonstrate feasibility');
       }
     }
-    
+
     return { fitScore, concerns, recommendations };
+  }
+
+  /**
+   * Generate dynamic strategic guidance using OpenAI when grant fit is poor
+   */
+  private async generateStrategicGuidance(userMessage: string, fitAssessment: any): Promise<{ content: string; suggestions: string[] }> {
+    const org = this.userContext?.organization;
+    const grant = this.grantContext;
+
+    const guidancePrompt = `The user just asked: "${userMessage}"
+
+They want help with their application to ${grant?.title || 'a grant opportunity'} from ${grant?.funder?.name || 'a funder'}.
+
+**Context:**
+- Organization: ${org?.name || 'User organization'} (${org?.orgType?.replace(/_/g, ' ') || 'organization'})
+- Grant focus: ${grant?.category?.replace(/_/g, ' ') || 'Not specified'}
+- Fit concerns: ${fitAssessment.concerns.join('; ')}
+- Recommendations: ${fitAssessment.recommendations.join('; ')}
+
+**Your task:**
+Write an empathetic, supportive response that:
+1. FIRST acknowledges their specific request and shows you understand what they want
+2. Expresses genuine care for their success
+3. Gently explains the positioning challenges you've identified
+4. Provides strategic options with encouraging language
+5. Offers to support them regardless of which direction they choose
+
+**Tone Guidelines:**
+- Start by validating their request: "I understand you're looking to..."
+- Be warm and supportive, not clinical or harsh
+- Frame challenges as "positioning opportunities" not problems
+- Use encouraging language like "strengthen", "enhance", "build on"
+- Show confidence in their ability to succeed
+- End with an open, supportive question
+
+**Formatting:**
+- Use **bold** for section headers only
+- Use bullet points (•) for lists
+- Keep it conversational and warm
+- Avoid clinical language
+
+Write your response now:`;
+
+    try {
+      const response = await this.llm.invoke([
+        new SystemMessage(this.generateSystemPrompt()),
+        new HumanMessage(guidancePrompt)
+      ]);
+
+      const content = response.content as string;
+
+      return {
+        content: this.fixFormattingIssues(content),
+        suggestions: fitAssessment.recommendations
+      };
+    } catch (error) {
+      console.error('Error generating strategic guidance:', error);
+
+      // Fallback to simple empathetic response
+      return {
+        content: `I understand you're looking to work on your application for this opportunity, and I'm here to help you succeed. Let me share some thoughts on how we can strengthen your positioning for the best possible outcome.
+
+Based on my review, there are a few areas where we can enhance your application strategy. Would you like to work together on addressing these, or explore other opportunities that might be an even better fit for your organization's strengths?`,
+        suggestions: fitAssessment.recommendations
+      };
+    }
   }
 
   /**
@@ -313,7 +382,7 @@ Focus on making this section stand out while maintaining accuracy and profession
   private async generateContextualFeedback(section: string, generatedContent: string, originalUserRequest: string): Promise<{ content: string; suggestions: string[] }> {
     const org = this.userContext?.organization;
     const grant = this.grantContext;
-    
+
     const feedbackPrompt = `You just generated a ${section} section for ${org?.name || 'the user'}'s grant proposal to ${grant?.funder?.name || 'a funder'}. 
 
 **Context:**
@@ -327,18 +396,26 @@ Focus on making this section stand out while maintaining accuracy and profession
 You created content for their document canvas that addresses their specific request.
 
 **Your task:**
-Write a natural, conversational response that:
-1. Acknowledges what you just accomplished in a personalized way
-2. Highlights 2-3 specific strengths of what you created
-3. Suggests 3-4 concrete next steps that make sense for their situation
-4. Maintains your expert consultant persona - confident but supportive
+Write a warm, encouraging response that:
+1. FIRST acknowledges their original request and shows you understood what they wanted
+2. Celebrates what you just accomplished together in a personalized way
+3. Highlights 2-3 specific strengths of what you created with enthusiasm
+4. Suggests 3-4 concrete next steps that feel achievable and exciting
+5. Maintains your supportive mentor persona - confident, encouraging, and genuinely invested in their success
+
+**Tone Guidelines:**
+- Be genuinely excited about their progress
+- Use encouraging language like "great work", "you're building something strong"
+- Frame next steps as opportunities, not obligations
+- Show confidence in their ability to succeed
+- Make them feel supported and capable
 
 **Formatting:**
-- Use **bold** for key points and section headers
+- Use **bold** for key achievements and positive highlights
 - Use bullet points (•) for lists
-- Keep it conversational and specific to their context
-- Avoid generic "I have created..." language
-- Make it feel like advice from an experienced consultant
+- Keep it conversational and warm
+- Avoid clinical or detached language
+- Make it feel like encouragement from a mentor who believes in them
 
 Write your response now:`;
 
@@ -361,17 +438,22 @@ Write your response now:`;
 
     } catch (error) {
       console.error('Error generating contextual feedback:', error);
-      
-      // Fallback to a simple but still contextual response
+
+      // Fallback to a warm, encouraging response
       return {
-        content: `Perfect! I've added the ${this.getSectionTitle(section)} to your document canvas. The content is tailored specifically for ${org?.name || 'your organization'}'s application to ${grant?.funder?.name || 'this funder'}.
+        content: `Excellent work! I've created the ${this.getSectionTitle(section)} and added it to your document canvas. This content is specifically crafted for ${org?.name || 'your organization'}'s unique strengths and ${grant?.funder?.name || 'this funder'}'s priorities.
 
-**What's Next:**
-• Review the content on your canvas and add any specific details
-• Consider how this section connects with your other proposal sections
-• Let me know if you'd like to work on another section or refine this one
+**You're Making Great Progress:**
+• The content on your canvas captures your organization's value proposition
+• Each section builds toward a compelling case for funding
+• You're developing something that truly represents your mission
 
-What would you like to tackle next?`,
+**Exciting Next Steps:**
+• Review and personalize the content with your specific achievements
+• Consider how this section strengthens your overall narrative
+• Let's continue building momentum with another section
+
+I'm excited to see how this proposal comes together! What would you like to work on next?`,
         suggestions: [
           'Review and customize the generated content',
           'Add specific organizational details',
@@ -458,7 +540,7 @@ Key milestones include project initiation, stakeholder engagement, implementatio
 ${org?.name || 'Our organization'} has demonstrated capacity to successfully manage complex projects, maintain strong stakeholder relationships, and deliver high-quality results. Our organizational infrastructure, systems, and processes provide the foundation for successful project implementation and sustainable impact.`
     };
 
-    const content = fallbackContent[section as keyof typeof fallbackContent] || 
+    const content = fallbackContent[section as keyof typeof fallbackContent] ||
       `[This section requires development based on your specific ${section} requirements and organizational context.]`;
 
     // Generate dynamic contextual feedback even for fallback
@@ -484,65 +566,65 @@ ${org?.name || 'Our organization'} has demonstrated capacity to successfully man
   private analyzeResourceNeeds(userMessage: string, conversationHistory: Array<{ role: 'user' | 'assistant'; content: string }>): string[] {
     const message = userMessage.toLowerCase();
     const fullConversation = conversationHistory.map(m => m.content.toLowerCase()).join(' ') + ' ' + message;
-    
+
     const resourceNeeds: string[] = [];
-    
+
     // Check for team/personnel related discussions
-    if (message.includes('team') || message.includes('staff') || message.includes('personnel') || 
-        message.includes('qualifications') || message.includes('experience') || message.includes('expertise')) {
+    if (message.includes('team') || message.includes('staff') || message.includes('personnel') ||
+      message.includes('qualifications') || message.includes('experience') || message.includes('expertise')) {
       if (!fullConversation.includes('cv') && !fullConversation.includes('resume')) {
         resourceNeeds.push('CVs or resumes of key team members');
       }
     }
-    
+
     // Check for budget related discussions
-    if (message.includes('budget') || message.includes('cost') || message.includes('funding') || 
-        message.includes('financial') || message.includes('money') || message.includes('price')) {
+    if (message.includes('budget') || message.includes('cost') || message.includes('funding') ||
+      message.includes('financial') || message.includes('money') || message.includes('price')) {
       if (!fullConversation.includes('budget breakdown') && !fullConversation.includes('financial plan')) {
         resourceNeeds.push('detailed budget breakdown or financial projections');
       }
     }
-    
+
     // Check for proposal writing discussions
-    if (message.includes('proposal') || message.includes('application') || message.includes('write') || 
-        message.includes('draft') || message.includes('section')) {
+    if (message.includes('proposal') || message.includes('application') || message.includes('write') ||
+      message.includes('draft') || message.includes('section')) {
       if (!fullConversation.includes('previous proposal') && !fullConversation.includes('past application')) {
         resourceNeeds.push('previous proposals or grant applications for reference');
       }
     }
-    
+
     // Check for requirements discussions
-    if (message.includes('requirement') || message.includes('criteria') || message.includes('guideline') || 
-        message.includes('rfp') || message.includes('solicitation')) {
+    if (message.includes('requirement') || message.includes('criteria') || message.includes('guideline') ||
+      message.includes('rfp') || message.includes('solicitation')) {
       if (!fullConversation.includes('full rfp') && !fullConversation.includes('complete guidelines')) {
         resourceNeeds.push('complete RFP document or grant guidelines');
       }
     }
-    
+
     // Check for organizational capacity discussions
-    if (message.includes('organization') || message.includes('capacity') || message.includes('track record') || 
-        message.includes('history') || message.includes('achievements')) {
+    if (message.includes('organization') || message.includes('capacity') || message.includes('track record') ||
+      message.includes('history') || message.includes('achievements')) {
       if (!fullConversation.includes('organizational documents') && !fullConversation.includes('annual report')) {
         resourceNeeds.push('organizational documents (annual reports, impact statements, etc.)');
       }
     }
-    
+
     // Check for partnership discussions
-    if (message.includes('partner') || message.includes('collaboration') || message.includes('support') || 
-        message.includes('endorsement') || message.includes('letter')) {
+    if (message.includes('partner') || message.includes('collaboration') || message.includes('support') ||
+      message.includes('endorsement') || message.includes('letter')) {
       if (!fullConversation.includes('letter of support') && !fullConversation.includes('endorsement letter')) {
         resourceNeeds.push('letters of support or partnership agreements');
       }
     }
-    
+
     // Check for impact/evaluation discussions
-    if (message.includes('impact') || message.includes('outcome') || message.includes('result') || 
-        message.includes('evaluation') || message.includes('metric') || message.includes('data')) {
+    if (message.includes('impact') || message.includes('outcome') || message.includes('result') ||
+      message.includes('evaluation') || message.includes('metric') || message.includes('data')) {
       if (!fullConversation.includes('impact data') && !fullConversation.includes('evaluation report')) {
         resourceNeeds.push('impact data or evaluation reports from previous projects');
       }
     }
-    
+
     return resourceNeeds;
   }
 
@@ -552,22 +634,22 @@ ${org?.name || 'Our organization'} has demonstrated capacity to successfully man
   private cleanResponseFormatting(content: string): string {
     // Remove excessive asterisks and clean up formatting
     let cleaned = content;
-    
+
     // Fix multiple consecutive asterisks
     cleaned = cleaned.replace(/\*{3,}/g, '**');
-    
+
     // Ensure proper spacing around headers
     cleaned = cleaned.replace(/\*\*([^*]+)\*\*(?!\s)/g, '**$1**\n');
-    
+
     // Clean up bullet points - ensure consistent formatting
     cleaned = cleaned.replace(/^[\s]*[-*]\s*/gm, '• ');
-    
+
     // Remove excessive line breaks
     cleaned = cleaned.replace(/\n{3,}/g, '\n\n');
-    
+
     // Trim whitespace
     cleaned = cleaned.trim();
-    
+
     return cleaned;
   }
 
@@ -576,32 +658,32 @@ ${org?.name || 'Our organization'} has demonstrated capacity to successfully man
    */
   private fixFormattingIssues(content: string): string {
     let fixed = content;
-    
+
     // Fix broken headers - common patterns from the chat log
     fixed = fixed.replace(/\*([^*]+)\*\*/g, '**$1**'); // *text** → **text**
     fixed = fixed.replace(/\*\*([^*]+)\*/g, '**$1**'); // **text* → **text**
     fixed = fixed.replace(/\*{3,}([^*]+)\*{3,}/g, '**$1**'); // ***text*** → **text**
-    
+
     // Fix bullet point formatting issues
     fixed = fixed.replace(/•\s*--\s*•\s*/g, '\n\n'); // Remove broken bullet separators
     fixed = fixed.replace(/•\s*\*/g, '\n\n**'); // Fix •* patterns
     fixed = fixed.replace(/^\s*•\s*\*\*/gm, '**'); // Remove bullets before headers
-    
+
     // Clean up numbered lists
     fixed = fixed.replace(/^\s*(\d+)\.\s*\*\*/gm, '\n**'); // Remove numbers before headers
-    
+
     // Ensure proper spacing around headers
     fixed = fixed.replace(/\*\*([^*]+)\*\*(?!\s*\n)/g, '**$1**\n\n');
-    
+
     // Fix multiple consecutive line breaks
     fixed = fixed.replace(/\n{3,}/g, '\n\n');
-    
+
     // Clean up bullet points - ensure consistent formatting
     fixed = fixed.replace(/^[\s]*[-*•]\s*/gm, '• ');
-    
+
     // Remove any remaining malformed asterisks
     fixed = fixed.replace(/\*(?!\*)/g, ''); // Remove single asterisks
-    
+
     return fixed.trim();
   }
 
@@ -610,16 +692,16 @@ ${org?.name || 'Our organization'} has demonstrated capacity to successfully man
    */
   private generateResourceRequests(resourceNeeds: string[]): string {
     if (resourceNeeds.length === 0) return '';
-    
+
     const requests = resourceNeeds.slice(0, 2); // Limit to 2 requests to avoid overwhelming
-    
-    let requestText = '\n\n**📎 To help you better, I could use:**\n';
+
+    let requestText = '\n\n**📎 I\'d love to help you even more effectively:**\n';
     requests.forEach((resource, index) => {
-      requestText += `${index + 1}. **${resource}** - This would help me provide more specific and tailored advice\n`;
+      requestText += `${index + 1}. **${resource}** - This would help me create even stronger, more personalized content for you\n`;
     });
-    
-    requestText += '\nYou can upload these documents using the "Upload Files" button, or just share the key information in our chat. Even rough drafts or partial information would be helpful!';
-    
+
+    requestText += '\nNo pressure at all! You can upload documents using the "Upload Files" button, or just share whatever information you have handy. Even rough notes or partial information helps me support you better!';
+
     return requestText;
   }
 
@@ -628,7 +710,7 @@ ${org?.name || 'Our organization'} has demonstrated capacity to successfully man
    */
   private detectProposalRequest(userMessage: string): { isProposalRequest: boolean; section?: string } {
     const message = userMessage.toLowerCase();
-    
+
     // Section-specific keywords
     const sectionKeywords = {
       'executive': ['executive summary', 'executive', 'summary', 'overview'],
@@ -644,15 +726,15 @@ ${org?.name || 'Our organization'} has demonstrated capacity to successfully man
       // Direct requests
       'write', 'draft', 'create', 'generate', 'build', 'make',
       'help me write', 'can you write', 'please write', 'draft a', 'create a',
-      
+
       // Document-related
       'proposal', 'application', 'submission', 'document', 'export', 'pdf',
       'sample proposal', 'proposal that', 'grant application',
-      
+
       // Action-oriented
       'apply', 'submit', 'prepare', 'put together', 'work on',
       'help me apply', 'help with', 'assist with',
-      
+
       // Content requests
       'what should i include', 'what do i need', 'how do i',
       'structure', 'format', 'template', 'example'
@@ -667,7 +749,7 @@ ${org?.name || 'Our organization'} has demonstrated capacity to successfully man
     // Check for proposal intent
     const hasProposalIntent = proposalIntents.some(intent => message.includes(intent));
     const hasGrantContext = grantContexts.some(context => message.includes(context));
-    
+
     // Smart detection logic
     if (hasProposalIntent && hasGrantContext) {
       // Find specific section if mentioned
@@ -676,7 +758,7 @@ ${org?.name || 'Our organization'} has demonstrated capacity to successfully man
           return { isProposalRequest: true, section };
         }
       }
-      
+
       // Default to executive summary for general requests
       return { isProposalRequest: true, section: 'executive' };
     }
@@ -708,38 +790,24 @@ ${org?.name || 'Our organization'} has demonstrated capacity to successfully man
     try {
       // Check if this is a proposal content request
       const proposalRequest = this.detectProposalRequest(userMessage);
-      
+
       if (proposalRequest.isProposalRequest && proposalRequest.section) {
         // Assess grant fit first - be honest about poor matches
         const fitAssessment = this.assessGrantFit();
-        
+
         if (fitAssessment.fitScore < 70) {
-          // Provide honest feedback about poor fit
-          const honestFeedback = `**Honest Assessment**
-
-I need to share some concerns about this grant opportunity for ${this.userContext?.organization?.name || 'your organization'}:
-
-${fitAssessment.concerns.map(concern => `• ${concern}`).join('\n')}
-
-**Strategic Recommendations:**
-${fitAssessment.recommendations.map(rec => `• ${rec}`).join('\n')}
-
-**Your Options:**
-• Proceed with a strategic approach addressing these concerns
-• Look for better-aligned opportunities that match your strengths
-• Consider partnerships to strengthen your application
-
-Would you like me to help you address these concerns, or should we explore better-suited opportunities?`;
+          // Generate dynamic strategic guidance using OpenAI
+          const strategicGuidance = await this.generateStrategicGuidance(userMessage, fitAssessment);
 
           return {
-            content: honestFeedback,
+            content: strategicGuidance.content,
             confidence: 0.9,
-            reasoning: 'Providing honest assessment of grant fit to help user make strategic decisions',
-            suggestions: fitAssessment.recommendations,
+            reasoning: 'Providing empathetic strategic guidance to help user make informed decisions',
+            suggestions: strategicGuidance.suggestions,
             contentType: 'chat'
           };
         }
-        
+
         // Generate proposal section content if fit is good
         return await this.generateProposalSection(proposalRequest.section, undefined, userMessage);
       }
@@ -748,8 +816,8 @@ Would you like me to help you address these concerns, or should we explore bette
       const messages = [
         new SystemMessage(this.generateSystemPrompt()),
         // Add conversation history
-        ...this.context.messages.map(msg => 
-          msg.role === 'user' 
+        ...this.context.messages.map(msg =>
+          msg.role === 'user'
             ? new HumanMessage(msg.content)
             : new AIMessage(msg.content)
         ),
@@ -767,7 +835,7 @@ Would you like me to help you address these concerns, or should we explore bette
       // Analyze if Maya should ask for additional resources
       const resourceNeeds = this.analyzeResourceNeeds(userMessage, this.context.messages);
       const resourceRequests = this.generateResourceRequests(resourceNeeds);
-      
+
       // Add resource requests to Maya's response if needed (but keep it natural)
       if (resourceRequests && !content.toLowerCase().includes('upload') && !content.toLowerCase().includes('document')) {
         content += resourceRequests;
@@ -794,7 +862,7 @@ Would you like me to help you address these concerns, or should we explore bette
 
     } catch (error) {
       console.error('Maya chat error:', error);
-      
+
       // Simple fallback using available context
       return this.generateFallbackResponse(userMessage);
     }
@@ -805,7 +873,7 @@ Would you like me to help you address these concerns, or should we explore bette
    */
   private extractSuggestions(content: string): string[] {
     const suggestions: string[] = [];
-    
+
     // Look for numbered lists or bullet points
     const lines = content.split('\n');
     for (const line of lines) {
