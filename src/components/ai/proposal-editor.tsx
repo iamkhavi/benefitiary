@@ -14,7 +14,9 @@ import TextAlign from '@tiptap/extension-text-align';
 import Highlight from '@tiptap/extension-highlight';
 import Link from '@tiptap/extension-link';
 import Placeholder from '@tiptap/extension-placeholder';
-import { useState, useEffect, useCallback } from 'react';
+import { Extension } from '@tiptap/core';
+import { Plugin, PluginKey } from '@tiptap/pm/state';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -69,6 +71,59 @@ interface AIWritingSession {
   progress: number;
 }
 
+// Custom Page Break Extension with Auto-pagination
+const PageBreak = Extension.create({
+  name: 'pageBreak',
+  
+  addGlobalAttributes() {
+    return [
+      {
+        types: ['paragraph', 'heading'],
+        attributes: {
+          pageBreak: {
+            default: null,
+            parseHTML: element => element.style.pageBreakBefore || null,
+            renderHTML: attributes => {
+              if (!attributes.pageBreak) return {}
+              return { style: `page-break-before: ${attributes.pageBreak}` }
+            },
+          },
+        },
+      },
+    ]
+  },
+  
+  addCommands() {
+    return {
+      insertPageBreak: () => ({ commands }: { commands: any }) => {
+        return commands.insertContent('<div class="page-break" style="page-break-before: always; height: 1px; margin: 0; padding: 0;"></div>')
+      },
+    } as any
+  },
+
+  addProseMirrorPlugins() {
+    return [
+      new Plugin({
+        key: new PluginKey('autoPagination'),
+        view: () => ({
+          update: (view: any) => {
+            // Auto-pagination logic will be handled by CSS and the container
+            setTimeout(() => {
+              const pages = document.querySelectorAll('.a4-page');
+              pages.forEach((page, index) => {
+                const pageNumber = page.querySelector('.page-number');
+                if (pageNumber) {
+                  pageNumber.textContent = `Page ${index + 1}`;
+                }
+              });
+            }, 100);
+          }
+        })
+      })
+    ]
+  }
+})
+
 export function ProposalEditor({ showCanvas, onClose, grantId, extractedContent, onContentUpdate }: ProposalEditorProps) {
   const [isAIWriting, setIsAIWriting] = useState<AIWritingSession>({
     isActive: false,
@@ -78,6 +133,8 @@ export function ProposalEditor({ showCanvas, onClose, grantId, extractedContent,
   const [showAIIndicators, setShowAIIndicators] = useState(true);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [wordCount, setWordCount] = useState(0);
+  const [pageCount, setPageCount] = useState(1);
+  const editorContainerRef = useRef<HTMLDivElement>(null);
   const [collaborators] = useState([
     { id: 'ai', name: 'AI Assistant', color: '#8B5CF6', isActive: true },
     { id: 'user', name: 'You', color: '#3B82F6', isActive: true }
@@ -126,6 +183,7 @@ export function ProposalEditor({ showCanvas, onClose, grantId, extractedContent,
           class: 'tiptap-link',
         },
       }),
+      PageBreak,
       Placeholder.configure({
         placeholder: ({ node }) => {
           if (node.type.name === 'heading') {
@@ -138,15 +196,49 @@ export function ProposalEditor({ showCanvas, onClose, grantId, extractedContent,
     content: '',
     editorProps: {
       attributes: {
-        class: 'prose prose-sm sm:prose lg:prose-lg xl:prose-xl mx-auto focus:outline-none min-h-[800px] p-8',
-        style: 'font-family: Georgia, serif; line-height: 1.6; max-width: none;'
+        class: 'a4-document-content focus:outline-none',
       },
     },
     onUpdate: ({ editor }) => {
       const text = editor.getText();
       setWordCount(text.split(/\s+/).filter(word => word.length > 0).length);
+      
+      // Update pagination after content changes
+      setTimeout(() => {
+        updatePagination();
+      }, 100);
     },
   });
+
+  // Pagination logic
+  const updatePagination = useCallback(() => {
+    if (!editorContainerRef.current || !editor) return;
+
+    const container = editorContainerRef.current;
+    const content = container.querySelector('.a4-document-content .ProseMirror');
+    if (!content) return;
+
+    // A4 dimensions in pixels (at 96 DPI)
+    const A4_HEIGHT_MM = 297;
+    const A4_WIDTH_MM = 210;
+    const MARGIN_TOP_MM = 25;
+    const MARGIN_BOTTOM_MM = 30;
+    const MARGIN_LEFT_MM = 20;
+    const MARGIN_RIGHT_MM = 20;
+    
+    const MM_TO_PX = 96 / 25.4; // Convert mm to px at 96 DPI
+    
+    const PAGE_HEIGHT_PX = A4_HEIGHT_MM * MM_TO_PX;
+    const CONTENT_HEIGHT_PX = PAGE_HEIGHT_PX - (MARGIN_TOP_MM + MARGIN_BOTTOM_MM) * MM_TO_PX;
+    
+    // Get actual content height
+    const contentHeight = content.scrollHeight;
+    const calculatedPages = Math.max(1, Math.ceil(contentHeight / CONTENT_HEIGHT_PX));
+    
+    if (calculatedPages !== pageCount) {
+      setPageCount(calculatedPages);
+    }
+  }, [pageCount, editor]);
 
   // Simulate AI writing in real-time
   const simulateAIWriting = useCallback(async (section: string, content: string) => {
@@ -218,6 +310,17 @@ export function ProposalEditor({ showCanvas, onClose, grantId, extractedContent,
       editor.commands.setContent(savedContent);
     }
   }, [editor, grantId]);
+
+  // Update pagination when editor is ready
+  useEffect(() => {
+    if (!editor) return;
+    
+    const timer = setTimeout(() => {
+      updatePagination();
+    }, 500);
+    
+    return () => clearTimeout(timer);
+  }, [editor, updatePagination]);
 
   // Handle extracted content from Maya
   useEffect(() => {
@@ -443,9 +546,12 @@ export function ProposalEditor({ showCanvas, onClose, grantId, extractedContent,
           </div>
 
           <div className="flex items-center space-x-2">
-            {/* Word Count */}
+            {/* Word Count & Page Count */}
             <Badge variant="outline" className="text-xs">
               {wordCount} words
+            </Badge>
+            <Badge variant="outline" className="text-xs">
+              {pageCount} {pageCount === 1 ? 'page' : 'pages'}
             </Badge>
             
             {/* Last Saved */}
@@ -608,19 +714,13 @@ export function ProposalEditor({ showCanvas, onClose, grantId, extractedContent,
         )}
       </div>
 
-      {/* Editor Canvas - A4 Size */}
+      {/* Editor Canvas - A4 Size with Pagination */}
       <div className="flex-1 overflow-y-auto p-6 bg-gray-100">
-        <Card 
-          className="mx-auto bg-white shadow-lg border-0 relative"
-          style={{ 
-            width: '210mm', 
-            minHeight: '297mm',
-            maxWidth: '210mm'
-          }}
-        >
+        <div className="mx-auto" style={{ width: '210mm', maxWidth: '210mm' }} ref={editorContainerRef}>
+          
           {/* AI Collaboration Indicators */}
           {showAIIndicators && (
-            <div className="absolute top-4 right-4 z-10">
+            <div className="fixed top-20 right-8 z-50">
               <div className="flex flex-col space-y-2">
                 <Badge className="bg-purple-100 text-purple-800 text-xs">
                   <Bot className="h-3 w-3 mr-1" />
@@ -636,44 +736,322 @@ export function ProposalEditor({ showCanvas, onClose, grantId, extractedContent,
 
           {/* Empty State Placeholder */}
           {(!editor?.getText() || editor.getText().trim() === '') && (
-            <div className="absolute inset-0 flex items-center justify-center p-8">
-              <div className="text-center max-w-md">
-                <div className="mb-6">
-                  <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <FileText className="w-8 h-8 text-gray-400" />
+            <div className="a4-page-container">
+              <Card 
+                className="a4-page bg-white shadow-lg border-0 relative"
+                style={{ 
+                  width: '210mm', 
+                  height: '297mm',
+                  maxWidth: '210mm',
+                  marginBottom: '0.5rem'
+                }}
+              >
+                <div className="absolute inset-0 flex items-center justify-center p-8">
+                  <div className="text-center max-w-md">
+                    <div className="mb-6">
+                      <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <FileText className="w-8 h-8 text-gray-400" />
+                      </div>
+                      <h3 className="text-lg font-medium text-gray-900 mb-2">
+                        Your Document Will Appear Here
+                      </h3>
+                      <p className="text-gray-500 text-sm leading-relaxed">
+                        Ask Maya to generate content, or start typing to create your proposal, report, or any document you need for your funding application.
+                      </p>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <div className="text-xs text-gray-400 uppercase tracking-wide font-medium">
+                        Try asking Maya:
+                      </div>
+                      <div className="space-y-1 text-sm text-gray-600">
+                        <div>"Draft an executive summary"</div>
+                        <div>"Create a project timeline"</div>
+                        <div>"Write a budget overview"</div>
+                      </div>
+                    </div>
                   </div>
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">
-                    Your Document Will Appear Here
-                  </h3>
-                  <p className="text-gray-500 text-sm leading-relaxed">
-                    Ask Maya to generate content, or start typing to create your proposal, report, or any document you need for your funding application.
-                  </p>
                 </div>
                 
-                <div className="space-y-2">
-                  <div className="text-xs text-gray-400 uppercase tracking-wide font-medium">
-                    Try asking Maya:
-                  </div>
-                  <div className="space-y-1 text-sm text-gray-600">
-                    <div>"Draft an executive summary"</div>
-                    <div>"Create a project timeline"</div>
-                    <div>"Write a budget overview"</div>
-                  </div>
+                {/* Page Number for Empty State */}
+                <div className="page-number absolute bottom-4 left-1/2 transform -translate-x-1/2">
+                  <span className="text-xs text-gray-500">Page 1</span>
+                </div>
+              </Card>
+            </div>
+          )}
+
+          {/* Paginated Editor Content */}
+          {editor?.getText() && editor.getText().trim() !== '' && (
+            <div className="paginated-document-container">
+              <div className="a4-document-wrapper">
+                <EditorContent 
+                  editor={editor} 
+                  className="a4-document-content focus-within:outline-none"
+                />
+                
+                {/* Page overlays for visual page breaks */}
+                <div className="page-overlays">
+                  {Array.from({ length: pageCount }, (_, index) => (
+                    <div 
+                      key={index}
+                      className="page-overlay"
+                      style={{
+                        position: 'absolute',
+                        top: `${index * 297 * (96/25.4) + index * (0.5 * 16)}px`, // A4 height + 0.5rem gap
+                        left: 0,
+                        width: '210mm',
+                        height: '297mm',
+                        border: '1px solid #e5e7eb',
+                        backgroundColor: 'white',
+                        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                        pointerEvents: 'none',
+                        zIndex: -1
+                      }}
+                    >
+                      {/* Page Number */}
+                      <div 
+                        className="page-number"
+                        style={{
+                          position: 'absolute',
+                          bottom: '15mm',
+                          left: '50%',
+                          transform: 'translateX(-50%)',
+                          fontSize: '10pt',
+                          color: '#666',
+                          fontFamily: 'Times New Roman, serif',
+                          pointerEvents: 'none'
+                        }}
+                      >
+                        Page {index + 1}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
             </div>
           )}
 
-          <EditorContent 
-            editor={editor} 
-            className={cn(
-              "tiptap-editor",
-              "min-h-[297mm] p-8",
-              "focus-within:outline-none",
-              (!editor?.getText() || editor.getText().trim() === '') && "opacity-0"
-            )}
-          />
-        </Card>
+          {/* Global Styles for A4 Document */}
+          <style jsx global>{`
+            .a4-document-wrapper {
+              position: relative;
+              width: 210mm;
+              max-width: 210mm;
+            }
+            
+            .a4-document-content {
+              position: relative;
+              z-index: 1;
+              font-family: 'Times New Roman', serif !important;
+              font-size: 12pt !important;
+              line-height: 1.6 !important;
+              color: #000 !important;
+              width: 210mm !important;
+              max-width: 210mm !important;
+              background: white;
+              box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            }
+            
+            .a4-document-content .ProseMirror {
+              outline: none !important;
+              padding: 25mm 20mm 30mm 20mm !important;
+              margin: 0 !important;
+              width: 210mm !important;
+              max-width: 210mm !important;
+              min-height: 297mm !important;
+              background: white;
+              position: relative;
+              
+              /* CSS-based pagination */
+              column-fill: auto;
+              orphans: 2;
+              widows: 2;
+            }
+            
+            /* Page break simulation using CSS */
+            .a4-document-content .ProseMirror::before {
+              content: '';
+              position: absolute;
+              top: 0;
+              left: 0;
+              right: 0;
+              height: 100%;
+              background-image: repeating-linear-gradient(
+                transparent,
+                transparent calc(297mm - 1px),
+                #e5e7eb calc(297mm - 1px),
+                #e5e7eb calc(297mm + 0.5rem - 1px),
+                transparent calc(297mm + 0.5rem)
+              );
+              pointer-events: none;
+              z-index: -1;
+            }
+            
+            .a4-document-content h1 {
+              font-size: 16pt !important;
+              font-weight: bold !important;
+              margin: 0 0 18pt 0 !important;
+              text-align: center !important;
+              page-break-after: avoid !important;
+              break-after: avoid !important;
+            }
+            
+            .a4-document-content h2 {
+              font-size: 14pt !important;
+              font-weight: bold !important;
+              margin: 24pt 0 12pt 0 !important;
+              page-break-after: avoid !important;
+              break-after: avoid !important;
+              border-bottom: none !important;
+            }
+            
+            .a4-document-content h3 {
+              font-size: 13pt !important;
+              font-weight: bold !important;
+              margin: 18pt 0 8pt 0 !important;
+              page-break-after: avoid !important;
+              break-after: avoid !important;
+            }
+            
+            .a4-document-content p {
+              margin: 0 0 12pt 0 !important;
+              text-align: justify !important;
+              orphans: 2 !important;
+              widows: 2 !important;
+              font-size: 12pt !important;
+              line-height: 1.6 !important;
+              page-break-inside: avoid !important;
+              break-inside: avoid-page !important;
+            }
+            
+            .a4-document-content ul, .a4-document-content ol {
+              margin: 12pt 0 !important;
+              padding-left: 24pt !important;
+              page-break-inside: avoid !important;
+              break-inside: avoid-page !important;
+            }
+            
+            .a4-document-content li {
+              margin-bottom: 6pt !important;
+              font-size: 12pt !important;
+              line-height: 1.6 !important;
+            }
+            
+            .a4-document-content strong {
+              font-weight: bold !important;
+            }
+            
+            .a4-document-content em {
+              font-style: italic !important;
+            }
+            
+            .a4-document-content blockquote {
+              margin: 12pt 0 !important;
+              padding-left: 12pt !important;
+              border-left: 3pt solid #ccc !important;
+              font-style: italic !important;
+              page-break-inside: avoid !important;
+              break-inside: avoid-page !important;
+            }
+            
+            /* Manual page break handling */
+            .a4-document-content .page-break {
+              page-break-before: always !important;
+              break-before: page !important;
+              height: 1px !important;
+              margin: 0 !important;
+              padding: 0 !important;
+              visibility: hidden !important;
+            }
+            
+            /* Page overlays */
+            .page-overlays {
+              position: absolute;
+              top: 0;
+              left: 0;
+              width: 100%;
+              height: 100%;
+              pointer-events: none;
+              z-index: -1;
+            }
+            
+            .page-overlay {
+              border-radius: 4px;
+            }
+            
+            /* Print styles */
+            @media print {
+              .a4-document-wrapper {
+                width: 100% !important;
+                max-width: none !important;
+              }
+              
+              .a4-document-content {
+                box-shadow: none !important;
+                width: 100% !important;
+                max-width: none !important;
+              }
+              
+              .a4-document-content .ProseMirror {
+                width: 100% !important;
+                max-width: none !important;
+                padding: 25mm 20mm 30mm 20mm !important;
+                min-height: auto !important;
+              }
+              
+              .a4-document-content .ProseMirror::before {
+                display: none !important;
+              }
+              
+              .page-overlays {
+                display: none !important;
+              }
+              
+              .a4-document-content h1, 
+              .a4-document-content h2, 
+              .a4-document-content h3 {
+                page-break-after: avoid !important;
+                break-after: avoid !important;
+              }
+              
+              .a4-document-content p {
+                orphans: 2 !important;
+                widows: 2 !important;
+                page-break-inside: avoid !important;
+                break-inside: avoid-page !important;
+              }
+            }
+            
+            /* Responsive adjustments */
+            @media (max-width: 768px) {
+              .a4-document-wrapper {
+                width: 100% !important;
+                max-width: 100% !important;
+              }
+              
+              .a4-document-content {
+                width: 100% !important;
+                max-width: 100% !important;
+              }
+              
+              .a4-document-content .ProseMirror {
+                width: 100% !important;
+                max-width: 100% !important;
+                padding: 20px !important;
+                min-height: 400px !important;
+              }
+              
+              .a4-document-content .ProseMirror::before {
+                display: none !important;
+              }
+              
+              .page-overlays {
+                display: none !important;
+              }
+            }
+          `}</style>
+        </div>
       </div>
 
       {/* Quick AI Actions */}
