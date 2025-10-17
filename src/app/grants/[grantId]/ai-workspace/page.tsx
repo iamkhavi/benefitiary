@@ -399,7 +399,7 @@ export default function AIWorkspacePage({ params }: { params: { grantId: string 
                 );
               } else if (data.type === 'complete' && metadata) {
                 // Handle completion and canvas integration
-                if (metadata.contentType === 'proposal_section' && metadata.extractedContent) {
+                if (metadata && metadata.contentType === 'proposal_section' && metadata.extractedContent) {
                   // Show canvas if not already visible
                   if (!showCanvas) {
                     setShowCanvas(true);
@@ -409,7 +409,7 @@ export default function AIWorkspacePage({ params }: { params: { grantId: string 
                   handleCanvasUpdate(metadata.extractedContent);
 
                   // Use Maya's dynamic response directly
-                  const summaryContent = data.response;
+                  const summaryContent = data.response || streamingMessage?.content || '';
 
                   setMessages(prev => 
                     prev.map(msg => 
@@ -445,7 +445,7 @@ export default function AIWorkspacePage({ params }: { params: { grantId: string 
     }
 
     // Handle canvas integration for proposal content
-    if (data.contentType === 'proposal_section' && data.extractedContent) {
+    if (data && data.contentType === 'proposal_section' && data.extractedContent) {
       // Show canvas if not already visible
       if (!showCanvas) {
         setShowCanvas(true);

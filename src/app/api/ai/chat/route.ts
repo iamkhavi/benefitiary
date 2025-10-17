@@ -82,7 +82,7 @@ export async function POST(request: NextRequest) {
           const streamContent = () => {
             if (currentIndex < content.length) {
               // Send next chunk (word by word for better UX)
-              const words = content.split(' ');
+              const words = (content || '').split(' ');
               let wordIndex = 0;
               let charIndex = 0;
 
@@ -113,10 +113,11 @@ export async function POST(request: NextRequest) {
               // Continue streaming with delay
               setTimeout(streamContent, Math.random() * 100 + 50); // 50-150ms delay
             } else {
-              // Send completion signal
+              // Send completion signal with response content
               const completeData = {
                 type: 'complete',
-                isComplete: true
+                isComplete: true,
+                response: mayaResponse.content
               };
 
               controller.enqueue(encoder.encode(`data: ${JSON.stringify(completeData)}\n\n`));
