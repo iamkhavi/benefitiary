@@ -51,6 +51,15 @@ export async function POST(request: NextRequest) {
       mayaResponse = await maya.chat(message);
     }
 
+    // Debug logging to see what Maya is actually returning
+    console.log('=== MAYA RESPONSE DEBUG ===');
+    console.log('User Message:', message);
+    console.log('Content Type:', mayaResponse.contentType);
+    console.log('Has Extracted Content:', !!mayaResponse.extractedContent);
+    console.log('Extracted Content:', mayaResponse.extractedContent);
+    console.log('Response Length:', mayaResponse.content?.length || 0);
+    console.log('========================');
+
     // Save conversation to database
     const { sessionId: newSessionId, messageId } = await maya.saveConversation(userMessage, mayaResponse);
 

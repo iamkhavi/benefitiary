@@ -196,6 +196,12 @@ Remember: You're a proactive consultant who asks for what you need to do the bes
       throw new Error('Maya agent not initialized. Call initialize() first.');
     }
 
+    console.log('=== GENERATING PROPOSAL SECTION ===');
+    console.log('Section:', section);
+    console.log('User Message:', userMessage);
+    console.log('Has Existing Content:', !!existingContent);
+    console.log('==================================');
+
     const sectionPrompts = {
       'executive': 'Generate a compelling executive summary that highlights the problem, solution, and expected impact',
       'project': 'Create a detailed project description including methodology, approach, and innovation',
@@ -802,6 +808,14 @@ ${org?.name || 'Our organization'} has demonstrated capacity to successfully man
       // Check if this is a proposal content request
       const proposalRequest = this.detectProposalRequest(userMessage);
 
+      // Debug logging
+      console.log('=== MAYA PROPOSAL DETECTION ===');
+      console.log('User Message:', userMessage);
+      console.log('Is Proposal Request:', proposalRequest.isProposalRequest);
+      console.log('Detected Section:', proposalRequest.section);
+      console.log('Is Demo Request:', this.isDemoRequest(userMessage));
+      console.log('===============================');
+
       if (proposalRequest.isProposalRequest && proposalRequest.section) {
         // Assess grant fit first - be honest about poor matches
         const fitAssessment = this.assessGrantFit();
@@ -809,8 +823,17 @@ ${org?.name || 'Our organization'} has demonstrated capacity to successfully man
         // Check if this is a demo/sample request - be very lenient for testing
         const isDemoRequest = this.isDemoRequest(userMessage);
 
+        // Debug fit assessment
+        console.log('=== FIT ASSESSMENT DEBUG ===');
+        console.log('Fit Score:', fitAssessment.fitScore);
+        console.log('Is Demo Request:', isDemoRequest);
+        console.log('Concerns:', fitAssessment.concerns);
+        console.log('Will Generate Content:', isDemoRequest || fitAssessment.fitScore >= 40);
+        console.log('===========================');
+
         if (isDemoRequest) {
           // For demo requests, always generate content regardless of fit
+          console.log('GENERATING CONTENT: Demo request detected');
           return await this.generateProposalSection(proposalRequest.section, undefined, userMessage);
         }
 

@@ -168,7 +168,7 @@ export default function AIWorkspacePage({ params }: { params: { grantId: string 
   const [streamingMessageId, setStreamingMessageId] = useState<string | null>(null);
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [showSidebar, setShowSidebar] = useState(false);
-  const [showCanvas, setShowCanvas] = useState(false);
+  const [showCanvas, setShowCanvas] = useState(true); // Show canvas by default for testing
   const [grantData, setGrantData] = useState<any>(null);
   const [loadingGrant, setLoadingGrant] = useState(true);
   const [loadingMessages, setLoadingMessages] = useState(true);

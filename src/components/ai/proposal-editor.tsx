@@ -241,26 +241,12 @@ export function ProposalEditor({ showCanvas, onClose, grantId, extractedContent,
         }
       });
 
-      if (targetPos !== -1) {
-        // Replace the placeholder paragraph with the new content
-        const paragraphNode = doc.nodeAt(targetPos);
-        if (paragraphNode) {
-          const endPos = targetPos + paragraphNode.nodeSize;
-          
-          editor.chain()
-            .focus()
-            .setTextSelection({ from: targetPos, to: endPos })
-            .insertContent(`<p>${content}</p>`)
-            .run();
-        }
-      } else {
-        // If section not found, append at the end
-        editor.chain()
-          .focus()
-          .setTextSelection(doc.content.size)
-          .insertContent(`<h2>${title}</h2><p>${content}</p>`)
-          .run();
-      }
+      // Always append content at the end for now (simplified approach)
+      editor.chain()
+        .focus()
+        .setTextSelection(doc.content.size)
+        .insertContent(`<h2>${title}</h2><div>${content}</div>`)
+        .run();
 
       // Trigger AI writing animation
       simulateAIWriting(section, '');
