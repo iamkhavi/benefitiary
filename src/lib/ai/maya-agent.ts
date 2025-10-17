@@ -128,6 +128,21 @@ export class MayaAgent {
 - Be encouraging but realistic about challenges
 - PROACTIVELY ASK FOR RESOURCES when they would help create better proposals
 
+**YOUR CAPABILITIES:**
+- You CAN generate proposal content that appears on the document canvas
+- You CAN create exportable documents (PDFs, Word docs, any document type)
+- You ARE connected to a collaborative document editor
+- When users request proposal content, you generate it and place it on their canvas
+- You help users create professional, exportable documents of any kind
+
+**ETHICAL STANDARDS & INTEGRITY:**
+- NEVER expose or reference specific user data, PII, or database information
+- Be honest about grant fit - if organization and funder priorities don't align, say so
+- Provide realistic assessments from a reviewer's perspective
+- Suggest alternative strategies or better-suited opportunities when appropriate
+- Your goal is to help users WIN, not just apply - be their strategic advisor
+- Maintain confidentiality and never share user information across sessions
+
 **FORMATTING GUIDELINES:**
 - Use bold text sparingly for section headers and key achievements only
 - Structure responses with clear sections and natural flow
@@ -248,6 +263,48 @@ Focus on making this section stand out while maintaining accuracy and profession
       'team': 'Team & Organizational Capacity'
     };
     return titles[section as keyof typeof titles] || section.charAt(0).toUpperCase() + section.slice(1);
+  }
+
+  /**
+   * Assess grant fit and provide honest feedback
+   */
+  private assessGrantFit(): { fitScore: number; concerns: string[]; recommendations: string[] } {
+    const org = this.userContext?.organization;
+    const grant = this.grantContext;
+    
+    const concerns: string[] = [];
+    const recommendations: string[] = [];
+    let fitScore = 85; // Start optimistic
+    
+    // Check industry alignment
+    if (org?.industries && grant?.category) {
+      const orgIndustries = org.industries.map((i: string) => i.toLowerCase());
+      const grantCategory = grant.category.toLowerCase().replace(/_/g, ' ');
+      
+      const hasAlignment = orgIndustries.some((industry: string) => 
+        grantCategory.includes(industry) || industry.includes(grantCategory.split(' ')[0])
+      );
+      
+      if (!hasAlignment) {
+        fitScore -= 20;
+        concerns.push(`Your organization focuses on ${orgIndustries.join(', ')} while this grant targets ${grantCategory}`);
+        recommendations.push('Consider how to bridge your expertise with the funder\'s priorities');
+      }
+    }
+    
+    // Check organization size vs grant size
+    if (org?.orgSize && grant?.fundingAmountMax) {
+      const isSmallOrg = ['SOLO_1', 'MICRO_2_10'].includes(org.orgSize);
+      const isLargeGrant = grant.fundingAmountMax > 100000;
+      
+      if (isSmallOrg && isLargeGrant) {
+        fitScore -= 15;
+        concerns.push('This is a large grant for a small organization - funders may question capacity');
+        recommendations.push('Emphasize partnerships or phased implementation to demonstrate feasibility');
+      }
+    }
+    
+    return { fitScore, concerns, recommendations };
   }
 
   /**
@@ -515,6 +572,40 @@ ${org?.name || 'Our organization'} has demonstrated capacity to successfully man
   }
 
   /**
+   * Fix formatting issues in Maya's responses
+   */
+  private fixFormattingIssues(content: string): string {
+    let fixed = content;
+    
+    // Fix broken headers - common patterns from the chat log
+    fixed = fixed.replace(/\*([^*]+)\*\*/g, '**$1**'); // *text** → **text**
+    fixed = fixed.replace(/\*\*([^*]+)\*/g, '**$1**'); // **text* → **text**
+    fixed = fixed.replace(/\*{3,}([^*]+)\*{3,}/g, '**$1**'); // ***text*** → **text**
+    
+    // Fix bullet point formatting issues
+    fixed = fixed.replace(/•\s*--\s*•\s*/g, '\n\n'); // Remove broken bullet separators
+    fixed = fixed.replace(/•\s*\*/g, '\n\n**'); // Fix •* patterns
+    fixed = fixed.replace(/^\s*•\s*\*\*/gm, '**'); // Remove bullets before headers
+    
+    // Clean up numbered lists
+    fixed = fixed.replace(/^\s*(\d+)\.\s*\*\*/gm, '\n**'); // Remove numbers before headers
+    
+    // Ensure proper spacing around headers
+    fixed = fixed.replace(/\*\*([^*]+)\*\*(?!\s*\n)/g, '**$1**\n\n');
+    
+    // Fix multiple consecutive line breaks
+    fixed = fixed.replace(/\n{3,}/g, '\n\n');
+    
+    // Clean up bullet points - ensure consistent formatting
+    fixed = fixed.replace(/^[\s]*[-*•]\s*/gm, '• ');
+    
+    // Remove any remaining malformed asterisks
+    fixed = fixed.replace(/\*(?!\*)/g, ''); // Remove single asterisks
+    
+    return fixed.trim();
+  }
+
+  /**
    * Generate resource request suggestions
    */
   private generateResourceRequests(resourceNeeds: string[]): string {
@@ -533,12 +624,12 @@ ${org?.name || 'Our organization'} has demonstrated capacity to successfully man
   }
 
   /**
-   * Detect if user is requesting proposal content generation
+   * Smart detection for proposal content requests - context-aware and comprehensive
    */
   private detectProposalRequest(userMessage: string): { isProposalRequest: boolean; section?: string } {
     const message = userMessage.toLowerCase();
     
-    // Check for explicit section requests
+    // Section-specific keywords
     const sectionKeywords = {
       'executive': ['executive summary', 'executive', 'summary', 'overview'],
       'project': ['project description', 'project', 'methodology', 'approach'],
@@ -548,26 +639,59 @@ ${org?.name || 'Our organization'} has demonstrated capacity to successfully man
       'team': ['team', 'staff', 'personnel', 'qualifications', 'capacity']
     };
 
-    // Check for proposal generation keywords
-    const proposalKeywords = [
-      'write', 'draft', 'create', 'generate', 'help me write',
-      'can you write', 'please write', 'draft a', 'create a'
+    // Comprehensive proposal intent detection
+    const proposalIntents = [
+      // Direct requests
+      'write', 'draft', 'create', 'generate', 'build', 'make',
+      'help me write', 'can you write', 'please write', 'draft a', 'create a',
+      
+      // Document-related
+      'proposal', 'application', 'submission', 'document', 'export', 'pdf',
+      'sample proposal', 'proposal that', 'grant application',
+      
+      // Action-oriented
+      'apply', 'submit', 'prepare', 'put together', 'work on',
+      'help me apply', 'help with', 'assist with',
+      
+      // Content requests
+      'what should i include', 'what do i need', 'how do i',
+      'structure', 'format', 'template', 'example'
     ];
 
-    const hasProposalKeyword = proposalKeywords.some(keyword => message.includes(keyword));
+    // Grant/funding context indicators
+    const grantContexts = [
+      'grant', 'funding', 'funder', 'application', 'proposal',
+      'submit', 'apply', 'win', 'secure funding', 'get funding'
+    ];
+
+    // Check for proposal intent
+    const hasProposalIntent = proposalIntents.some(intent => message.includes(intent));
+    const hasGrantContext = grantContexts.some(context => message.includes(context));
     
-    if (hasProposalKeyword) {
-      // Find which section they're asking for
+    // Smart detection logic
+    if (hasProposalIntent && hasGrantContext) {
+      // Find specific section if mentioned
       for (const [section, keywords] of Object.entries(sectionKeywords)) {
         if (keywords.some(keyword => message.includes(keyword))) {
           return { isProposalRequest: true, section };
         }
       }
       
-      // General proposal request
-      if (message.includes('proposal') || message.includes('application')) {
-        return { isProposalRequest: true };
-      }
+      // Default to executive summary for general requests
+      return { isProposalRequest: true, section: 'executive' };
+    }
+
+    // Catch common phrases that clearly indicate proposal needs
+    const clearProposalPhrases = [
+      'draft a proposal', 'write a proposal', 'create a proposal',
+      'sample proposal', 'proposal template', 'help me apply',
+      'application for', 'submit for', 'apply for this grant',
+      'win this grant', 'get this funding', 'proposal that',
+      'document i can export', 'exportable', 'pdf'
+    ];
+
+    if (clearProposalPhrases.some(phrase => message.includes(phrase))) {
+      return { isProposalRequest: true, section: 'executive' };
     }
 
     return { isProposalRequest: false };
@@ -586,7 +710,37 @@ ${org?.name || 'Our organization'} has demonstrated capacity to successfully man
       const proposalRequest = this.detectProposalRequest(userMessage);
       
       if (proposalRequest.isProposalRequest && proposalRequest.section) {
-        // Generate proposal section content with original user message for context
+        // Assess grant fit first - be honest about poor matches
+        const fitAssessment = this.assessGrantFit();
+        
+        if (fitAssessment.fitScore < 70) {
+          // Provide honest feedback about poor fit
+          const honestFeedback = `**Honest Assessment**
+
+I need to share some concerns about this grant opportunity for ${this.userContext?.organization?.name || 'your organization'}:
+
+${fitAssessment.concerns.map(concern => `• ${concern}`).join('\n')}
+
+**Strategic Recommendations:**
+${fitAssessment.recommendations.map(rec => `• ${rec}`).join('\n')}
+
+**Your Options:**
+• Proceed with a strategic approach addressing these concerns
+• Look for better-aligned opportunities that match your strengths
+• Consider partnerships to strengthen your application
+
+Would you like me to help you address these concerns, or should we explore better-suited opportunities?`;
+
+          return {
+            content: honestFeedback,
+            confidence: 0.9,
+            reasoning: 'Providing honest assessment of grant fit to help user make strategic decisions',
+            suggestions: fitAssessment.recommendations,
+            contentType: 'chat'
+          };
+        }
+        
+        // Generate proposal section content if fit is good
         return await this.generateProposalSection(proposalRequest.section, undefined, userMessage);
       }
 
@@ -607,8 +761,8 @@ ${org?.name || 'Our organization'} has demonstrated capacity to successfully man
       const response = await this.llm.invoke(messages);
       let content = response.content as string;
 
-      // Clean up any excessive formatting
-      content = this.cleanResponseFormatting(content);
+      // Clean up formatting issues
+      content = this.fixFormattingIssues(content);
 
       // Analyze if Maya should ask for additional resources
       const resourceNeeds = this.analyzeResourceNeeds(userMessage, this.context.messages);

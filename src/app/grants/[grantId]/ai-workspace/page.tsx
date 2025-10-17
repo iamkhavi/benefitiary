@@ -6,6 +6,12 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import {
+  PromptInput,
+  PromptInputAction,
+  PromptInputActions,
+  PromptInputTextarea,
+} from '@/components/ui/prompt-input';
 import { 
   Bot,
   User,
@@ -17,7 +23,9 @@ import {
   Sparkles,
   MessageSquare,
   X,
-  Zap
+  Zap,
+  ArrowUp,
+  Square
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
@@ -916,52 +924,76 @@ Maya is analyzing this document...`,
 
           {/* Input Area */}
           <div className="border-t border-gray-200 bg-white p-4">
-            <div className="flex items-end space-x-3">
-              <div className="flex-1">
-                <Textarea
-                  value={inputMessage}
-                  onChange={(e) => setInputMessage(e.target.value)}
-                  placeholder="Ask me about eligibility, requirements, or get help with your proposal..."
-                  className="min-h-[60px] resize-none"
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
-                      e.preventDefault();
-                      handleSendMessage();
-                    }
-                  }}
-                />
-                <div className="flex items-center justify-between mt-2">
-                  <div className="flex items-center space-x-2">
+            <PromptInput
+              value={inputMessage}
+              onValueChange={setInputMessage}
+              isLoading={isLoading || isStreaming}
+              onSubmit={handleSendMessage}
+              className="w-full"
+            >
+              {/* Show uploaded files */}
+              {uploadedFiles.length > 0 && (
+                <div className="flex flex-wrap gap-2 pb-2">
+                  {uploadedFiles.map((file) => (
+                    <div
+                      key={file.id}
+                      className="bg-secondary flex items-center gap-2 rounded-lg px-3 py-2 text-sm"
+                    >
+                      <Paperclip className="size-4" />
+                      <span className="max-w-[120px] truncate">{file.name}</span>
+                      <button
+                        onClick={() => removeFile(file.id)}
+                        className="hover:bg-secondary/50 rounded-full p-1"
+                      >
+                        <X className="size-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <PromptInputTextarea 
+                placeholder="Ask me about eligibility, requirements, or get help with your proposal..." 
+              />
+
+              <PromptInputActions className="flex items-center justify-between gap-2 pt-2">
+                <PromptInputAction tooltip="Attach files">
+                  <label
+                    htmlFor="file-upload"
+                    className="hover:bg-secondary-foreground/10 flex h-8 w-8 cursor-pointer items-center justify-center rounded-2xl"
+                  >
                     <input
                       type="file"
-                      ref={fileInputRef}
-                      onChange={handleFileUpload}
                       multiple
-                      accept=".pdf,.doc,.docx,.txt"
+                      onChange={handleFileUpload}
                       className="hidden"
+                      id="file-upload"
+                      ref={fileInputRef}
+                      accept=".pdf,.doc,.docx,.txt"
                     />
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => fileInputRef.current?.click()}
-                    >
-                      <Paperclip className="h-4 w-4 mr-2" />
-                      Upload Files
-                    </Button>
-                  </div>
-                  <div className="text-xs text-gray-500">
-                    Press Enter to send, Shift+Enter for new line
-                  </div>
-                </div>
-              </div>
-              <Button
-                onClick={() => handleSendMessage()}
-                disabled={!inputMessage.trim() || isLoading}
-                className="px-6"
-              >
-                <Send className="h-4 w-4" />
-              </Button>
-            </div>
+                    <Paperclip className="text-primary size-5" />
+                  </label>
+                </PromptInputAction>
+
+                <PromptInputAction
+                  tooltip={isLoading || isStreaming ? "Stop generation" : "Send message"}
+                >
+                  <Button
+                    variant="default"
+                    size="icon"
+                    className="h-8 w-8 rounded-full"
+                    onClick={() => handleSendMessage()}
+                    disabled={!inputMessage.trim() || isLoading || isStreaming}
+                  >
+                    {isLoading || isStreaming ? (
+                      <Square className="size-5 fill-current" />
+                    ) : (
+                      <ArrowUp className="size-5" />
+                    )}
+                  </Button>
+                </PromptInputAction>
+              </PromptInputActions>
+            </PromptInput>
           </div>
         </div>
       </div>
