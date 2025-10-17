@@ -55,6 +55,10 @@ interface ProposalEditorProps {
     section: string;
     title: string;
     content: string;
+    editingIntent?: {
+      intent: 'rewrite' | 'append' | 'modify' | 'new';
+      target?: string;
+    };
   } | null;
   onContentUpdate?: () => void;
 }
@@ -220,8 +224,6 @@ export function ProposalEditor({ showCanvas, onClose, grantId, extractedContent,
     if (!editor || !extractedContent) return;
 
     const insertExtractedContent = () => {
-      const { section, title, content } = extractedContent;
-      
       // Find the section heading in the document
       const doc = editor.state.doc;
       let sectionPos = -1;
@@ -229,7 +231,7 @@ export function ProposalEditor({ showCanvas, onClose, grantId, extractedContent,
       
       doc.descendants((node, pos) => {
         if (node.type.name === 'heading' && 
-            node.textContent.toLowerCase().includes(section.toLowerCase())) {
+            node.textContent.toLowerCase().includes(sectionName.toLowerCase())) {
           sectionPos = pos;
           // Find the paragraph after this heading
           const nextPos = pos + node.nodeSize;
@@ -241,15 +243,66 @@ export function ProposalEditor({ showCanvas, onClose, grantId, extractedContent,
         }
       });
 
-      // Always append content at the end for now (simplified approach)
-      editor.chain()
-        .focus()
-        .setTextSelection(doc.content.size)
-        .insertContent(`<h2>${title}</h2><div>${content}</div>`)
-        .run();
+      const { section: sectionName, title, content, editingIntent } = extractedContent;
+      
+      // Handle different editing intents
+      if (editingIntent?.intent === 'rewrite') {
+        // Clear entire document and insert new content
+        editor.chain()
+          .focus()
+          .selectAll()
+          .deleteSelection()
+          .insertContent(`<h1 style="text-align: center; margin-bottom: 2rem;">${title}</h1><div>${content}</div>`)
+          .run();
+      } else if (editingIntent?.intent === 'modify') {
+        // Find and replace specific section
+        const doc = editor.state.doc;
+        let sectionFound = false;
+        
+        doc.descendants((node, pos) => {
+          if (node.type.name === 'heading' && 
+              node.textContent.toLowerCase().includes(sectionName.toLowerCase())) {
+            // Find the end of this section (next heading or end of document)
+            let endPos = doc.content.size;
+            doc.descendants((nextNode, nextPos) => {
+              if (nextPos > pos && nextNode.type.name === 'heading' && 
+                  nextNode.attrs.level <= node.attrs.level) {
+                endPos = nextPos;
+                return false;
+              }
+            });
+            
+            // Replace the section content
+            editor.chain()
+              .focus()
+              .setTextSelection({ from: pos, to: endPos })
+              .insertContent(`<h2 style="margin-top: 2rem; margin-bottom: 1rem; font-weight: bold;">${title}</h2><div>${content}</div>`)
+              .run();
+            
+            sectionFound = true;
+            return false;
+          }
+        });
+        
+        if (!sectionFound) {
+          // Section not found, append at end
+          editor.chain()
+            .focus()
+            .setTextSelection(doc.content.size)
+            .insertContent(`<h2 style="margin-top: 2rem; margin-bottom: 1rem; font-weight: bold;">${title}</h2><div>${content}</div>`)
+            .run();
+        }
+      } else {
+        // Default: append at end (for 'new' and 'append' intents)
+        editor.chain()
+          .focus()
+          .setTextSelection(doc.content.size)
+          .insertContent(`<h2 style="margin-top: 2rem; margin-bottom: 1rem; font-weight: bold;">${title}</h2><div>${content}</div>`)
+          .run();
+      }
 
       // Trigger AI writing animation
-      simulateAIWriting(section, '');
+      simulateAIWriting(sectionName, '');
       
       // Clear the extracted content
       if (onContentUpdate) {

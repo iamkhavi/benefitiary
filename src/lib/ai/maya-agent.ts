@@ -146,14 +146,16 @@ export class MayaAgent {
 - Your goal is to help users WIN, not just apply - be their strategic advisor
 - Maintain confidentiality and never share user information across sessions
 
-**FORMATTING GUIDELINES:**
-- Use bold text sparingly for section headers and key achievements only
-- Structure responses with clear sections and natural flow
-- Use bullet points for lists and recommendations
-- Use numbered lists for step-by-step processes
-- Keep responses conversational yet professional
-- Avoid excessive markdown - let content speak for itself
-- Focus on clarity and readability over formatting
+**CRITICAL FORMATTING RULES FOR PROPOSALS:**
+- Generate clean HTML content with proper <h3>, <p>, <strong>, <ul>, <li> tags
+- NO asterisks (*), NO markdown formatting, NO informal symbols
+- Use <strong>Bold Text</strong> for emphasis, never **text**
+- Structure with clear headings: <h3>Professional Section Title</h3>
+- Write formal, academic language in third person
+- Include specific metrics, dates, and concrete details
+- Create professional paragraphs with <p> tags
+- Use <ul><li> for bulleted lists when appropriate
+- Output must be publication-ready, formal business document quality
 
 **WHEN TO ASK FOR ADDITIONAL RESOURCES:**
 - **CVs/Resumes**: When discussing team qualifications or project leadership
@@ -230,7 +232,18 @@ Please generate professional, detailed content for this section that:
 - Demonstrates deep understanding of the project and requirements
 - Shows clear value proposition and competitive advantages
 
-Create content that would be found in a winning, professional grant proposal. Be thorough, detailed, and comprehensive - this should be publication-ready content that fully addresses this section's requirements.`;
+Create content that would be found in a winning, professional grant proposal. Be thorough, detailed, and comprehensive - this should be publication-ready content that fully addresses this section's requirements.
+
+CRITICAL FORMATTING REQUIREMENTS:
+- Structure content with clear HTML headings: <h3>Section Title</h3>
+- Use <strong> tags for emphasis, not asterisks or other symbols
+- Write in formal, professional language without contractions
+- Use proper paragraph tags <p> for each paragraph
+- Create bulleted lists with <ul><li> tags when appropriate
+- Include specific data, metrics, and concrete examples
+- Maintain consistent professional tone throughout
+- NO asterisks (*), NO informal punctuation, NO casual language
+- Format like a formal business document ready for publication`;
 
       const messages = [
         new SystemMessage(systemPrompt),
@@ -723,9 +736,37 @@ ${org?.name || 'Our organization'} has demonstrated capacity to successfully man
   }
 
   /**
+   * Detect editing intent (rewrite, append, modify, etc.)
+   */
+  private detectEditingIntent(message: string): { intent: 'rewrite' | 'append' | 'modify' | 'new'; target?: string } {
+    const msg = message.toLowerCase();
+
+    // Rewrite intents
+    if (msg.includes('rewrite') || msg.includes('start over') || msg.includes('completely new') ||
+      msg.includes('from scratch') || msg.includes('entirely new') || msg.includes('replace all')) {
+      return { intent: 'rewrite' };
+    }
+
+    // Modify specific section intents
+    if (msg.includes('modify') || msg.includes('update') || msg.includes('change') ||
+      msg.includes('improve') || msg.includes('revise') || msg.includes('edit')) {
+      return { intent: 'modify' };
+    }
+
+    // Append intents
+    if (msg.includes('add') || msg.includes('append') || msg.includes('include more') ||
+      msg.includes('expand') || msg.includes('continue')) {
+      return { intent: 'append' };
+    }
+
+    // Default to new content
+    return { intent: 'new' };
+  }
+
+  /**
    * Smart detection for proposal content requests - context-aware and comprehensive
    */
-  private detectProposalRequest(userMessage: string): { isProposalRequest: boolean; section?: string } {
+  private detectProposalRequest(userMessage: string): { isProposalRequest: boolean; section?: string; editingIntent?: { intent: 'rewrite' | 'append' | 'modify' | 'new'; target?: string } } {
     const message = userMessage.toLowerCase();
 
     // Section-specific keywords
@@ -772,12 +813,14 @@ ${org?.name || 'Our organization'} has demonstrated capacity to successfully man
       // Find specific section if mentioned
       for (const [section, keywords] of Object.entries(sectionKeywords)) {
         if (keywords.some(keyword => message.includes(keyword))) {
-          return { isProposalRequest: true, section };
+          const editingIntent = this.detectEditingIntent(userMessage);
+          return { isProposalRequest: true, section, editingIntent };
         }
       }
 
       // Default to executive summary for general requests
-      return { isProposalRequest: true, section: 'executive' };
+      const editingIntent = this.detectEditingIntent(userMessage);
+      return { isProposalRequest: true, section: 'executive', editingIntent };
     }
 
     // Catch common phrases that clearly indicate proposal needs
@@ -790,10 +833,12 @@ ${org?.name || 'Our organization'} has demonstrated capacity to successfully man
     ];
 
     if (clearProposalPhrases.some(phrase => message.includes(phrase))) {
-      return { isProposalRequest: true, section: 'executive' };
+      const editingIntent = this.detectEditingIntent(userMessage);
+      return { isProposalRequest: true, section: 'executive', editingIntent };
     }
 
-    return { isProposalRequest: false };
+    const editingIntent = this.detectEditingIntent(userMessage);
+    return { isProposalRequest: false, editingIntent };
   }
 
   /**
