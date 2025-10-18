@@ -6,6 +6,7 @@
 import { ChatOpenAI } from '@langchain/openai';
 import { HumanMessage, SystemMessage, AIMessage } from '@langchain/core/messages';
 import { prisma } from '@/lib/prisma';
+import { z } from 'zod';
 
 interface ChatContext {
   userId: string;
@@ -137,6 +138,17 @@ export class MayaAgent {
 - You ARE connected to a collaborative document editor
 - When users request proposal content, you generate it and place it on their canvas
 - You help users create professional, exportable documents of any kind
+- You CAN analyze uploaded RFP documents, proposal samples, and guidelines
+- You ADAPT your writing style and format based on uploaded examples
+- You UNDERSTAND that each funder has unique requirements and preferences
+
+**IMPORTANT: FUNDER-SPECIFIC ADAPTATION:**
+- EVERY funder has different requirements, formats, and evaluation criteria
+- ALWAYS ask for the specific RFP, guidelines, or proposal samples when available
+- ADAPT your content structure, tone, and focus based on funder preferences
+- NEVER assume a one-size-fits-all approach to proposal writing
+- CUSTOMIZE sections, headings, and emphasis based on what the funder values
+- REFERENCE specific evaluation criteria from RFPs when creating content
 
 **ETHICAL STANDARDS & INTEGRITY:**
 - NEVER expose or reference specific user data, PII, or database information
@@ -158,15 +170,23 @@ export class MayaAgent {
 - Output must be publication-ready, formal business document quality
 
 **WHEN TO ASK FOR ADDITIONAL RESOURCES:**
+- **RFP Documents**: ALWAYS ask for the complete RFP/guidelines - this is CRITICAL for proper formatting and content
+- **Proposal Samples**: Ask for successful proposals to this funder or similar funders to understand their preferences
+- **Funder Guidelines**: Request any additional funder-specific requirements or evaluation rubrics
+- **Previous Proposals**: When they mention past grant applications or want to improve existing content
 - **CVs/Resumes**: When discussing team qualifications or project leadership
 - **Budget Information**: When creating budget sections or discussing financial capacity
-- **Previous Proposals**: When they mention past grant applications or want to improve existing content
-- **RFP Documents**: When they reference specific requirements you haven't seen
 - **Organizational Documents**: When discussing organizational capacity, track record, or capabilities
 - **Financial Statements**: When discussing organizational sustainability or matching funds
 - **Letters of Support**: When discussing partnerships or community endorsements
 - **Project Plans**: When they mention existing project documentation
 - **Impact Data**: When discussing outcomes, metrics, or evaluation frameworks
+
+**CRITICAL: FUNDER RESEARCH LIMITATIONS:**
+- You do NOT have web search capabilities to research funders in real-time
+- You CANNOT browse the internet for current funder information
+- You MUST rely on uploaded documents and user-provided information
+- ALWAYS be transparent about these limitations when users ask about current funder requirements
 
 **HOW TO ASK FOR RESOURCES:**
 - Be specific about what you need and why it would help
@@ -188,6 +208,639 @@ export class MayaAgent {
 - Asking for resources you don't actually need
 
 Remember: You're a proactive consultant who asks for what you need to do the best job possible. Use that knowledge to provide personalized, expert guidance.`;
+  }
+
+  /**
+   * Check for uploaded RFP or funder documents in the session
+   */
+  private async getUploadedFunderDocuments(): Promise<string> {
+    if (!this.context?.sessionId) return '';
+
+    try {
+      const contextFiles = await prisma.aIContextFile.findMany({
+        where: { sessionId: this.context.sessionId },
+        orderBy: { createdAt: 'desc' }
+      });
+
+      if (contextFiles.length === 0) return '';
+
+      let funderContext = '\n\n**UPLOADED FUNDER DOCUMENTS:**\n';
+      for (const file of contextFiles) {
+        funderContext += `\n**${file.fileName}:**\n${file.summary}\n`;
+        if (file.extractedText) {
+          // Include key excerpts from RFP/guidelines
+          const excerpt = file.extractedText.substring(0, 1000);
+          funderContext += `Key content: ${excerpt}...\n`;
+        }
+      }
+
+      return funderContext;
+    } catch (error) {
+      console.error('Error fetching uploaded documents:', error);
+      return '';
+    }
+  }
+
+  /**
+   * Generate complete proposal with cover page, table of contents, and content
+   */
+  async generateCompleteProposal(sections: string[] = ['executive', 'project', 'budget', 'impact', 'timeline', 'team']): Promise<MayaResponse> {
+    if (!this.context) {
+      throw new Error('Maya agent not initialized. Call initialize() first.');
+    }
+
+    try {
+      const org = this.userContext?.organization;
+      const grant = this.grantContext;
+
+      // Generate cover page
+      const coverPage = this.generateCoverPage();
+
+      // Generate table of contents
+      const tableOfContents = this.generateTableOfContents(sections);
+
+      // Generate all content sections
+      const contentSections = [];
+      for (const section of sections) {
+        const sectionContent = await this.generateProposalSectionContent(section);
+        contentSections.push(sectionContent);
+      }
+
+      // Combine all parts with styling
+      const completeProposal = `
+        <style>
+          ${this.getProposalCSS()}
+        </style>
+        <div class="proposal-document">
+          <!-- Page 1: Cover Page -->
+          <div class="page cover-page">
+            ${coverPage}
+          </div>
+          
+          <!-- Page 2: Table of Contents -->
+          <div class="page table-of-contents">
+            ${tableOfContents}
+          </div>
+          
+          <!-- Content Pages -->
+          ${contentSections.map((content, index) => `
+            <div class="page content-page">
+              <div class="page-header">
+                <div class="page-number">Page ${index + 3}</div>
+              </div>
+              ${content}
+            </div>
+          `).join('')}
+        </div>
+      `;
+
+      return {
+        content: `I've generated your complete proposal with professional formatting! Here's what I've created:
+
+**Your Proposal Structure:**
+• **Page 1**: Professional cover page with ${org?.name || 'your organization'}'s information
+• **Page 2**: Comprehensive table of contents for easy navigation
+• **Pages 3+**: All proposal sections with detailed, compelling content
+
+The proposal is now ready for ${grant?.funder?.name || 'your target funder'} and follows professional grant application standards. Each section builds a strong case for funding your project.
+
+**What's Included:**
+• Executive summary highlighting your key value proposition
+• Detailed project description with methodology and innovation
+• Comprehensive budget overview with justifications
+• Expected impact and measurable outcomes
+• Project timeline with key milestones
+• Team qualifications and organizational capacity
+
+You can now export this as a PDF or Word document for submission. Would you like me to adjust any specific sections or help you customize the formatting further?`,
+        confidence: 0.95,
+        reasoning: 'Generated complete proposal with professional page structure',
+        suggestions: [
+          'Review and customize the cover page information',
+          'Add your organization logo to the cover page',
+          'Export as PDF for professional submission',
+          'Customize sections based on funder requirements'
+        ],
+        contentType: 'proposal_section',
+        extractedContent: {
+          section: 'complete_proposal',
+          title: 'Complete Grant Proposal',
+          content: completeProposal
+        }
+      };
+
+    } catch (error) {
+      console.error('Maya complete proposal generation error:', error);
+      throw new Error('Something went wrong generating the complete proposal. Please try again.');
+    }
+  }
+
+  /**
+   * Generate professional cover page
+   */
+  private generateCoverPage(): string {
+    const org = this.userContext?.organization;
+    const grant = this.grantContext;
+    const currentDate = new Date().toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+
+    return `
+      <div class="cover-page-content">
+        <div class="header-section">
+          <div class="organization-branding">
+            <div class="logo-container">
+              <div class="logo-placeholder">[ORGANIZATION LOGO]</div>
+            </div>
+            <div class="org-name-header">
+              <h1 class="organization-name">${org?.name || 'Organization Name'}</h1>
+              <p class="org-tagline">${org?.orgType?.replace(/_/g, ' ') || 'Organization Type'}</p>
+            </div>
+          </div>
+        </div>
+        
+        <div class="title-section">
+          <div class="proposal-header">
+            <h1 class="main-title">Grant Proposal</h1>
+            <div class="title-underline"></div>
+          </div>
+          
+          <div class="grant-details">
+            <h2 class="grant-title">${grant?.title || 'Grant Opportunity Title'}</h2>
+            <p class="grant-subtitle">Funding Request Proposal</p>
+          </div>
+        </div>
+        
+        <div class="submission-section">
+          <div class="submission-grid">
+            <div class="submission-item">
+              <h3>Submitted To:</h3>
+              <p class="funder-name">${grant?.funder?.name || 'Funding Organization'}</p>
+            </div>
+            
+            <div class="submission-item">
+              <h3>Submitted By:</h3>
+              <p class="applicant-name">${org?.name || 'Organization Name'}</p>
+              <p class="applicant-location">${org?.country || 'Location'}</p>
+            </div>
+            
+            <div class="submission-item">
+              <h3>Submission Date:</h3>
+              <p class="submission-date">${currentDate}</p>
+            </div>
+            
+            <div class="submission-item">
+              <h3>Requested Amount:</h3>
+              <p class="requested-amount">$${grant?.fundingAmountMax?.toLocaleString() || '[Amount]'}</p>
+            </div>
+          </div>
+        </div>
+        
+        <div class="contact-section">
+          <h3>Primary Contact Information</h3>
+          <div class="contact-grid">
+            <div class="contact-item">
+              <strong>Principal Investigator:</strong><br>
+              [Principal Investigator Name]<br>
+              [Title/Position]
+            </div>
+            <div class="contact-item">
+              <strong>Contact Details:</strong><br>
+              Email: [contact@organization.com]<br>
+              Phone: [Phone Number]
+            </div>
+          </div>
+        </div>
+        
+        <div class="cover-footer">
+          <div class="footer-line"></div>
+          <p class="confidentiality-notice">This proposal contains confidential and proprietary information</p>
+        </div>
+      </div>
+    `;
+  }
+
+  /**
+   * Generate table of contents
+   */
+  private generateTableOfContents(sections: string[]): string {
+    const sectionTitles = {
+      'executive': 'Executive Summary',
+      'project': 'Project Description',
+      'budget': 'Budget Overview',
+      'impact': 'Expected Impact & Outcomes',
+      'timeline': 'Project Timeline',
+      'team': 'Team & Organizational Capacity'
+    };
+
+    let pageNumber = 3; // Start after cover page and TOC
+    const tocEntries = sections.map(section => {
+      const title = sectionTitles[section as keyof typeof sectionTitles] ||
+        section.charAt(0).toUpperCase() + section.slice(1);
+      const entry = `<div class="toc-entry"><span class="toc-title">${title}</span><span class="toc-page">${pageNumber}</span></div>`;
+      pageNumber++;
+      return entry;
+    });
+
+    return `
+      <div class="table-of-contents-content">
+        <h1>Table of Contents</h1>
+        <div class="toc-list">
+          ${tocEntries.join('\n          ')}
+        </div>
+      </div>
+    `;
+  }
+
+  /**
+   * Generate CSS for proposal formatting
+   */
+  private getProposalCSS(): string {
+    return `
+      .proposal-document {
+        font-family: 'Times New Roman', serif;
+        line-height: 1.6;
+        color: #333;
+      }
+      
+      .page {
+        min-height: 11in;
+        width: 8.5in;
+        margin: 0 auto 1in auto;
+        padding: 1in;
+        background: white;
+        box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        page-break-after: always;
+      }
+      
+      .cover-page {
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        text-align: center;
+      }
+      
+      .cover-page-content .header-section {
+        margin-bottom: 2in;
+      }
+      
+      .logo-placeholder {
+        border: 2px dashed #ccc;
+        padding: 40px;
+        margin: 20px auto;
+        width: 200px;
+        color: #666;
+        font-style: italic;
+      }
+      
+      .title-section h1 {
+        font-size: 36px;
+        margin-bottom: 20px;
+        color: #2c3e50;
+      }
+      
+      .title-section h2 {
+        font-size: 24px;
+        margin-bottom: 30px;
+        color: #34495e;
+      }
+      
+      .organization-section, .contact-section {
+        margin: 40px 0;
+        text-align: left;
+      }
+      
+      .org-name {
+        font-size: 20px;
+        color: #2c3e50;
+      }
+      
+      .submission-info {
+        margin-top: 60px;
+        padding-top: 20px;
+        border-top: 1px solid #eee;
+      }
+      
+      .table-of-contents-content h1 {
+        font-size: 28px;
+        margin-bottom: 40px;
+        text-align: center;
+        color: #2c3e50;
+      }
+      
+      .toc-list {
+        margin-top: 40px;
+      }
+      
+      .toc-entry {
+        display: flex;
+        justify-content: space-between;
+        padding: 10px 0;
+        border-bottom: 1px dotted #ccc;
+        font-size: 16px;
+      }
+      
+      .toc-title {
+        font-weight: bold;
+      }
+      
+      .content-page {
+        position: relative;
+      }
+      
+      .page-header {
+        position: absolute;
+        top: 0.5in;
+        right: 0.5in;
+        font-size: 12px;
+        color: #666;
+      }
+      
+      .content-page h3 {
+        font-size: 20px;
+        margin: 30px 0 20px 0;
+        color: #2c3e50;
+        border-bottom: 2px solid #3498db;
+        padding-bottom: 10px;
+      }
+      
+      .content-page p {
+        margin-bottom: 15px;
+        text-align: justify;
+      }
+      
+      .content-page ul {
+        margin: 15px 0;
+        padding-left: 30px;
+      }
+      
+      .content-page li {
+        margin-bottom: 8px;
+      }
+      
+      .content-page strong {
+        color: #2c3e50;
+      }
+      
+      /* Enhanced Cover Page Styles */
+      .organization-branding {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin-bottom: 40px;
+        gap: 30px;
+      }
+      
+      .logo-container {
+        flex-shrink: 0;
+      }
+      
+      .logo-placeholder {
+        border: 2px dashed #3498db;
+        padding: 30px;
+        width: 120px;
+        height: 120px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #3498db;
+        font-style: italic;
+        font-size: 12px;
+        text-align: center;
+        border-radius: 8px;
+      }
+      
+      .org-name-header {
+        text-align: left;
+      }
+      
+      .organization-name {
+        font-size: 28px;
+        font-weight: bold;
+        color: #2c3e50;
+        margin: 0 0 8px 0;
+        line-height: 1.2;
+      }
+      
+      .org-tagline {
+        font-size: 16px;
+        color: #7f8c8d;
+        margin: 0;
+        font-style: italic;
+      }
+      
+      .proposal-header {
+        text-align: center;
+        margin: 60px 0 40px 0;
+      }
+      
+      .main-title {
+        font-size: 42px;
+        font-weight: bold;
+        color: #2c3e50;
+        margin: 0 0 15px 0;
+        letter-spacing: 2px;
+      }
+      
+      .title-underline {
+        width: 200px;
+        height: 4px;
+        background: linear-gradient(90deg, #3498db, #2980b9);
+        margin: 0 auto;
+        border-radius: 2px;
+      }
+      
+      .grant-details {
+        text-align: center;
+        margin: 40px 0;
+      }
+      
+      .grant-title {
+        font-size: 24px;
+        color: #34495e;
+        margin: 0 0 10px 0;
+        font-weight: 600;
+      }
+      
+      .grant-subtitle {
+        font-size: 16px;
+        color: #7f8c8d;
+        margin: 0;
+        font-style: italic;
+      }
+      
+      .submission-section {
+        margin: 50px 0;
+        padding: 30px;
+        background: #f8f9fa;
+        border-radius: 8px;
+        border-left: 4px solid #3498db;
+      }
+      
+      .submission-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 30px;
+      }
+      
+      .submission-item h3 {
+        font-size: 14px;
+        color: #7f8c8d;
+        margin: 0 0 8px 0;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        font-weight: 600;
+      }
+      
+      .funder-name, .applicant-name, .submission-date, .requested-amount {
+        font-size: 16px;
+        color: #2c3e50;
+        margin: 0;
+        font-weight: 600;
+      }
+      
+      .applicant-location {
+        font-size: 14px;
+        color: #7f8c8d;
+        margin: 4px 0 0 0;
+      }
+      
+      .contact-section {
+        margin: 40px 0;
+        text-align: left;
+      }
+      
+      .contact-section h3 {
+        font-size: 18px;
+        color: #2c3e50;
+        margin: 0 0 20px 0;
+        text-align: center;
+        font-weight: 600;
+      }
+      
+      .contact-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 30px;
+      }
+      
+      .contact-item {
+        padding: 20px;
+        background: #ffffff;
+        border: 1px solid #ecf0f1;
+        border-radius: 6px;
+        font-size: 14px;
+        line-height: 1.6;
+      }
+      
+      .contact-item strong {
+        color: #2c3e50;
+        display: block;
+        margin-bottom: 8px;
+      }
+      
+      .cover-footer {
+        margin-top: 60px;
+        text-align: center;
+      }
+      
+      .footer-line {
+        width: 100%;
+        height: 2px;
+        background: linear-gradient(90deg, transparent, #bdc3c7, transparent);
+        margin: 0 0 20px 0;
+      }
+      
+      .confidentiality-notice {
+        font-size: 12px;
+        color: #95a5a6;
+        font-style: italic;
+        margin: 0;
+      }
+
+      @media print {
+        .page {
+          box-shadow: none;
+          margin: 0;
+        }
+        
+        .submission-grid, .contact-grid {
+          grid-template-columns: 1fr 1fr;
+        }
+        
+        .organization-branding {
+          flex-direction: column;
+          gap: 20px;
+        }
+        
+        .org-name-header {
+          text-align: center;
+        }
+      }
+    `;
+  }
+
+  /**
+   * Generate individual proposal section content
+   */
+  private async generateProposalSectionContent(section: string): Promise<string> {
+    const sectionPrompts = {
+      'executive': 'Generate a compelling executive summary that highlights the problem, solution, and expected impact',
+      'project': 'Create a detailed project description including methodology, approach, and innovation',
+      'budget': 'Develop a comprehensive budget overview with major cost categories and justifications',
+      'impact': 'Describe expected outcomes, measurable results, and long-term benefits',
+      'timeline': 'Create a project timeline with key milestones and deliverables',
+      'team': 'Highlight team expertise, organizational capacity, and qualifications'
+    };
+
+    const sectionPrompt = sectionPrompts[section as keyof typeof sectionPrompts] ||
+      `Generate content for the ${section} section of the proposal`;
+
+    const systemPrompt = this.generateProposalSystemPrompt();
+    const funderDocuments = await this.getUploadedFunderDocuments();
+
+    const userPrompt = `${sectionPrompt}
+
+${funderDocuments}
+
+Please generate professional, detailed content for this section that:
+- Aligns with the grant requirements and funder priorities
+- References our organization's specific capabilities and experience
+- Uses compelling, evidence-based language
+- Follows grant writing best practices
+- Is comprehensive and detailed (aim for 800-1500+ words for full sections)
+- Includes relevant subsections, bullet points, and detailed explanations
+- Demonstrates deep understanding of the project and requirements
+- Shows clear value proposition and competitive advantages
+
+Create content that would be found in a winning, professional grant proposal. Be thorough, detailed, and comprehensive - this should be publication-ready content that fully addresses this section's requirements.
+
+CRITICAL FORMATTING REQUIREMENTS:
+- Structure content with clear HTML headings: <h3>Section Title</h3>
+- Use <strong> tags for emphasis, not asterisks or other symbols
+- Write in formal, professional language without contractions
+- Use proper paragraph tags <p> for each paragraph
+- Create bulleted lists with <ul><li> tags when appropriate
+- Include specific data, metrics, and concrete examples
+- Maintain consistent professional tone throughout
+- NO asterisks (*), NO informal punctuation, NO casual language
+- Format like a formal business document ready for publication`;
+
+    try {
+      const messages = [
+        new SystemMessage(systemPrompt),
+        new HumanMessage(userPrompt)
+      ];
+
+      const response = await this.llm.invoke(messages);
+      return response.content as string;
+
+    } catch (error) {
+      console.error('Error generating section content:', error);
+      return `<h3>${this.getSectionTitle(section)}</h3><p>[Content generation failed for this section. Please try again.]</p>`;
+    }
   }
 
   /**
@@ -218,7 +871,11 @@ Remember: You're a proactive consultant who asks for what you need to do the bes
 
     try {
       const systemPrompt = this.generateProposalSystemPrompt();
+      const funderDocuments = await this.getUploadedFunderDocuments();
+
       const userPrompt = `${sectionPrompt}
+
+${funderDocuments}
 
 ${existingContent ? `Current content to improve/expand:\n${existingContent}\n\n` : ''}
 
@@ -779,6 +1436,17 @@ ${org?.name || 'Our organization'} has demonstrated capacity to successfully man
       'team': ['team', 'staff', 'personnel', 'qualifications', 'capacity']
     };
 
+    // Check for complete proposal requests first
+    const completeProposalKeywords = [
+      'complete proposal', 'full proposal', 'entire proposal', 'whole proposal',
+      'page 1', 'page one', 'cover page', 'table of contents', 'complete document',
+      'full document', 'entire document', 'all sections', 'complete application'
+    ];
+
+    if (completeProposalKeywords.some(keyword => message.includes(keyword))) {
+      return { isProposalRequest: true, section: 'complete_proposal' };
+    }
+
     // Comprehensive proposal intent detection
     const proposalIntents = [
       // Direct requests
@@ -842,11 +1510,60 @@ ${org?.name || 'Our organization'} has demonstrated capacity to successfully man
   }
 
   /**
+   * Handle requests that require web search (which Maya cannot do)
+   */
+  private handleWebSearchRequest(userMessage: string): MayaResponse | null {
+    const searchKeywords = [
+      'search for', 'look up', 'find information about', 'research', 'browse',
+      'current requirements', 'latest guidelines', 'recent changes',
+      'what does their website say', 'check their website', 'online information'
+    ];
+
+    const isSearchRequest = searchKeywords.some(keyword =>
+      userMessage.toLowerCase().includes(keyword)
+    );
+
+    if (isSearchRequest) {
+      return {
+        content: `I understand you'd like me to research current information, but I need to be transparent about my limitations: **I don't have web search capabilities** and cannot browse the internet for real-time information.
+
+**What I CAN do instead:**
+• Work with documents you upload (RFPs, guidelines, proposal samples)
+• Use the grant information already in our system
+• Help you structure questions to research yourself
+• Analyze any funder materials you can share with me
+
+**For the most current information, I recommend:**
+• Visiting the funder's official website directly
+• Uploading their latest RFP or guidelines using the "Upload Files" button
+• Sharing any recent communications from the funder
+
+Would you like to upload any funder documents, or shall I help you with what we already know about this opportunity?`,
+        confidence: 0.9,
+        contentType: 'chat',
+        suggestions: [
+          'Upload the latest RFP document',
+          'Share funder guidelines you have',
+          'Work with existing grant information'
+        ]
+      };
+    }
+
+    return null;
+  }
+
+  /**
    * Chat with Maya - main conversation method
    */
   async chat(userMessage: string): Promise<MayaResponse> {
     if (!this.context) {
       throw new Error('Maya agent not initialized. Call initialize() first.');
+    }
+
+    // Check if this is a web search request first
+    const searchResponse = this.handleWebSearchRequest(userMessage);
+    if (searchResponse) {
+      return searchResponse;
     }
 
     try {
@@ -879,7 +1596,11 @@ ${org?.name || 'Our organization'} has demonstrated capacity to successfully man
         if (isDemoRequest) {
           // For demo requests, always generate content regardless of fit
           console.log('GENERATING CONTENT: Demo request detected');
-          return await this.generateProposalSection(proposalRequest.section, undefined, userMessage);
+          if (proposalRequest.section === 'complete_proposal') {
+            return await this.generateCompleteProposal();
+          } else {
+            return await this.generateProposalSection(proposalRequest.section, undefined, userMessage);
+          }
         }
 
         if (fitAssessment.fitScore < 40) {
@@ -895,8 +1616,14 @@ ${org?.name || 'Our organization'} has demonstrated capacity to successfully man
           };
         }
 
-        // Generate proposal section content if fit is good
-        return await this.generateProposalSection(proposalRequest.section, undefined, userMessage);
+        // Generate proposal content based on request type
+        if (proposalRequest.section === 'complete_proposal') {
+          console.log('GENERATING COMPLETE PROPOSAL: Full document with cover page and TOC');
+          return await this.generateCompleteProposal();
+        } else {
+          console.log('GENERATING SECTION:', proposalRequest.section);
+          return await this.generateProposalSection(proposalRequest.section, undefined, userMessage);
+        }
       }
 
       // Build conversation messages for regular chat
@@ -988,13 +1715,101 @@ ${org?.name || 'Our organization'} has demonstrated capacity to successfully man
   }
 
   /**
-   * Analyze uploaded file and provide insights
+   * Analyze uploaded file using the existing AI extract system
    */
   async analyzeUploadedFile(fileName: string, fileContent: string, fileType: string): Promise<MayaResponse> {
     if (!this.context) {
       throw new Error('Maya agent not initialized. Call initialize() first.');
     }
 
+    try {
+      // Use the existing AI extract system for document analysis
+      if (fileType === 'application/pdf') {
+        return await this.analyzeDocumentWithAIExtract(fileName, fileContent);
+      }
+
+      // For non-PDF files, use text analysis
+      return await this.analyzeTextDocument(fileName, fileContent);
+    } catch (error) {
+      console.error('Maya file analysis error:', error);
+      throw new Error('Failed to analyze uploaded document.');
+    }
+  }
+
+  /**
+   * Analyze document using the existing AI extract system
+   */
+  private async analyzeDocumentWithAIExtract(fileName: string, fileContent: string): Promise<MayaResponse> {
+    try {
+      // Create a FormData object to send to the AI extract endpoint
+      const formData = new FormData();
+      const blob = new Blob([fileContent], { type: 'application/pdf' });
+      const file = new File([blob], fileName, { type: 'application/pdf' });
+      formData.append('file', file);
+
+      // Call the existing AI extract API
+      const response = await fetch('/api/admin/grants/ai-extract', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error(`AI extract failed: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+
+      if (result.success && result.extractedData) {
+        // Maya can now understand the document structure and content
+        return {
+          content: this.generateDocumentAnalysisResponse(result.extractedData, fileName),
+          confidence: 0.9,
+          contentType: 'document_extract',
+          suggestions: [
+            'Use this structure for your proposal',
+            'Adapt the formatting style',
+            'Reference the evaluation criteria'
+          ]
+        };
+      } else {
+        throw new Error('Failed to extract document content');
+      }
+    } catch (error) {
+      console.error('AI extract analysis failed:', error);
+      return await this.analyzeTextDocument(fileName, fileContent);
+    }
+  }
+
+  /**
+   * Generate Maya's response about the analyzed document
+   */
+  private generateDocumentAnalysisResponse(extractedData: any, fileName: string): string {
+    const org = this.userContext?.organization;
+
+    return `Excellent! I've analyzed **${fileName}** and can now help you create a proposal that matches this format and style.
+
+**Document Analysis:**
+• **Type**: ${extractedData.fundingType || 'Grant/RFP'} document
+• **Structure**: ${extractedData.proposalSections?.length || 'Multiple'} main sections identified
+• **Funding Range**: ${extractedData.fundingAmountMin ? `$${extractedData.fundingAmountMin.toLocaleString()} - $${extractedData.fundingAmountMax?.toLocaleString()}` : 'Not specified'}
+• **Key Requirements**: ${extractedData.requiredDocuments?.slice(0, 3).join(', ') || 'Standard proposal documents'}
+
+**What I Can Do Now:**
+• **Emulate the structure** - I'll organize your proposal using the same section headings and flow
+• **Match the tone** - I'll adapt my writing style to match this funder's preferences  
+• **Address evaluation criteria** - I'll ensure we hit all the key points they're looking for
+• **Follow their format** - I'll use similar formatting, emphasis, and organization
+
+**Ready to Start:**
+I can now generate proposal content that follows this document's structure and requirements. Just tell me which section you'd like to work on, and I'll create content that aligns with what this funder expects.
+
+Would you like me to start with a specific section, or shall I create an outline based on this document's structure?`;
+  }
+
+  /**
+   * Analyze text documents (non-PDF)
+   */
+  private async analyzeTextDocument(fileName: string, fileContent: string): Promise<MayaResponse> {
     try {
       const systemPrompt = `You are Maya, a grant consultant analyzing an uploaded document to help with grant applications.
 
@@ -1008,7 +1823,7 @@ ${org?.name || 'Our organization'} has demonstrated capacity to successfully man
 **CURRENT CONTEXT:**
 - Organization: ${this.userContext?.organization?.name || 'Client organization'}
 - Grant: ${this.grantContext?.title || 'Target grant opportunity'}
-- File: ${fileName} (${fileType})
+- File: ${fileName}
 
 Analyze this document and provide helpful insights for the grant application.`;
 

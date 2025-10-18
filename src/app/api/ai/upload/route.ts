@@ -87,15 +87,65 @@ I've analyzed this document and added it to our conversation context. You can no
 }
 
 async function extractTextFromFile(file: File): Promise<string> {
-  // Placeholder text extraction
-  // In production, use libraries like pdf-parse, mammoth, etc.
-  
   if (file.type === 'text/plain') {
     return await file.text();
   }
   
-  // For PDF and Word docs, you'd use appropriate libraries
-  return `Extracted text from ${file.name}. This is a placeholder - implement actual text extraction based on file type.`;
+  if (file.type === 'application/pdf') {
+    try {
+      // Use the same PDF extraction logic as the AI extract system
+      const PDFParser = require('pdf2json');
+      const arrayBuffer = await file.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
+      
+      const pdfParser = new PDFParser();
+      
+      const extractedText = await new Promise<string>((resolve, reject) => {
+        pdfParser.on('pdfParser_dataError', (errData: any) => {
+          reject(new Error(errData.parserError));
+        });
+
+        pdfParser.on('pdfParser_dataReady', (pdfData: any) => {
+          try {
+            let fullText = '';
+            if (pdfData.Pages) {
+              pdfData.Pages.forEach((page: any) => {
+                if (page.Texts) {
+                  page.Texts.forEach((text: any) => {
+                    if (text.R) {
+                      text.R.forEach((run: any) => {
+                        if (run.T) {
+                          try {
+                            fullText += decodeURIComponent(run.T) + ' ';
+                          } catch (uriError) {
+                            fullText += run.T + ' ';
+                          }
+                        }
+                      });
+                    }
+                  });
+                }
+                fullText += '\n\n';
+              });
+            }
+            resolve(fullText.trim());
+          } catch (error) {
+            reject(error);
+          }
+        });
+
+        pdfParser.parseBuffer(buffer);
+      });
+
+      return extractedText;
+    } catch (error) {
+      console.error('PDF extraction failed:', error);
+      return `Failed to extract text from ${file.name}. Error: ${error instanceof Error ? error.message : 'Unknown error'}`;
+    }
+  }
+  
+  // For other file types, return a message indicating the limitation
+  return `File type ${file.type} is not yet supported for text extraction. Please convert to PDF or plain text.`;
 }
 
 async function generateFileSummary(text: string): Promise<string> {
