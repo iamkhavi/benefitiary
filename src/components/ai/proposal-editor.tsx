@@ -148,6 +148,9 @@ export function ProposalEditor({ showCanvas, onClose, grantId, extractedContent,
         orderedList: false,
         listItem: false,
         blockquote: false,
+        bold: false,
+        italic: false,
+        link: false,
       }),
       Heading.configure({
         levels: [1, 2, 3],
@@ -327,6 +330,8 @@ export function ProposalEditor({ showCanvas, onClose, grantId, extractedContent,
     if (!editor || !extractedContent) return;
 
     const insertExtractedContent = () => {
+      const { section: sectionName, title, content, editingIntent } = extractedContent;
+      
       // Find the section heading in the document
       const doc = editor.state.doc;
       let sectionPos = -1;
@@ -345,8 +350,6 @@ export function ProposalEditor({ showCanvas, onClose, grantId, extractedContent,
           return false;
         }
       });
-
-      const { section: sectionName, title, content, editingIntent } = extractedContent;
       
       // Handle different editing intents
       if (editingIntent?.intent === 'rewrite') {
