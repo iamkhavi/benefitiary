@@ -2,14 +2,14 @@
  * Maya Response Generation - Natural, contextual responses
  */
 
-import { ChatOpenAI } from '@langchain/openai';
+import { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import { HumanMessage, SystemMessage } from '@langchain/core/messages';
 import { UserContext, GrantContext } from './types';
 
 export class ResponseGenerator {
-  private llm: ChatOpenAI;
+  private llm: BaseChatModel;
 
-  constructor(llm: ChatOpenAI) {
+  constructor(llm: BaseChatModel) {
     this.llm = llm;
   }
 
@@ -20,33 +20,55 @@ export class ResponseGenerator {
     const org = userContext?.organization;
     const grant = grantContext;
 
-    return `You are Maya, an experienced grant consultant. You help organizations create winning proposals.
+    return `
+You are **Maya**, a seasoned grant consultant and funding strategist with over 15 years of experience helping organizations win competitive grants.
+You combine human expertise with advanced AI reasoning to support users as if you were their real consultant.
 
-**Current Context:**
-- Organization: ${org?.name || 'Organization'} (${org?.orgType?.replace(/_/g, ' ') || 'Not specified'})
-- Grant: ${grant?.title || 'Grant Opportunity'} from ${grant?.funder?.name || 'Funder'}
-- Funding: $${grant?.fundingAmountMin?.toLocaleString() || '0'} - $${grant?.fundingAmountMax?.toLocaleString() || '0'}
+---
 
-**Your Role:**
-- Generate actual proposal content when users request it
-- Respond naturally to user questions and concerns
-- Be direct and helpful - focus on results
-- When users complain about missing content, immediately create what they need
-- Match the user's tone and emotional state
-- Use bullet points and clear structure in responses
-- Don't follow rigid templates - respond contextually
+### 🧭 Current Context
+- **Organization:** ${org?.name || 'Organization'} (${org?.orgType?.replace(/_/g, ' ') || 'Not specified'})
+- **Grant:** ${grant?.title || 'Grant Opportunity'} — funded by ${grant?.funder?.name || 'Funder'}
+- **Funding Range:** ${grant?.fundingAmountMin?.toLocaleString() || '0'} – ${grant?.fundingAmountMax?.toLocaleString() || '0'}
 
-**Key Capabilities:**
-- Create complete proposals with cover pages and sections
-- Generate individual proposal sections (executive, project, budget, etc.)
-- Analyze uploaded documents
-- Provide strategic guidance on grant applications
+---
 
-Respond naturally and helpfully to whatever the user needs.`;
+### 💼 Your Professional Role
+- Act as the user's **AI-powered grant consultant and advisor** — reliable, insightful, and approachable.  
+- Communicate **like a human expert**, not like a script.  
+- Help users **save time** by producing high-quality content, explanations, or actionable next steps.  
+- Adapt to user intent — whether they want a full proposal, a specific section, document analysis, or advice.  
+- Respond **with clarity, empathy, and initiative.**
+
+---
+
+### 🧩 Enhanced Capabilities
+- Write **complete, professionally formatted proposals** (cover page, all sections, budget tables, annexes).  
+- Generate **specific proposal sections** (Executive Summary, Problem, Methods, etc.).  
+- Analyze **uploaded RFPs and proposals** to extract deliverables and insights.  
+- Offer **strategic guidance** to improve competitiveness.  
+- Write **naturally**, using logical flow, bullet points, and professional formatting.
+
+---
+
+### 💬 Response Guidelines
+- Always **acknowledge context** and what was achieved before responding.  
+- Sound like a consultant giving advice — **never robotic**.  
+- When users request content, create it in a **submission-ready format** (HTML formatted for A4 canvas).  
+- If the user asks a question, **explain clearly** and suggest what they can do next.  
+- Mirror the user's **tone and urgency** (supportive, motivational).  
+- When appropriate, summarize progress ("We've completed... Next, we'll…").  
+- Use short paragraphs, clear headers, and bullet points.
+
+---
+
+Respond as Maya — confident, professional, and genuinely helpful.  
+Focus on making the user feel guided, not instructed.
+`;
   }
 
   /**
-   * Generate contextual response after creating content
+   * Generate context-aware post-action response (from ChatGPT guide)
    */
   async generateContentResponse(
     section: string, 
@@ -56,13 +78,21 @@ Respond naturally and helpfully to whatever the user needs.`;
     grantContext: GrantContext
   ): Promise<{ content: string; suggestions: string[] }> {
     
-    const prompt = `I just generated a ${this.getSectionTitle(section)} section for the user's grant proposal.
+    const sectionTitle = this.getSectionTitle(section);
+    const wordCount = generatedContent.split(/\s+/).length;
 
-User request: "${userRequest}"
-Content created: ${generatedContent.split(/\s+/).length} words
-Organization: ${userContext?.organization?.name || 'User organization'}
+    const prompt = `
+You just helped the user by generating the "${sectionTitle}" section (${wordCount} words)
+for their ${grantContext?.title || 'current grant'} proposal.
 
-Respond naturally - acknowledge what was accomplished and suggest next steps. Be concise and use bullet points.`;
+Write a short, natural reflection (2–4 sentences) that:
+1. Acknowledges what was achieved.
+2. Explains why this section strengthens the proposal.
+3. Suggests 1–3 next helpful actions (like editing or continuing).
+4. Sounds like a real consultant — not scripted.
+
+Use markdown with short paragraphs and bullet points for suggestions.
+`;
 
     try {
       const response = await this.llm.invoke([
@@ -77,8 +107,8 @@ Respond naturally - acknowledge what was accomplished and suggest next steps. Be
       };
     } catch (error) {
       return {
-        content: `✅ Added ${this.getSectionTitle(section)} to your canvas\n\n**Next steps:**\n• Review and customize the content\n• Add specific details about your organization\n• Continue with other sections`,
-        suggestions: ['Review generated content', 'Customize with your details', 'Work on next section']
+        content: `I've drafted your **${sectionTitle}** section, summarizing project purpose and expected outcomes.\n\n**Next suggestions:**\n• Review and personalize content\n• Add organization-specific data\n• Proceed to next section`,
+        suggestions: ['Review section', 'Customize', 'Continue writing']
       };
     }
   }
@@ -108,6 +138,25 @@ Respond naturally - acknowledge what was accomplished and suggest next steps. Be
     } catch (error) {
       return "I'm having trouble processing that request. Could you try rephrasing it?";
     }
+  }
+
+  /**
+   * Build context summary for continuity (from ChatGPT guide)
+   */
+  buildContextSummary(userContext: UserContext, grantContext: GrantContext, proposalState?: any): string {
+    if (!proposalState) return '';
+    
+    const completed = proposalState.sections?.filter((s: any) => s.content).map((s: any) => s.title).join(', ') || 'None yet';
+    const next = proposalState.sections?.find((s: any) => !s.content)?.title || 'Pending user selection';
+
+    return `
+Current Proposal Context:
+- Organization: ${userContext?.organization?.name}
+- Grant: ${grantContext?.title}
+- Sections completed: ${completed}
+- Next logical section: ${next}
+- Last action: ${proposalState.lastAction}
+`;
   }
 
   /**

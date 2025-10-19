@@ -2,15 +2,16 @@
  * Maya Agent - Refactored for clarity and maintainability
  */
 
-import { ChatOpenAI } from '@langchain/openai';
 import { prisma } from '@/lib/prisma';
 import { ChatContext, MayaResponse, UserContext, GrantContext } from './types';
 import { IntentDetector, UserIntent } from './intent-detector';
 import { ResponseGenerator } from './response-generator';
 import { ProposalGenerator } from './proposal-generator';
+import { LLMFactory } from './llm-factory';
+import { BaseChatModel } from '@langchain/core/language_models/chat_models';
 
 export class MayaAgent {
-    private llm: ChatOpenAI;
+    private llm: BaseChatModel;
     private context: ChatContext | null = null;
     private userContext: any = null;
     private grantContext: any = null;
@@ -20,11 +21,12 @@ export class MayaAgent {
     private proposalGenerator: ProposalGenerator;
 
     constructor() {
-        this.llm = new ChatOpenAI({
-            model: 'gpt-4',
+        // Use xAI as primary provider with higher token limits
+        this.llm = LLMFactory.createLLM({
+            provider: 'xai',
+            model: 'grok-beta',
             temperature: 0.7,
-            maxTokens: 4000,
-            openAIApiKey: process.env.OPENAI_API_KEY,
+            maxTokens: 8000, // Much higher than OpenAI's 4000
         });
 
         this.intentDetector = new IntentDetector();

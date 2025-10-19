@@ -36,3 +36,14 @@ export interface GrantContext {
   deadline?: Date;
   category?: string;
 }
+
+export interface ProposalState {
+  sections: {
+    id: string;
+    title: string;
+    content: string;
+    lastEdited: string;
+  }[];
+  lastAction: string;
+  overallProgress: string; // e.g., "3/8 sections completed"
+}
