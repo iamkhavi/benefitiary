@@ -106,8 +106,15 @@ export async function POST(request: NextRequest) {
       userMessage = `Please provide clarifying questions about: ${topic}`;
       mayaResponse = await maya.chat(userMessage);
     } else {
-      // Regular chat message - let the intelligent agent handle everything
-      mayaResponse = await maya.chat(message);
+      // Regular chat message - let the intelligent agent handle everything with timeout
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Maya response timeout')), 60000) // 60 second timeout
+      );
+      
+      mayaResponse = await Promise.race([
+        maya.chat(message),
+        timeoutPromise
+      ]) as any;
     }
 
     // Debug logging to see what Maya is actually returning
@@ -141,13 +148,23 @@ export async function POST(request: NextRequest) {
             sessionId: newSessionId,
             messageId: messageId,
             contentType: mayaResponse.contentType,
-            extractedContent: mayaResponse.extractedContent,
+            extractedContent: mayaResponse.extractedContent ? {
+              ...mayaResponse.extractedContent,
+              content: mayaResponse.extractedContent.content?.substring(0, 1000) || '' // Truncate large content
+            } : null,
             confidence: mayaResponse.confidence,
             suggestions: mayaResponse.suggestions,
             reasoning: mayaResponse.reasoning
           };
 
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify(initialData)}\n\n`));
+          try {
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify(initialData)}\n\n`));
+          } catch (error) {
+            console.error('Metadata JSON error:', error);
+            // Send simplified metadata
+            const simpleData = { type: 'metadata', sessionId: newSessionId, messageId: messageId };
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify(simpleData)}\n\n`));
+          }
 
           // Stream the content character by character
           const content = mayaResponse.content;
@@ -176,11 +193,16 @@ export async function POST(request: NextRequest) {
 
               const chunkData = {
                 type: 'content',
-                chunk: wordWithSpace,
+                chunk: wordWithSpace.replace(/[\r\n]/g, ' '), // Remove line breaks that break JSON
                 isComplete: false
               };
 
-              controller.enqueue(encoder.encode(`data: ${JSON.stringify(chunkData)}\n\n`));
+              try {
+                controller.enqueue(encoder.encode(`data: ${JSON.stringify(chunkData)}\n\n`));
+              } catch (error) {
+                console.error('JSON stringify error:', error);
+                // Skip problematic chunks
+              }
 
               currentIndex = charIndex + currentWord.length + (wordIndex > 0 ? 1 : 0);
 

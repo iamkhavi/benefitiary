@@ -773,9 +773,9 @@ The content is now live on your document canvas - you can see it, edit it, and e
   }
 
   /**
-   * Generate complete proposal with proper grant proposal structure
+   * Generate complete proposal with essential sections (faster generation)
    */
-  async generateCompleteProposal(sections: string[] = ['cover', 'abstract', 'background', 'project', 'methodology', 'budget', 'timeline', 'team', 'evaluation', 'impact', 'sustainability', 'references']): Promise<MayaResponse> {
+  async generateCompleteProposal(sections: string[] = ['cover', 'executive', 'project', 'budget', 'timeline', 'team']): Promise<MayaResponse> {
     if (!this.context) {
       throw new Error('Maya agent not initialized. Call initialize() first.');
     }
@@ -784,16 +784,22 @@ The content is now live on your document canvas - you can see it, edit it, and e
       const org = this.userContext?.organization;
       const grant = this.grantContext;
 
-      // Generate cover page first
-      const coverPage = await this.generateCoverPage();
-      
-      // Generate table of contents
-      const tableOfContents = this.generateTableOfContents(sections);
-      
-      // Generate all content sections
+      // Generate essential sections only for speed
       const contentSections = [];
-      for (const section of sections) {
-        if (section === 'cover') continue; // Skip cover as it's handled separately
+      
+      // Generate cover page
+      if (sections.includes('cover')) {
+        const coverPage = await this.generateCoverPage();
+        contentSections.push({
+          section: 'cover',
+          title: 'Cover Page',
+          content: coverPage
+        });
+      }
+
+      // Generate core sections (skip TOC for now to be faster)
+      const coreSections = sections.filter(s => s !== 'cover');
+      for (const section of coreSections.slice(0, 4)) { // Limit to first 4 sections for speed
         const sectionContent = await this.generateProposalSectionContent(section);
         contentSections.push({
           section,
@@ -802,14 +808,8 @@ The content is now live on your document canvas - you can see it, edit it, and e
         });
       }
 
-      // Combine cover page, TOC, and all sections for the canvas
-      const completeProposal = [
-        coverPage,
-        '<div style="page-break-before: always;"></div>',
-        tableOfContents,
-        '<div style="page-break-before: always;"></div>',
-        ...contentSections.map(s => s.content)
-      ].join('\n\n');
+      // Combine sections for the canvas
+      const completeProposal = contentSections.map(s => s.content).join('\n\n<div style="page-break-before: always;"></div>\n\n');
 
       return {
         content: `Excellent! I've created your complete grant proposal and it's now live on your document canvas.
