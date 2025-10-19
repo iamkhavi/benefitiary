@@ -121,26 +121,22 @@ export class MayaAgent {
 - Category: ${grant?.category?.replace(/_/g, ' ') || 'Not specified'}
 
 **YOUR CONSULTATION STYLE:**
-- ALWAYS acknowledge and validate the user's request in the first 1-2 sentences
-- Show you understand what they're asking for before providing guidance
-- Speak with warmth and empathy, like a supportive mentor who genuinely cares
-- Be encouraging and optimistic while remaining strategically realistic
-- Reference the specific organization and grant in your advice
-- Provide actionable, concrete recommendations with positive framing
-- Explain your reasoning clearly but gently
-- Ask clarifying questions with curiosity, not judgment
-- Celebrate their efforts and acknowledge the courage it takes to seek funding
-- PROACTIVELY ASK FOR RESOURCES when they would help create better proposals
+- Listen carefully to what users are actually asking for and respond contextually
+- Be emotionally intelligent - if they're frustrated, acknowledge it; if they're excited, match their energy
+- Focus on the document canvas - users care about seeing actual content appear there
+- Be honest about what you can and cannot do - don't claim fake accomplishments
+- When users complain about missing content, immediately focus on generating what they need
+- Adapt your tone to match the situation - not every response needs to be overly cheerful
+- Be direct and helpful - users want results, not just encouragement
+- Ask for resources only when you genuinely need them to create better content
 
 **YOUR CAPABILITIES:**
-- You CAN generate proposal content that appears on the document canvas
-- You CAN create exportable documents (PDFs, Word docs, any document type)
-- You ARE connected to a collaborative document editor
-- When users request proposal content, you generate it and place it on their canvas
-- You help users create professional, exportable documents of any kind
-- You CAN analyze uploaded RFP documents, proposal samples, and guidelines
-- You ADAPT your writing style and format based on uploaded examples
-- You UNDERSTAND that each funder has unique requirements and preferences
+- Generate proposal content that appears on the user's document canvas
+- Create complete proposals with cover pages, table of contents, and sections
+- Analyze uploaded documents and adapt content based on funder requirements
+- Help users create professional, exportable documents
+- Understand when users are frustrated about missing content and take immediate action
+- Focus on delivering actual content rather than just talking about it
 
 **IMPORTANT: FUNDER-SPECIFIC ADAPTATION:**
 - EVERY funder has different requirements, formats, and evaluation criteria
@@ -200,14 +196,14 @@ export class MayaAgent {
 - "It sounds like you've applied for similar grants before. Could you share a previous proposal? I can help you improve and adapt it for this opportunity."
 - "Do you have the full RFP document? I'd like to review the specific evaluation criteria to make sure we address everything."
 
-**AVOID:**
-- Robotic or template-like responses
-- Generic advice that could apply to anyone
-- Capability lists or menu options
-- Overly formal language
-- Asking for resources you don't actually need
+**IMPORTANT BEHAVIORAL GUIDELINES:**
+- When users say they see "nothing on the canvas" or complain about missing content, immediately generate what they're asking for
+- Don't claim you've already created something if the user says it's not there
+- Match the user's emotional state - if they're frustrated, be understanding and solution-focused
+- Focus on action over explanation - users want to see results on their canvas
+- Be conversational and natural - avoid rigid response templates
 
-Remember: You're a proactive consultant who asks for what you need to do the best job possible. Use that knowledge to provide personalized, expert guidance.`;
+You are a skilled consultant who delivers results. When users need content, create it. When they're stuck, help them move forward. Be genuine, helpful, and focused on their success.`;
   }
 
   /**
@@ -990,45 +986,24 @@ CRITICAL FORMATTING REQUIREMENTS:
   }
 
   /**
-   * Generate dynamic strategic guidance using OpenAI when grant fit is poor
+   * Generate strategic guidance when there are concerns about grant fit
    */
   private async generateStrategicGuidance(userMessage: string, fitAssessment: any): Promise<{ content: string; suggestions: string[] }> {
     const org = this.userContext?.organization;
     const grant = this.grantContext;
 
-    const guidancePrompt = `The user just asked: "${userMessage}"
+    // Natural prompt that allows for honest, contextual responses
+    const guidancePrompt = `User request: "${userMessage}"
 
-They want help with their application to ${grant?.title || 'a grant opportunity'} from ${grant?.funder?.name || 'a funder'}.
+They want help with ${grant?.title || 'a grant opportunity'} from ${grant?.funder?.name || 'a funder'}.
 
-**Context:**
-- Organization: ${org?.name || 'User organization'} (${org?.orgType?.replace(/_/g, ' ') || 'organization'})
-- Grant focus: ${grant?.category?.replace(/_/g, ' ') || 'Not specified'}
-- Fit concerns: ${fitAssessment.concerns.join('; ')}
-- Recommendations: ${fitAssessment.recommendations.join('; ')}
+Organization: ${org?.name || 'User organization'} (${org?.orgType?.replace(/_/g, ' ') || 'organization'})
+Grant focus: ${grant?.category?.replace(/_/g, ' ') || 'Not specified'}
 
-**Your task:**
-Write an empathetic, supportive response that:
-1. FIRST acknowledges their specific request and shows you understand what they want
-2. Expresses genuine care for their success
-3. Gently explains the positioning challenges you've identified
-4. Provides strategic options with encouraging language
-5. Offers to support them regardless of which direction they choose
+Potential concerns I've identified:
+${fitAssessment.concerns.join('\n')}
 
-**Tone Guidelines:**
-- Start by validating their request: "I understand you're looking to..."
-- Be warm and supportive, not clinical or harsh
-- Frame challenges as "positioning opportunities" not problems
-- Use encouraging language like "strengthen", "enhance", "build on"
-- Show confidence in their ability to succeed
-- End with an open, supportive question
-
-**Formatting:**
-- Use **bold** for section headers only
-- Use bullet points (•) for lists
-- Keep it conversational and warm
-- Avoid clinical language
-
-Write your response now:`;
+Respond as Maya - be honest but supportive about the fit concerns. Help them understand the challenges while offering constructive paths forward.`;
 
     try {
       const response = await this.llm.invoke([
@@ -1036,67 +1011,36 @@ Write your response now:`;
         new HumanMessage(guidancePrompt)
       ]);
 
-      const content = response.content as string;
-
       return {
-        content: this.fixFormattingIssues(content),
+        content: this.fixFormattingIssues(response.content as string),
         suggestions: fitAssessment.recommendations
       };
     } catch (error) {
       console.error('Error generating strategic guidance:', error);
 
-      // Fallback to simple empathetic response
       return {
-        content: `I understand you're looking to work on your application for this opportunity, and I'm here to help you succeed. Let me share some thoughts on how we can strengthen your positioning for the best possible outcome.
-
-Based on my review, there are a few areas where we can enhance your application strategy. Would you like to work together on addressing these, or explore other opportunities that might be an even better fit for your organization's strengths?`,
-        suggestions: fitAssessment.recommendations
+        content: `I want to be honest with you about this opportunity. While I can help you create content, I've noticed some potential challenges with the fit between your organization and this grant's focus areas. Would you like to discuss these concerns, or should we proceed with creating the content you requested?`,
+        suggestions: ['Discuss fit concerns', 'Proceed with content creation', 'Explore alternative opportunities']
       };
     }
   }
 
   /**
-   * Generate contextual feedback using OpenAI based on what actually happened
+   * Generate contextual feedback based on what actually happened
    */
   private async generateContextualFeedback(section: string, generatedContent: string, originalUserRequest: string): Promise<{ content: string; suggestions: string[] }> {
     const org = this.userContext?.organization;
     const grant = this.grantContext;
 
-    const feedbackPrompt = `You just generated a ${section} section for ${org?.name || 'the user'}'s grant proposal to ${grant?.funder?.name || 'a funder'}. 
+    // Simple, natural prompt that lets OpenAI respond contextually
+    const feedbackPrompt = `I just generated a ${this.getSectionTitle(section)} section for the user's grant proposal and added it to their document canvas.
 
-**Context:**
-- User's original request: "${originalUserRequest}"
-- Section generated: ${this.getSectionTitle(section)}
-- Content length: ${generatedContent.split(/\s+/).length} words
-- Grant: ${grant?.title || 'Grant opportunity'}
-- Organization: ${org?.name || 'User organization'} (${org?.orgType?.replace(/_/g, ' ') || 'organization'})
+User's request: "${originalUserRequest}"
+Organization: ${org?.name || 'User organization'}
+Grant: ${grant?.title || 'Grant opportunity'}
+Content generated: ${generatedContent.split(/\s+/).length} words
 
-**What you accomplished:**
-You created content for their document canvas that addresses their specific request.
-
-**Your task:**
-Write a warm, encouraging response that:
-1. FIRST acknowledges their original request and shows you understood what they wanted
-2. Celebrates what you just accomplished together in a personalized way
-3. Highlights 2-3 specific strengths of what you created with enthusiasm
-4. Suggests 3-4 concrete next steps that feel achievable and exciting
-5. Maintains your supportive mentor persona - confident, encouraging, and genuinely invested in their success
-
-**Tone Guidelines:**
-- Be genuinely excited about their progress
-- Use encouraging language like "great work", "you're building something strong"
-- Frame next steps as opportunities, not obligations
-- Show confidence in their ability to succeed
-- Make them feel supported and capable
-
-**Formatting:**
-- Use **bold** for key achievements and positive highlights
-- Use bullet points (•) for lists
-- Keep it conversational and warm
-- Avoid clinical or detached language
-- Make it feel like encouragement from a mentor who believes in them
-
-Write your response now:`;
+Respond naturally as Maya, acknowledging what was accomplished and what they might want to do next. Be helpful and contextual - don't follow a template.`;
 
     try {
       const messages = [
@@ -1107,37 +1051,18 @@ Write your response now:`;
       const response = await this.llm.invoke(messages);
       const content = response.content as string;
 
-      // Extract suggestions from the response (look for bullet points or numbered items)
-      const suggestions = this.extractSuggestions(content);
-
       return {
-        content,
-        suggestions
+        content: this.fixFormattingIssues(content),
+        suggestions: this.extractSuggestions(content)
       };
 
     } catch (error) {
       console.error('Error generating contextual feedback:', error);
 
-      // Fallback to a warm, encouraging response
+      // Simple fallback
       return {
-        content: `Excellent work! I've created the ${this.getSectionTitle(section)} and added it to your document canvas. This content is specifically crafted for ${org?.name || 'your organization'}'s unique strengths and ${grant?.funder?.name || 'this funder'}'s priorities.
-
-**You're Making Great Progress:**
-• The content on your canvas captures your organization's value proposition
-• Each section builds toward a compelling case for funding
-• You're developing something that truly represents your mission
-
-**Exciting Next Steps:**
-• Review and personalize the content with your specific achievements
-• Consider how this section strengthens your overall narrative
-• Let's continue building momentum with another section
-
-I'm excited to see how this proposal comes together! What would you like to work on next?`,
-        suggestions: [
-          'Review and customize the generated content',
-          'Add specific organizational details',
-          'Work on the next proposal section'
-        ]
+        content: `I've added the ${this.getSectionTitle(section)} to your canvas. You can review and edit it as needed. What would you like to work on next?`,
+        suggestions: ['Review the generated content', 'Edit and customize as needed', 'Work on another section']
       };
     }
   }
@@ -1450,12 +1375,17 @@ ${org?.name || 'Our organization'} has demonstrated capacity to successfully man
     // Comprehensive proposal intent detection
     const proposalIntents = [
       // Direct requests
-      'write', 'draft', 'create', 'generate', 'build', 'make',
+      'write', 'draft', 'create', 'generate', 'build', 'make', 'rewrite',
       'help me write', 'can you write', 'please write', 'draft a', 'create a',
+
+      // Rewrite requests (common user pattern)
+      'rewrite', 'redo', 'start over', 'from scratch', 'again',
+      'rewrite the proposal', 'rewrite the entire proposal',
 
       // Document-related
       'proposal', 'application', 'submission', 'document', 'export', 'pdf',
-      'sample proposal', 'proposal that', 'grant application',
+      'sample proposal', 'proposal that', 'grant application', 'proper proposal',
+      'winning proposal', 'complete proposal', 'full proposal',
 
       // Action-oriented
       'apply', 'submit', 'prepare', 'put together', 'work on',
@@ -1507,6 +1437,50 @@ ${org?.name || 'Our organization'} has demonstrated capacity to successfully man
 
     const editingIntent = this.detectEditingIntent(userMessage);
     return { isProposalRequest: false, editingIntent };
+  }
+
+  /**
+   * Detect when users are complaining about missing content or frustrated
+   */
+  private detectContentComplaint(userMessage: string): { isComplaint: boolean; type?: string; requestedSection?: string } {
+    const message = userMessage.toLowerCase();
+
+    // Frustration indicators
+    const frustrationPhrases = [
+      'nothing on the canvas', 'see nothing', 'nothing there', 'not seeing anything',
+      'where is', 'missing', 'not working', 'not appearing', 'not showing',
+      'i need a proper', 'for sure i see nothing', 'please i need',
+      'rewrite the proposal again', 'rewrite the entire proposal',
+      'from scratch', 'proper proposal', 'winning proposal'
+    ];
+
+    // Check if user is expressing frustration
+    const isFrustrated = frustrationPhrases.some(phrase => message.includes(phrase));
+
+    if (isFrustrated) {
+      // Try to detect what section they want
+      const sectionKeywords = {
+        'executive': ['executive', 'summary'],
+        'project': ['project', 'description'],
+        'budget': ['budget'],
+        'complete_proposal': ['proposal', 'entire', 'complete', 'full', 'whole']
+      };
+
+      for (const [section, keywords] of Object.entries(sectionKeywords)) {
+        if (keywords.some(keyword => message.includes(keyword))) {
+          return { isComplaint: true, type: 'missing_content', requestedSection: section };
+        }
+      }
+
+      // Default to complete proposal if they're asking for "proper proposal"
+      if (message.includes('proper proposal') || message.includes('winning proposal') || message.includes('from scratch')) {
+        return { isComplaint: true, type: 'missing_content', requestedSection: 'complete_proposal' };
+      }
+
+      return { isComplaint: true, type: 'missing_content', requestedSection: 'executive' };
+    }
+
+    return { isComplaint: false };
   }
 
   /**
@@ -1567,6 +1541,14 @@ Would you like to upload any funder documents, or shall I help you with what we 
     }
 
     try {
+      // Check for user complaints about missing content first
+      const contentComplaint = this.detectContentComplaint(userMessage);
+      if (contentComplaint.isComplaint) {
+        console.log('CONTENT COMPLAINT DETECTED:', contentComplaint.type);
+        // User is frustrated - immediately generate what they need
+        return await this.generateProposalSection(contentComplaint.requestedSection || 'executive', undefined, userMessage);
+      }
+
       // Check if this is a proposal content request
       const proposalRequest = this.detectProposalRequest(userMessage);
 

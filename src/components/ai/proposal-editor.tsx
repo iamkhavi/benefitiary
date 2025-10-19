@@ -20,14 +20,14 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { 
-  Download, 
-  Save, 
-  FileText, 
-  Bold as BoldIcon, 
-  Italic as ItalicIcon, 
+import {
+  Download,
+  Save,
+  FileText,
+  Bold as BoldIcon,
+  Italic as ItalicIcon,
   Underline as UnderlineIcon,
-  List, 
+  List,
   ListOrdered,
   AlignLeft,
   AlignCenter,
@@ -74,7 +74,7 @@ interface AIWritingSession {
 // Custom Page Break Extension with Auto-pagination
 const PageBreak = Extension.create({
   name: 'pageBreak',
-  
+
   addGlobalAttributes() {
     return [
       {
@@ -92,7 +92,7 @@ const PageBreak = Extension.create({
       },
     ]
   },
-  
+
   addCommands() {
     return {
       insertPageBreak: () => ({ commands }: { commands: any }) => {
@@ -205,7 +205,7 @@ export function ProposalEditor({ showCanvas, onClose, grantId, extractedContent,
     onUpdate: ({ editor }) => {
       const text = editor.getText();
       setWordCount(text.split(/\s+/).filter(word => word.length > 0).length);
-      
+
       // Update pagination after content changes
       setTimeout(() => {
         updatePagination();
@@ -226,17 +226,17 @@ export function ProposalEditor({ showCanvas, onClose, grantId, extractedContent,
     const HEADER_SPACE_MM = 25;  // Standard header space
     const FOOTER_SPACE_MM = 25;  // Standard footer space
     const SIDE_MARGIN_MM = 20;   // Left and right margins
-    
+
     const MM_TO_PX = 96 / 25.4; // Convert mm to px at 96 DPI
-    
+
     // Available content height per page (excluding header and footer)
     const CONTENT_HEIGHT_PER_PAGE_MM = A4_HEIGHT_MM - HEADER_SPACE_MM - FOOTER_SPACE_MM; // 247mm
     const CONTENT_HEIGHT_PER_PAGE_PX = CONTENT_HEIGHT_PER_PAGE_MM * MM_TO_PX;
-    
+
     // Get actual content height
     const contentHeight = content.scrollHeight;
     const calculatedPages = Math.max(1, Math.ceil(contentHeight / CONTENT_HEIGHT_PER_PAGE_PX));
-    
+
     if (calculatedPages !== pageCount) {
       setPageCount(calculatedPages);
     }
@@ -251,7 +251,7 @@ export function ProposalEditor({ showCanvas, onClose, grantId, extractedContent,
     // Find the section heading
     const doc = editor.state.doc;
     let sectionPos = -1;
-    
+
     doc.descendants((node, pos) => {
       if (node.type.name === 'heading' && node.textContent.toLowerCase().includes(section.toLowerCase())) {
         sectionPos = pos;
@@ -263,26 +263,26 @@ export function ProposalEditor({ showCanvas, onClose, grantId, extractedContent,
 
     // Find the paragraph after the heading
     let targetPos = sectionPos + doc.nodeAt(sectionPos)!.nodeSize;
-    
+
     // Simulate typing character by character
     const words = content.split(' ');
     for (let i = 0; i < words.length; i++) {
       if (!isAIWriting.isActive) break;
-      
+
       const progress = (i / words.length) * 100;
       setIsAIWriting(prev => ({ ...prev, progress }));
-      
+
       // Add word with space
       const wordToAdd = (i === 0 ? '' : ' ') + words[i];
-      
+
       editor.chain()
         .focus()
         .setTextSelection(targetPos)
         .insertContent(wordToAdd)
         .run();
-      
+
       targetPos += wordToAdd.length;
-      
+
       // Random delay to simulate human-like typing
       await new Promise(resolve => setTimeout(resolve, Math.random() * 100 + 50));
     }
@@ -316,11 +316,11 @@ export function ProposalEditor({ showCanvas, onClose, grantId, extractedContent,
   // Update pagination when editor is ready
   useEffect(() => {
     if (!editor) return;
-    
+
     const timer = setTimeout(() => {
       updatePagination();
     }, 500);
-    
+
     return () => clearTimeout(timer);
   }, [editor, updatePagination]);
 
@@ -330,15 +330,15 @@ export function ProposalEditor({ showCanvas, onClose, grantId, extractedContent,
 
     const insertExtractedContent = () => {
       const { section: sectionName, title, content, editingIntent } = extractedContent;
-      
+
       // Find the section heading in the document
       const doc = editor.state.doc;
       let sectionPos = -1;
       let targetPos = -1;
-      
+
       doc.descendants((node, pos) => {
-        if (node.type.name === 'heading' && 
-            node.textContent.toLowerCase().includes(sectionName.toLowerCase())) {
+        if (node.type.name === 'heading' &&
+          node.textContent.toLowerCase().includes(sectionName.toLowerCase())) {
           sectionPos = pos;
           // Find the paragraph after this heading
           const nextPos = pos + node.nodeSize;
@@ -349,7 +349,7 @@ export function ProposalEditor({ showCanvas, onClose, grantId, extractedContent,
           return false;
         }
       });
-      
+
       // Handle different editing intents
       if (editingIntent?.intent === 'rewrite') {
         if (editingIntent.target === 'document' || !editingIntent.target) {
@@ -364,30 +364,30 @@ export function ProposalEditor({ showCanvas, onClose, grantId, extractedContent,
           // Rewrite specific section
           let sectionFound = false;
           doc.descendants((node, pos) => {
-            if (node.type.name === 'heading' && 
-                node.textContent.toLowerCase().includes(sectionName.toLowerCase())) {
+            if (node.type.name === 'heading' &&
+              node.textContent.toLowerCase().includes(sectionName.toLowerCase())) {
               // Find the end of this section
               let endPos = doc.content.size;
               doc.descendants((nextNode, nextPos) => {
-                if (nextPos > pos && nextNode.type.name === 'heading' && 
-                    nextNode.attrs.level <= node.attrs.level) {
+                if (nextPos > pos && nextNode.type.name === 'heading' &&
+                  nextNode.attrs.level <= node.attrs.level) {
                   endPos = nextPos;
                   return false;
                 }
               });
-              
+
               // Replace the entire section
               editor.chain()
                 .focus()
                 .setTextSelection({ from: pos, to: endPos })
                 .insertContent(content)
                 .run();
-              
+
               sectionFound = true;
               return false;
             }
           });
-          
+
           if (!sectionFound) {
             // Section not found, append new section
             editor.chain()
@@ -401,32 +401,32 @@ export function ProposalEditor({ showCanvas, onClose, grantId, extractedContent,
         // Find and replace specific section
         const doc = editor.state.doc;
         let sectionFound = false;
-        
+
         doc.descendants((node, pos) => {
-          if (node.type.name === 'heading' && 
-              node.textContent.toLowerCase().includes(sectionName.toLowerCase())) {
+          if (node.type.name === 'heading' &&
+            node.textContent.toLowerCase().includes(sectionName.toLowerCase())) {
             // Find the end of this section (next heading or end of document)
             let endPos = doc.content.size;
             doc.descendants((nextNode, nextPos) => {
-              if (nextPos > pos && nextNode.type.name === 'heading' && 
-                  nextNode.attrs.level <= node.attrs.level) {
+              if (nextPos > pos && nextNode.type.name === 'heading' &&
+                nextNode.attrs.level <= node.attrs.level) {
                 endPos = nextPos;
                 return false;
               }
             });
-            
+
             // Replace the section content
             editor.chain()
               .focus()
               .setTextSelection({ from: pos, to: endPos })
               .insertContent(`<h2 style="margin-top: 2rem; margin-bottom: 1rem; font-weight: bold;">${title}</h2><div>${content}</div>`)
               .run();
-            
+
             sectionFound = true;
             return false;
           }
         });
-        
+
         if (!sectionFound) {
           // Section not found, append at end
           editor.chain()
@@ -445,7 +445,7 @@ export function ProposalEditor({ showCanvas, onClose, grantId, extractedContent,
       } else {
         // If no editing intent specified, check if document is empty
         const isEmpty = !editor.getText() || editor.getText().trim() === '';
-        
+
         if (isEmpty) {
           // Empty document - insert content directly
           editor.chain()
@@ -464,7 +464,7 @@ export function ProposalEditor({ showCanvas, onClose, grantId, extractedContent,
 
       // Trigger AI writing animation
       simulateAIWriting(sectionName, '');
-      
+
       // Clear the extracted content
       if (onContentUpdate) {
         onContentUpdate();
@@ -485,7 +485,7 @@ export function ProposalEditor({ showCanvas, onClose, grantId, extractedContent,
         'timeline': 'The project timeline spans multiple phases with clear milestones and deliverables at each stage...',
         'team': 'Our multidisciplinary team combines extensive experience and proven expertise in the relevant domain areas...'
       };
-      
+
       const content = sampleContent[section as keyof typeof sampleContent] || 'AI-generated content for this section...';
       await simulateAIWriting(section, content);
       return;
@@ -511,7 +511,7 @@ export function ProposalEditor({ showCanvas, onClose, grantId, extractedContent,
       }
 
       const data = await response.json();
-      
+
       if (data.success && data.content) {
         await simulateAIWriting(section, data.content);
       } else {
@@ -520,44 +520,44 @@ export function ProposalEditor({ showCanvas, onClose, grantId, extractedContent,
 
     } catch (error) {
       console.error('AI Assist Error:', error);
-      
+
       // Fallback to sample content
       const fallbackContent = `I apologize, but I'm having trouble connecting to the AI service. Here's a general framework for the ${section} section that you can customize:
 
 [This section would typically include specific guidance for ${section} based on your grant requirements and organizational context. Please try the AI assist feature again, or contact support if the issue persists.]`;
-      
+
       await simulateAIWriting(section, fallbackContent);
     }
   };
 
   const saveDraft = () => {
     if (!editor) return;
-    
+
     const content = editor.getHTML();
     localStorage.setItem(`proposal-${grantId || 'draft'}`, content);
     setLastSaved(new Date());
-    
+
     // In production, also save to API
     console.log('Saving to API...', content);
   };
 
   const exportToPDF = async () => {
     if (!editor) return;
-    
+
     try {
       const content = editor.getHTML();
-      
+
       // Get grant and organization info for PDF metadata
       const grantResponse = await fetch(`/api/grants/${grantId}`);
       const grantData = await grantResponse.json();
-      
+
       const title = `Grant Proposal - ${grantData.grant?.title || 'Untitled'}`;
       const organizationName = 'Your Organization'; // This should come from user context
       const grantTitle = grantData.grant?.title || 'Grant Opportunity';
       const funderName = grantData.grant?.funder?.name || 'Funding Organization';
-      
+
       await downloadProposalPDF(title, organizationName, grantTitle, funderName, content);
-      
+
     } catch (error) {
       console.error('PDF export error:', error);
       alert('Failed to export PDF. Please try again.');
@@ -585,12 +585,12 @@ export function ProposalEditor({ showCanvas, onClose, grantId, extractedContent,
               <FileText className="h-5 w-5 mr-2 text-blue-600" />
               Document Canvas
             </h3>
-            
+
             {/* Collaborators */}
             <div className="flex items-center space-x-2">
               {collaborators.map((collaborator) => (
                 <div key={collaborator.id} className="flex items-center space-x-1">
-                  <div 
+                  <div
                     className="w-3 h-3 rounded-full"
                     style={{ backgroundColor: collaborator.color }}
                   />
@@ -611,7 +611,7 @@ export function ProposalEditor({ showCanvas, onClose, grantId, extractedContent,
             <Badge variant="outline" className="text-xs">
               {pageCount} {pageCount === 1 ? 'page' : 'pages'}
             </Badge>
-            
+
             {/* Last Saved */}
             {lastSaved && (
               <Badge variant="outline" className="text-xs text-green-600">
@@ -638,12 +638,12 @@ export function ProposalEditor({ showCanvas, onClose, grantId, extractedContent,
                 <X className="h-4 w-4" />
               </Button>
             )}
-            
+
             <Button variant="outline" size="sm" onClick={exportToPDF}>
               <FileDown className="h-4 w-4 mr-2" />
               Export PDF
             </Button>
-            
+
             <Button size="sm" onClick={saveDraft}>
               <Save className="h-4 w-4 mr-2" />
               Save
@@ -660,7 +660,7 @@ export function ProposalEditor({ showCanvas, onClose, grantId, extractedContent,
           >
             <BoldIcon className="h-4 w-4" />
           </Button>
-          
+
           <Button
             variant={editor.isActive('italic') ? 'default' : 'ghost'}
             size="sm"
@@ -668,7 +668,7 @@ export function ProposalEditor({ showCanvas, onClose, grantId, extractedContent,
           >
             <ItalicIcon className="h-4 w-4" />
           </Button>
-          
+
           <Button
             variant={editor.isActive('underline') ? 'default' : 'ghost'}
             size="sm"
@@ -686,7 +686,7 @@ export function ProposalEditor({ showCanvas, onClose, grantId, extractedContent,
           >
             <Heading1 className="h-4 w-4" />
           </Button>
-          
+
           <Button
             variant={editor.isActive('heading', { level: 2 }) ? 'default' : 'ghost'}
             size="sm"
@@ -704,7 +704,7 @@ export function ProposalEditor({ showCanvas, onClose, grantId, extractedContent,
           >
             <List className="h-4 w-4" />
           </Button>
-          
+
           <Button
             variant={editor.isActive('orderedList') ? 'default' : 'ghost'}
             size="sm"
@@ -722,7 +722,7 @@ export function ProposalEditor({ showCanvas, onClose, grantId, extractedContent,
           >
             <AlignLeft className="h-4 w-4" />
           </Button>
-          
+
           <Button
             variant={editor.isActive({ textAlign: 'center' }) ? 'default' : 'ghost'}
             size="sm"
@@ -758,7 +758,7 @@ export function ProposalEditor({ showCanvas, onClose, grantId, extractedContent,
               </div>
               <div className="flex items-center space-x-2">
                 <div className="w-24 h-2 bg-purple-200 rounded-full overflow-hidden">
-                  <div 
+                  <div
                     className="h-full bg-purple-600 transition-all duration-300"
                     style={{ width: `${isAIWriting.progress}%` }}
                   />
@@ -775,7 +775,7 @@ export function ProposalEditor({ showCanvas, onClose, grantId, extractedContent,
       {/* Editor Canvas - A4 Size with Pagination */}
       <div className="flex-1 overflow-y-auto p-6 bg-gray-100">
         <div className="mx-auto" style={{ width: '210mm', maxWidth: '210mm' }} ref={editorContainerRef}>
-          
+
           {/* AI Collaboration Indicators */}
           {showAIIndicators && (
             <div className="fixed top-20 right-8 z-50">
@@ -795,10 +795,10 @@ export function ProposalEditor({ showCanvas, onClose, grantId, extractedContent,
           {/* Empty State Placeholder */}
           {(!editor?.getText() || editor.getText().trim() === '') && (
             <div className="a4-page-container">
-              <Card 
+              <Card
                 className="a4-page bg-white shadow-lg border-0 relative"
-                style={{ 
-                  width: '210mm', 
+                style={{
+                  width: '210mm',
                   height: '297mm',
                   maxWidth: '210mm',
                   marginBottom: '0.5rem'
@@ -817,7 +817,7 @@ export function ProposalEditor({ showCanvas, onClose, grantId, extractedContent,
                         Ask Maya to generate content, or start typing to create your proposal, report, or any document you need for your funding application.
                       </p>
                     </div>
-                    
+
                     <div className="space-y-2">
                       <div className="text-xs text-gray-400 uppercase tracking-wide font-medium">
                         Try asking Maya:
@@ -830,7 +830,7 @@ export function ProposalEditor({ showCanvas, onClose, grantId, extractedContent,
                     </div>
                   </div>
                 </div>
-                
+
                 {/* Page Number for Empty State */}
                 <div className="page-number absolute bottom-4 left-1/2 transform -translate-x-1/2">
                   <span className="text-xs text-gray-500">Page 1</span>
@@ -845,7 +845,7 @@ export function ProposalEditor({ showCanvas, onClose, grantId, extractedContent,
               {/* Render multiple A4 pages */}
               {Array.from({ length: pageCount }, (_, pageIndex) => (
                 <div key={pageIndex} className="a4-page-wrapper" style={{ marginBottom: '8mm' }}>
-                  <div 
+                  <div
                     className="a4-page"
                     style={{
                       width: '210mm',
@@ -858,7 +858,7 @@ export function ProposalEditor({ showCanvas, onClose, grantId, extractedContent,
                     }}
                   >
                     {/* Header Space (25mm from top) */}
-                    <div 
+                    <div
                       className="page-header"
                       style={{
                         position: 'absolute',
@@ -882,7 +882,7 @@ export function ProposalEditor({ showCanvas, onClose, grantId, extractedContent,
                     </div>
 
                     {/* Content Area */}
-                    <div 
+                    <div
                       className="page-content-area"
                       style={{
                         position: 'absolute',
@@ -894,15 +894,15 @@ export function ProposalEditor({ showCanvas, onClose, grantId, extractedContent,
                       }}
                     >
                       {pageIndex === 0 && (
-                        <EditorContent 
-                          editor={editor} 
+                        <EditorContent
+                          editor={editor}
                           className="a4-document-content focus-within:outline-none"
                         />
                       )}
                     </div>
 
                     {/* Footer Space with Page Number */}
-                    <div 
+                    <div
                       className="page-footer"
                       style={{
                         position: 'absolute',
@@ -916,7 +916,7 @@ export function ProposalEditor({ showCanvas, onClose, grantId, extractedContent,
                         justifyContent: 'center'
                       }}
                     >
-                      <span 
+                      <span
                         style={{
                           fontSize: '10pt',
                           color: '#6b7280',
@@ -1236,7 +1236,7 @@ export function ProposalEditor({ showCanvas, onClose, grantId, extractedContent,
               Impact
             </Button>
           </div>
-          
+
           <div className="text-xs text-gray-500">
             Press / for AI commands • Ctrl+S to save
           </div>
