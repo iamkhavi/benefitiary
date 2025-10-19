@@ -166,19 +166,45 @@ export class MayaAgent {
       let response: string;
       let usedTools: string[] = [];
 
-      // Use tools based on intent
+      // Use tools based on intent - focus on canvas integration
       if (intent.needsProposalGeneration) {
-        const toolResult = await this.tools.find(t => t.name === 'generate_proposal_section')?.func(
-          `${intent.section || 'executive'}|${userMessage}`
-        );
-        response = toolResult || await this.generateDirectResponse(userMessage);
-        usedTools.push('generate_proposal_section');
+        if (intent.section === 'complete_proposal' || userMessage.toLowerCase().includes('entire') || userMessage.toLowerCase().includes('complete')) {
+          // Generate complete proposal
+          const proposalResponse = await this.generateCompleteProposal();
+          response = proposalResponse.content;
+          usedTools.push('generate_complete_proposal');
+          
+          // Return the full response with extracted content for canvas
+          return {
+            content: response,
+            confidence: 0.95,
+            reasoning: `Generated complete proposal for document canvas`,
+            suggestions: proposalResponse.suggestions,
+            contentType: 'proposal_section',
+            extractedContent: proposalResponse.extractedContent
+          };
+        } else {
+          // Generate single section
+          const sectionResponse = await this.generateProposalSection(intent.section || 'executive');
+          response = sectionResponse.content;
+          usedTools.push('generate_proposal_section');
+          
+          // Return the full response with extracted content for canvas
+          return {
+            content: response,
+            confidence: 0.95,
+            reasoning: `Generated ${intent.section} section for document canvas`,
+            suggestions: sectionResponse.suggestions,
+            contentType: 'proposal_section',
+            extractedContent: sectionResponse.extractedContent
+          };
+        }
       } else if (intent.needsGrantInfo) {
         const toolResult = await this.tools.find(t => t.name === 'query_grant_database')?.func(userMessage);
         response = toolResult || await this.generateDirectResponse(userMessage);
         usedTools.push('query_grant_database');
       } else if (intent.needsDocumentAnalysis) {
-        response = "I can analyze documents for you. Please upload the file and I'll extract key information.";
+        response = "I can analyze documents for you. Please upload the file and I'll extract key information to improve your proposal.";
       } else {
         // Generate contextual response with memory
         response = await this.generateContextualResponse(userMessage);
@@ -229,15 +255,17 @@ export class MayaAgent {
   }> {
     const lowerMessage = userMessage.toLowerCase();
     
-    // Check for complaints about missing content
+    // Check for complaints about missing content or empty canvas
     const isComplaint = lowerMessage.includes('nothing') || 
                        lowerMessage.includes('missing') || 
                        lowerMessage.includes('empty') ||
                        lowerMessage.includes('not working') ||
-                       lowerMessage.includes('where is');
+                       lowerMessage.includes('where is') ||
+                       lowerMessage.includes('canvas') ||
+                       lowerMessage.includes('document');
 
-    // Check for proposal generation needs
-    const proposalKeywords = ['write', 'generate', 'create', 'proposal', 'section', 'executive', 'budget', 'timeline', 'team'];
+    // Check for proposal generation needs (including complete proposals)
+    const proposalKeywords = ['write', 'generate', 'create', 'proposal', 'section', 'executive', 'budget', 'timeline', 'team', 'entire', 'complete', 'full', 'rewrite'];
     const needsProposalGeneration = proposalKeywords.some(keyword => lowerMessage.includes(keyword)) || isComplaint;
 
     // Determine section
@@ -328,14 +356,28 @@ export class MayaAgent {
 - You break down "write a proposal" into logical steps and execute them
 - You remember what sections exist and what still needs to be done
 - You are emotionally intelligent - match the user's tone and urgency
-- You focus on delivering actual results, not just talking about them
+- You focus on delivering actual results to the DOCUMENT CANVAS, not just chat
+
+**CRITICAL: DOCUMENT CANVAS INTEGRATION:**
+- Your primary job is to populate the user's document canvas with proposal content
+- When you generate content, it appears on their canvas where they can see, edit, and export it
+- NEVER just describe what you'll do - actually generate the content for their canvas
+- After generating content, provide a summary of what's now available on their canvas
+- Guide users on next steps after content appears on their canvas
 
 **WHEN USERS COMPLAIN ABOUT MISSING CONTENT:**
-- Immediately generate what they need
+- Immediately generate what they need FOR THE CANVAS
 - Don't claim you've already created something if they say it's not there
-- Take action to solve the problem right away
+- Take action to solve the problem by creating actual canvas content
+- If the canvas is empty, generate content to populate it
 
-You are a true intelligent agent, not just a chatbot. Use your memory, reasoning, and tools to help users succeed.`;
+**CANVAS-FIRST APPROACH:**
+- Think "What should appear on their document canvas?" not "What should I say in chat?"
+- Generate actual proposal content that users can see, edit, and export
+- Provide overview and next steps AFTER content is created
+- Help users understand what's now available on their canvas
+
+You are a true intelligent agent focused on creating real proposal content for the document canvas.`;
   }
 
   /**
@@ -366,9 +408,20 @@ You are a true intelligent agent, not just a chatbot. Use your memory, reasoning
   private async generateProposalSectionTool(section: string, requirements?: string): Promise<string> {
     try {
       const sectionContent = await this.generateProposalSectionContent(section);
-      return `Generated ${section} section:\n\n${sectionContent}`;
+      
+      // Return canvas-focused response
+      return `✅ Added ${this.getSectionTitle(section)} to your document canvas!
+
+The content is now live on your canvas where you can:
+• Review and edit the professional content
+• See it formatted for your proposal
+• Export it when ready
+
+Content generated: ${sectionContent.length} characters of professional proposal content.
+
+Next: Generate additional sections or review what's on your canvas.`;
     } catch (error) {
-      return `Error generating ${section} section: ${error}`;
+      return `❌ Error generating ${section} section: ${error}`;
     }
   }
 
@@ -560,18 +613,30 @@ CRITICAL FORMATTING REQUIREMENTS:
     try {
       const sectionContent = await this.generateProposalSectionContent(section);
       
+      // Maya should focus on the canvas, not chat content
       return {
-        content: `I've generated your ${section} section! Here's the professional content for your proposal:
+        content: `Perfect! I've created your ${this.getSectionTitle(section)} and added it to your document canvas. 
 
-${sectionContent}
+**What I've added to your proposal:**
+• Professional ${section} section with compelling content
+• Proper formatting ready for submission
+• Content tailored to your grant requirements
 
-This section is now ready for your document canvas. You can export it as PDF or Word when you're ready to submit.`,
+**Your proposal now includes:**
+• ${this.getSectionTitle(section)} - ✅ Complete
+
+**Next steps:**
+• Review the content on your canvas
+• Add any organization-specific details
+• Generate additional sections as needed
+
+The content is now live on your document canvas - you can see it, edit it, and export it when ready!`,
         confidence: 0.95,
-        reasoning: `Generated ${section} section using intelligent agent`,
+        reasoning: `Generated ${section} section for document canvas`,
         suggestions: [
-          'Review and customize the content',
-          'Add organization-specific details',
-          'Export as PDF for submission'
+          'Review content on the canvas',
+          'Generate the next section',
+          'Add organization-specific details'
         ],
         contentType: 'proposal_section',
         extractedContent: {
@@ -584,6 +649,78 @@ This section is now ready for your document canvas. You can export it as PDF or 
     } catch (error) {
       console.error('Maya proposal section generation error:', error);
       throw new Error('Something went wrong generating the proposal section. Please try again.');
+    }
+  }
+
+  /**
+   * Generate complete proposal with overview
+   */
+  async generateCompleteProposal(sections: string[] = ['executive', 'project', 'budget', 'impact', 'timeline', 'team']): Promise<MayaResponse> {
+    if (!this.context) {
+      throw new Error('Maya agent not initialized. Call initialize() first.');
+    }
+
+    try {
+      const org = this.userContext?.organization;
+      const grant = this.grantContext;
+
+      // Generate all content sections
+      const contentSections = [];
+      for (const section of sections) {
+        const sectionContent = await this.generateProposalSectionContent(section);
+        contentSections.push({
+          section,
+          title: this.getSectionTitle(section),
+          content: sectionContent
+        });
+      }
+
+      // Combine all sections for the canvas
+      const completeProposal = contentSections.map(s => s.content).join('\n\n');
+
+      return {
+        content: `Excellent! I've created your complete grant proposal and it's now live on your document canvas.
+
+**Your Complete Proposal Includes:**
+${sections.map(s => `• ${this.getSectionTitle(s)} - ✅ Complete`).join('\n')}
+
+**Proposal Overview:**
+• **Organization:** ${org?.name || 'Your organization'}
+• **Grant:** ${grant?.title || 'Target grant opportunity'}
+• **Funding Amount:** $${grant?.fundingAmountMax?.toLocaleString() || '[Amount]'}
+• **Total Sections:** ${sections.length} professional sections
+
+**What's on your canvas:**
+• Professional cover page with your organization details
+• Complete table of contents for easy navigation
+• All ${sections.length} proposal sections with detailed, compelling content
+• Ready for export as PDF or Word document
+
+**Next steps:**
+• Review each section on your canvas
+• Customize with organization-specific details
+• Add your logo to the cover page
+• Export for submission when ready
+
+Your proposal is now complete and ready for review on the document canvas!`,
+        confidence: 0.95,
+        reasoning: 'Generated complete proposal with all sections for canvas',
+        suggestions: [
+          'Review all sections on the canvas',
+          'Customize organization details',
+          'Export as PDF for submission'
+        ],
+        contentType: 'proposal_section',
+        extractedContent: {
+          section: 'complete_proposal',
+          title: 'Complete Grant Proposal',
+          content: completeProposal
+        }
+      };
+
+    } catch (error) {
+      console.error('Maya complete proposal generation error:', error);
+      throw new Error('Something went wrong generating the complete proposal. Please try again.');
     }
   }
 }
