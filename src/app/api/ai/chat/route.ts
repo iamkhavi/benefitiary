@@ -136,12 +136,13 @@ export async function POST(request: NextRequest) {
       const stream = new ReadableStream({
         start(controller) {
           try {
-            // Send initial metadata - simplified to avoid JSON issues
+            // Send initial metadata with extracted content
             const initialData = {
               type: 'metadata',
               sessionId: newSessionId,
               messageId: messageId,
-              contentType: mayaResponse.contentType || 'chat'
+              contentType: mayaResponse.contentType || 'chat',
+              extractedContent: mayaResponse.extractedContent || null
             };
 
             controller.enqueue(encoder.encode(`data: ${JSON.stringify(initialData)}\n\n`));
