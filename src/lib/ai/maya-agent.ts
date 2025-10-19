@@ -268,15 +268,32 @@ export class MayaAgent {
     const proposalKeywords = ['write', 'generate', 'create', 'proposal', 'section', 'executive', 'budget', 'timeline', 'team', 'entire', 'complete', 'full', 'rewrite'];
     const needsProposalGeneration = proposalKeywords.some(keyword => lowerMessage.includes(keyword)) || isComplaint;
 
-    // Determine section
-    let section = 'executive';
-    if (lowerMessage.includes('executive')) section = 'executive';
-    else if (lowerMessage.includes('project')) section = 'project';
-    else if (lowerMessage.includes('budget')) section = 'budget';
-    else if (lowerMessage.includes('impact')) section = 'impact';
-    else if (lowerMessage.includes('timeline')) section = 'timeline';
-    else if (lowerMessage.includes('team')) section = 'team';
-    else if (lowerMessage.includes('complete') || lowerMessage.includes('full')) section = 'complete_proposal';
+    // Determine section - prioritize complete proposals
+    let section = 'complete_proposal'; // Default to complete proposal, not just executive
+    
+    // Check for complete proposal requests first
+    if (lowerMessage.includes('complete') || 
+        lowerMessage.includes('full') || 
+        lowerMessage.includes('entire') || 
+        lowerMessage.includes('whole') ||
+        lowerMessage.includes('rewrite') ||
+        (lowerMessage.includes('proposal') && !lowerMessage.includes('section'))) {
+      section = 'complete_proposal';
+    }
+    // Then check for specific sections
+    else if (lowerMessage.includes('executive') || lowerMessage.includes('summary')) section = 'executive';
+    else if (lowerMessage.includes('project') || lowerMessage.includes('description')) section = 'project';
+    else if (lowerMessage.includes('budget') || lowerMessage.includes('cost')) section = 'budget';
+    else if (lowerMessage.includes('impact') || lowerMessage.includes('outcome')) section = 'impact';
+    else if (lowerMessage.includes('timeline') || lowerMessage.includes('schedule')) section = 'timeline';
+    else if (lowerMessage.includes('team') || lowerMessage.includes('staff')) section = 'team';
+    else if (lowerMessage.includes('cover') || lowerMessage.includes('title')) section = 'cover';
+    else if (lowerMessage.includes('abstract')) section = 'abstract';
+    else if (lowerMessage.includes('background') || lowerMessage.includes('literature')) section = 'background';
+    else if (lowerMessage.includes('method') || lowerMessage.includes('approach')) section = 'methodology';
+    else if (lowerMessage.includes('evaluation') || lowerMessage.includes('assessment')) section = 'evaluation';
+    else if (lowerMessage.includes('sustainability') || lowerMessage.includes('future')) section = 'sustainability';
+    else if (lowerMessage.includes('reference') || lowerMessage.includes('citation')) section = 'references';
 
     // Check for grant info needs
     const grantKeywords = ['grant', 'funding', 'requirements', 'deadline', 'funder'];
@@ -358,18 +375,31 @@ export class MayaAgent {
 - You are emotionally intelligent - match the user's tone and urgency
 - You focus on delivering actual results to the DOCUMENT CANVAS, not just chat
 
+**GRANT PROPOSAL EXPERTISE:**
+- You understand that a complete grant proposal has a specific structure and flow
+- Standard grant proposal sections include: Cover Page, Abstract, Background/Significance, Project Description, Methodology, Budget, Timeline, Team Qualifications, Evaluation Plan, Expected Outcomes, Sustainability, and References
+- When users ask for a "proposal" or "complete proposal", they want the full document structure, not just an executive summary
+- Different funders may require different sections, but you understand the standard academic/research proposal format
+- You know that proposals should be comprehensive, evidence-based, and professionally formatted
+
 **CRITICAL: DOCUMENT CANVAS INTEGRATION:**
-- Your primary job is to populate the user's document canvas with proposal content
+- Your primary job is to populate the user's document canvas with professional proposal content
 - When you generate content, it appears on their canvas where they can see, edit, and export it
 - NEVER just describe what you'll do - actually generate the content for their canvas
 - After generating content, provide a summary of what's now available on their canvas
 - Guide users on next steps after content appears on their canvas
 
+**WHEN USERS ASK FOR PROPOSALS:**
+- "Write a proposal" = Generate a complete, multi-section grant proposal with cover page, table of contents, and all standard sections
+- "Rewrite the proposal" = Replace the entire document with a new complete proposal
+- Don't default to just an executive summary - understand they want a full proposal document
+- Generate professional, submission-ready content with proper formatting and structure
+
 **WHEN USERS COMPLAIN ABOUT MISSING CONTENT:**
 - Immediately generate what they need FOR THE CANVAS
 - Don't claim you've already created something if they say it's not there
 - Take action to solve the problem by creating actual canvas content
-- If the canvas is empty, generate content to populate it
+- If the canvas is empty, generate a complete proposal to populate it
 
 **CANVAS-FIRST APPROACH:**
 - Think "What should appear on their document canvas?" not "What should I say in chat?"
@@ -377,7 +407,7 @@ export class MayaAgent {
 - Provide overview and next steps AFTER content is created
 - Help users understand what's now available on their canvas
 
-You are a true intelligent agent focused on creating real proposal content for the document canvas.`;
+You are a true intelligent agent with deep grant writing expertise, focused on creating real, comprehensive proposal content for the document canvas.`;
   }
 
   /**
@@ -470,12 +500,18 @@ Recommendation: Start with Executive Summary to establish the foundation.`;
    */
   private async generateProposalSectionContent(section: string): Promise<string> {
     const sectionPrompts = {
-      'executive': 'Generate a compelling executive summary that highlights the problem, solution, and expected impact',
-      'project': 'Create a detailed project description including methodology, approach, and innovation',
-      'budget': 'Develop a comprehensive budget overview with major cost categories and justifications',
-      'impact': 'Describe expected outcomes, measurable results, and long-term benefits',
-      'timeline': 'Create a project timeline with key milestones and deliverables',
-      'team': 'Highlight team expertise, organizational capacity, and qualifications'
+      'executive': 'Generate a compelling executive summary that provides a concise overview of the entire proposal, including the problem statement, proposed solution, methodology, expected outcomes, and funding request. This should be written last but appear first in the proposal.',
+      'abstract': 'Create a brief abstract (150-250 words) that summarizes the key elements of the proposal including objectives, methods, expected outcomes, and significance.',
+      'background': 'Develop a comprehensive background section that establishes the problem context, reviews relevant literature, identifies gaps in current knowledge or practice, and demonstrates the need for this project.',
+      'project': 'Create a detailed project description that includes: clear objectives, comprehensive methodology, innovative approaches, detailed work plan, risk management strategies, and expected deliverables.',
+      'methodology': 'Describe the specific methods, approaches, and procedures that will be used to achieve the project objectives. Include research design, data collection methods, analysis techniques, and quality assurance measures.',
+      'budget': 'Develop a comprehensive budget that includes: personnel costs, equipment, supplies, travel, indirect costs, cost-share commitments, and detailed budget justification for each category.',
+      'impact': 'Describe the expected short-term and long-term impacts, including measurable outcomes, broader impacts on the field/community, dissemination plans, and how success will be evaluated.',
+      'timeline': 'Create a detailed project timeline with specific milestones, deliverables, and key activities organized by project phases or years. Include Gantt chart or similar visual representation.',
+      'team': 'Highlight the qualifications and expertise of key personnel, organizational capacity, institutional resources, and any collaborating organizations. Include CVs and letters of support.',
+      'evaluation': 'Describe the evaluation framework, including formative and summative evaluation methods, key performance indicators, data collection procedures, and how results will be used for improvement.',
+      'sustainability': 'Explain how the project outcomes will be sustained beyond the funding period, including plans for continued funding, institutional support, and long-term impact.',
+      'references': 'Provide a comprehensive bibliography of all sources cited in the proposal, formatted according to the funder\'s preferred citation style.'
     };
 
     const sectionPrompt = sectionPrompts[section as keyof typeof sectionPrompts] ||
@@ -518,16 +554,100 @@ CRITICAL FORMATTING REQUIREMENTS:
   }
 
   /**
+   * Generate professional cover page
+   */
+  private async generateCoverPage(): Promise<string> {
+    const org = this.userContext?.organization;
+    const grant = this.grantContext;
+    const currentDate = new Date().toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+
+    return `
+      <div style="text-align: center; padding: 50mm 0; height: 297mm; display: flex; flex-direction: column; justify-content: center;">
+        <div style="margin-bottom: 40mm;">
+          <div style="border: 2px solid #333; padding: 20mm; margin: 0 20mm;">
+            <h1 style="font-size: 24pt; font-weight: bold; margin-bottom: 20mm; color: #333;">
+              GRANT PROPOSAL
+            </h1>
+            
+            <h2 style="font-size: 18pt; margin-bottom: 15mm; color: #555;">
+              ${grant?.title || 'Grant Opportunity Title'}
+            </h2>
+            
+            <div style="margin: 20mm 0; font-size: 14pt;">
+              <p><strong>Submitted to:</strong></p>
+              <p style="margin-bottom: 10mm;">${grant?.funder?.name || 'Funding Organization'}</p>
+              
+              <p><strong>Submitted by:</strong></p>
+              <p>${org?.name || 'Organization Name'}</p>
+              <p style="margin-bottom: 10mm;">${org?.country || 'Location'}</p>
+              
+              <p><strong>Date:</strong></p>
+              <p style="margin-bottom: 10mm;">${currentDate}</p>
+              
+              <p><strong>Requested Amount:</strong></p>
+              <p style="font-weight: bold; font-size: 16pt;">$${grant?.fundingAmountMax?.toLocaleString() || '[Amount]'}</p>
+            </div>
+          </div>
+        </div>
+        
+        <div style="position: absolute; bottom: 20mm; left: 50%; transform: translateX(-50%); font-size: 10pt; color: #666;">
+          This proposal contains confidential and proprietary information
+        </div>
+      </div>
+    `;
+  }
+
+  /**
+   * Generate table of contents
+   */
+  private generateTableOfContents(sections: string[]): string {
+    let pageNumber = 3; // Start after cover page and TOC
+    const tocEntries = sections
+      .filter(section => section !== 'cover') // Exclude cover page from TOC
+      .map(section => {
+        const title = this.getSectionTitle(section);
+        const entry = `
+          <div style="display: flex; justify-content: space-between; padding: 8pt 0; border-bottom: 1px dotted #ccc;">
+            <span>${title}</span>
+            <span>${pageNumber}</span>
+          </div>
+        `;
+        pageNumber++;
+        return entry;
+      });
+
+    return `
+      <div style="padding: 25mm 20mm;">
+        <h1 style="text-align: center; font-size: 20pt; margin-bottom: 30mm;">TABLE OF CONTENTS</h1>
+        <div style="font-size: 12pt; line-height: 1.6;">
+          ${tocEntries.join('')}
+        </div>
+      </div>
+    `;
+  }
+
+  /**
    * Get section title
    */
   private getSectionTitle(section: string): string {
     const titles = {
+      'cover': 'Cover Page',
+      'abstract': 'Abstract',
       'executive': 'Executive Summary',
+      'background': 'Background and Significance',
       'project': 'Project Description',
-      'budget': 'Budget Overview',
-      'impact': 'Expected Impact & Outcomes',
-      'timeline': 'Project Timeline',
-      'team': 'Team & Organizational Capacity'
+      'methodology': 'Methodology and Approach',
+      'budget': 'Budget and Budget Justification',
+      'timeline': 'Project Timeline and Milestones',
+      'team': 'Team Qualifications and Organizational Capacity',
+      'evaluation': 'Evaluation Plan',
+      'impact': 'Expected Outcomes and Broader Impacts',
+      'sustainability': 'Sustainability and Future Plans',
+      'references': 'References and Bibliography'
     };
     
     return titles[section as keyof typeof titles] || 
@@ -653,9 +773,9 @@ The content is now live on your document canvas - you can see it, edit it, and e
   }
 
   /**
-   * Generate complete proposal with overview
+   * Generate complete proposal with proper grant proposal structure
    */
-  async generateCompleteProposal(sections: string[] = ['executive', 'project', 'budget', 'impact', 'timeline', 'team']): Promise<MayaResponse> {
+  async generateCompleteProposal(sections: string[] = ['cover', 'abstract', 'background', 'project', 'methodology', 'budget', 'timeline', 'team', 'evaluation', 'impact', 'sustainability', 'references']): Promise<MayaResponse> {
     if (!this.context) {
       throw new Error('Maya agent not initialized. Call initialize() first.');
     }
@@ -664,9 +784,16 @@ The content is now live on your document canvas - you can see it, edit it, and e
       const org = this.userContext?.organization;
       const grant = this.grantContext;
 
+      // Generate cover page first
+      const coverPage = await this.generateCoverPage();
+      
+      // Generate table of contents
+      const tableOfContents = this.generateTableOfContents(sections);
+      
       // Generate all content sections
       const contentSections = [];
       for (const section of sections) {
+        if (section === 'cover') continue; // Skip cover as it's handled separately
         const sectionContent = await this.generateProposalSectionContent(section);
         contentSections.push({
           section,
@@ -675,8 +802,14 @@ The content is now live on your document canvas - you can see it, edit it, and e
         });
       }
 
-      // Combine all sections for the canvas
-      const completeProposal = contentSections.map(s => s.content).join('\n\n');
+      // Combine cover page, TOC, and all sections for the canvas
+      const completeProposal = [
+        coverPage,
+        '<div style="page-break-before: always;"></div>',
+        tableOfContents,
+        '<div style="page-break-before: always;"></div>',
+        ...contentSections.map(s => s.content)
+      ].join('\n\n');
 
       return {
         content: `Excellent! I've created your complete grant proposal and it's now live on your document canvas.

@@ -71,6 +71,129 @@ interface AIWritingSession {
   progress: number;
 }
 
+// Professional Paginated Document Component
+function PaginatedDocument({ editor }: { editor: any }) {
+  const [pages, setPages] = useState<string[]>([]);
+  const contentRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!editor) return;
+
+    const updatePagination = () => {
+      const content = editor.getHTML();
+      if (!content || content.trim() === '') {
+        setPages([]);
+        return;
+      }
+
+      // Create a temporary container to measure content
+      const tempContainer = document.createElement('div');
+      tempContainer.style.position = 'absolute';
+      tempContainer.style.visibility = 'hidden';
+      tempContainer.style.width = '170mm'; // A4 width minus margins (210mm - 40mm)
+      tempContainer.style.fontFamily = 'Times New Roman, serif';
+      tempContainer.style.fontSize = '12pt';
+      tempContainer.style.lineHeight = '1.6';
+      tempContainer.innerHTML = content;
+      document.body.appendChild(tempContainer);
+
+      const contentHeight = tempContainer.scrollHeight;
+      const pageHeight = 247 * 3.779527559; // 247mm in pixels (A4 height minus margins)
+      
+      document.body.removeChild(tempContainer);
+
+      // Calculate number of pages needed
+      const numPages = Math.max(1, Math.ceil(contentHeight / pageHeight));
+      
+      // Split content across pages (simplified - in production you'd want more sophisticated splitting)
+      const newPages = [];
+      if (numPages === 1) {
+        newPages.push(content);
+      } else {
+        // For multiple pages, we'll use CSS page-break-inside: avoid and let the browser handle it
+        newPages.push(content);
+      }
+      
+      setPages(newPages);
+    };
+
+    // Update pagination when content changes
+    const updateHandler = () => {
+      setTimeout(updatePagination, 100);
+    };
+
+    editor.on('update', updateHandler);
+    updatePagination(); // Initial pagination
+
+    return () => {
+      editor.off('update', updateHandler);
+    };
+  }, [editor]);
+
+  if (pages.length === 0) return null;
+
+  return (
+    <div className="paginated-document">
+      {pages.map((pageContent, pageIndex) => (
+        <div key={pageIndex} className="a4-page-wrapper" style={{ marginBottom: '8mm' }}>
+          <div
+            className="a4-page"
+            style={{
+              width: '210mm',
+              height: '297mm',
+              backgroundColor: 'white',
+              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+              border: '1px solid #e5e7eb',
+              position: 'relative',
+              pageBreakAfter: 'always'
+            }}
+          >
+            {/* Content Area */}
+            <div
+              className="page-content-area"
+              style={{
+                padding: '25mm 20mm 25mm 20mm',
+                height: '247mm',
+                overflow: 'hidden'
+              }}
+            >
+              {pageIndex === 0 ? (
+                // First page gets the live editor
+                <EditorContent
+                  editor={editor}
+                  className="a4-document-content focus-within:outline-none"
+                />
+              ) : (
+                // Subsequent pages show static content (for overflow)
+                <div 
+                  className="a4-document-content"
+                  dangerouslySetInnerHTML={{ __html: pageContent }}
+                />
+              )}
+            </div>
+
+            {/* Page Footer with Number */}
+            <div
+              className="page-footer"
+              style={{
+                position: 'absolute',
+                bottom: '10mm',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                fontSize: '10pt',
+                color: '#6b7280',
+                fontFamily: 'Times New Roman, serif'
+              }}
+            >
+              <span>Page {pageIndex + 1}</span>
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 // Custom Page Break Extension with Auto-pagination
 const PageBreak = Extension.create({
   name: 'pageBreak',
@@ -99,28 +222,6 @@ const PageBreak = Extension.create({
         return commands.insertContent('<div class="page-break" style="page-break-before: always; height: 1px; margin: 0; padding: 0;"></div>')
       },
     } as any
-  },
-
-  addProseMirrorPlugins() {
-    return [
-      new Plugin({
-        key: new PluginKey('autoPagination'),
-        view: () => ({
-          update: (view: any) => {
-            // Auto-pagination logic will be handled by CSS and the container
-            setTimeout(() => {
-              const pages = document.querySelectorAll('.a4-page');
-              pages.forEach((page, index) => {
-                const pageNumber = page.querySelector('.page-number');
-                if (pageNumber) {
-                  pageNumber.textContent = `Page ${index + 1}`;
-                }
-              });
-            }, 100);
-          }
-        })
-      })
-    ]
   }
 })
 
@@ -203,44 +304,18 @@ export function ProposalEditor({ showCanvas, onClose, grantId, extractedContent,
       },
     },
     onUpdate: ({ editor }) => {
-      const text = editor.getText();
-      setWordCount(text.split(/\s+/).filter(word => word.length > 0).length);
-
-      // Update pagination after content changes
-      setTimeout(() => {
-        updatePagination();
-      }, 100);
+      updateWordCount();
     },
   });
 
-  // Pagination logic - Standard A4 with proper header/footer spaces
-  const updatePagination = useCallback(() => {
-    if (!editorContainerRef.current || !editor) return;
-
-    const container = editorContainerRef.current;
-    const content = container.querySelector('.a4-document-content .ProseMirror');
-    if (!content) return;
-
-    // Standard A4 dimensions (210mm x 297mm)
-    const A4_HEIGHT_MM = 297;
-    const HEADER_SPACE_MM = 25;  // Standard header space
-    const FOOTER_SPACE_MM = 25;  // Standard footer space
-    const SIDE_MARGIN_MM = 20;   // Left and right margins
-
-    const MM_TO_PX = 96 / 25.4; // Convert mm to px at 96 DPI
-
-    // Available content height per page (excluding header and footer)
-    const CONTENT_HEIGHT_PER_PAGE_MM = A4_HEIGHT_MM - HEADER_SPACE_MM - FOOTER_SPACE_MM; // 247mm
-    const CONTENT_HEIGHT_PER_PAGE_PX = CONTENT_HEIGHT_PER_PAGE_MM * MM_TO_PX;
-
-    // Get actual content height
-    const contentHeight = content.scrollHeight;
-    const calculatedPages = Math.max(1, Math.ceil(contentHeight / CONTENT_HEIGHT_PER_PAGE_PX));
-
-    if (calculatedPages !== pageCount) {
-      setPageCount(calculatedPages);
-    }
-  }, [pageCount, editor]);
+  // Simple word count update - no complex pagination needed
+  const updateWordCount = useCallback(() => {
+    if (!editor) return;
+    
+    const text = editor.getText();
+    const words = text.split(/\s+/).filter(word => word.length > 0).length;
+    setWordCount(words);
+  }, [editor]);
 
   // Simulate AI writing in real-time
   const simulateAIWriting = useCallback(async (section: string, content: string) => {
@@ -313,16 +388,16 @@ export function ProposalEditor({ showCanvas, onClose, grantId, extractedContent,
     }
   }, [editor, grantId]);
 
-  // Update pagination when editor is ready
+  // Update word count when editor is ready
   useEffect(() => {
     if (!editor) return;
 
     const timer = setTimeout(() => {
-      updatePagination();
+      updateWordCount();
     }, 500);
 
     return () => clearTimeout(timer);
-  }, [editor, updatePagination]);
+  }, [editor, updateWordCount]);
 
   // Handle extracted content from Maya
   useEffect(() => {
@@ -609,7 +684,7 @@ export function ProposalEditor({ showCanvas, onClose, grantId, extractedContent,
               {wordCount} words
             </Badge>
             <Badge variant="outline" className="text-xs">
-              {pageCount} {pageCount === 1 ? 'page' : 'pages'}
+              Document
             </Badge>
 
             {/* Last Saved */}
@@ -792,149 +867,46 @@ export function ProposalEditor({ showCanvas, onClose, grantId, extractedContent,
             </div>
           )}
 
-          {/* Empty State Placeholder */}
+          {/* Empty State - No Pages Shown */}
           {(!editor?.getText() || editor.getText().trim() === '') && (
-            <div className="a4-page-container">
-              <Card
-                className="a4-page bg-white shadow-lg border-0 relative"
-                style={{
-                  width: '210mm',
-                  height: '297mm',
-                  maxWidth: '210mm',
-                  marginBottom: '0.5rem'
-                }}
-              >
-                <div className="absolute inset-0 flex items-center justify-center p-8">
-                  <div className="text-center max-w-md">
-                    <div className="mb-6">
-                      <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <FileText className="w-8 h-8 text-gray-400" />
-                      </div>
-                      <h3 className="text-lg font-medium text-gray-900 mb-2">
-                        Your Document Will Appear Here
-                      </h3>
-                      <p className="text-gray-500 text-sm leading-relaxed">
-                        Ask Maya to generate content, or start typing to create your proposal, report, or any document you need for your funding application.
-                      </p>
-                    </div>
+            <div className="empty-canvas-state flex items-center justify-center" style={{ minHeight: '400px' }}>
+              <div className="text-center max-w-md">
+                <div className="mb-6">
+                  <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <FileText className="w-8 h-8 text-gray-400" />
+                  </div>
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">
+                    Ready to Create Your Document
+                  </h3>
+                  <p className="text-gray-500 text-sm leading-relaxed">
+                    Ask Maya to generate content and professional pages will appear here. Each page will be properly formatted for submission.
+                  </p>
+                </div>
 
-                    <div className="space-y-2">
-                      <div className="text-xs text-gray-400 uppercase tracking-wide font-medium">
-                        Try asking Maya:
-                      </div>
-                      <div className="space-y-1 text-sm text-gray-600">
-                        <div>"Draft an executive summary"</div>
-                        <div>"Create a project timeline"</div>
-                        <div>"Write a budget overview"</div>
-                      </div>
-                    </div>
+                <div className="space-y-2">
+                  <div className="text-xs text-gray-400 uppercase tracking-wide font-medium">
+                    Try asking Maya:
+                  </div>
+                  <div className="space-y-1 text-sm text-gray-600">
+                    <div>"Write a complete proposal"</div>
+                    <div>"Generate an executive summary"</div>
+                    <div>"Create a project timeline"</div>
                   </div>
                 </div>
-
-                {/* Page Number for Empty State */}
-                <div className="page-number absolute bottom-4 left-1/2 transform -translate-x-1/2">
-                  <span className="text-xs text-gray-500">Page 1</span>
-                </div>
-              </Card>
+              </div>
             </div>
           )}
 
-          {/* Paginated Editor Content */}
+          {/* Professional Paginated Document - Only Show Pages with Content */}
           {editor?.getText() && editor.getText().trim() !== '' && (
-            <div className="paginated-document-container">
-              {/* Render multiple A4 pages */}
-              {Array.from({ length: pageCount }, (_, pageIndex) => (
-                <div key={pageIndex} className="a4-page-wrapper" style={{ marginBottom: '8mm' }}>
-                  <div
-                    className="a4-page"
-                    style={{
-                      width: '210mm',
-                      height: '297mm',
-                      backgroundColor: 'white',
-                      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-                      border: '1px solid #e5e7eb',
-                      position: 'relative',
-                      overflow: 'hidden'
-                    }}
-                  >
-                    {/* Header Space (25mm from top) */}
-                    <div
-                      className="page-header"
-                      style={{
-                        position: 'absolute',
-                        top: 0,
-                        left: 0,
-                        right: 0,
-                        height: '25mm',
-                        borderBottom: pageIndex === 0 ? 'none' : '1px solid #f3f4f6',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontSize: '10pt',
-                        color: '#9ca3af'
-                      }}
-                    >
-                      {pageIndex > 0 && (
-                        <span style={{ fontFamily: 'Times New Roman, serif' }}>
-                          {/* Header content for subsequent pages */}
-                        </span>
-                      )}
-                    </div>
-
-                    {/* Content Area */}
-                    <div
-                      className="page-content-area"
-                      style={{
-                        position: 'absolute',
-                        top: '25mm',
-                        left: '20mm',
-                        right: '20mm',
-                        bottom: '25mm',
-                        overflow: 'hidden'
-                      }}
-                    >
-                      {pageIndex === 0 && (
-                        <EditorContent
-                          editor={editor}
-                          className="a4-document-content focus-within:outline-none"
-                        />
-                      )}
-                    </div>
-
-                    {/* Footer Space with Page Number */}
-                    <div
-                      className="page-footer"
-                      style={{
-                        position: 'absolute',
-                        bottom: 0,
-                        left: 0,
-                        right: 0,
-                        height: '25mm',
-                        borderTop: '1px solid #f3f4f6',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center'
-                      }}
-                    >
-                      <span
-                        style={{
-                          fontSize: '10pt',
-                          color: '#6b7280',
-                          fontFamily: 'Times New Roman, serif'
-                        }}
-                      >
-                        Page {pageIndex + 1}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              ))}
+            <div className="document-container">
+              <PaginatedDocument editor={editor} />
             </div>
           )}
 
-          {/* Global Styles for A4 Document */}
+          {/* Global Styles for Professional A4 Document */}
           <style jsx global>{`
-            .a4-document-wrapper {
+            .paginated-document {
               position: relative;
               width: 210mm;
               max-width: 210mm;
@@ -946,6 +918,97 @@ export function ProposalEditor({ showCanvas, onClose, grantId, extractedContent,
               font-family: 'Times New Roman', serif !important;
               font-size: 12pt !important;
               line-height: 1.6 !important;
+              color: #000000 !important;
+            }
+
+            .a4-document-content h1 {
+              font-size: 18pt !important;
+              font-weight: bold !important;
+              margin: 24pt 0 12pt 0 !important;
+              page-break-after: avoid !important;
+            }
+
+            .a4-document-content h2 {
+              font-size: 16pt !important;
+              font-weight: bold !important;
+              margin: 18pt 0 10pt 0 !important;
+              page-break-after: avoid !important;
+            }
+
+            .a4-document-content h3 {
+              font-size: 14pt !important;
+              font-weight: bold !important;
+              margin: 14pt 0 8pt 0 !important;
+              page-break-after: avoid !important;
+            }
+
+            .a4-document-content p {
+              margin: 0 0 12pt 0 !important;
+              text-align: justify !important;
+              orphans: 2 !important;
+              widows: 2 !important;
+            }
+
+            .a4-document-content ul, .a4-document-content ol {
+              margin: 12pt 0 12pt 24pt !important;
+              padding: 0 !important;
+            }
+
+            .a4-document-content li {
+              margin: 6pt 0 !important;
+              page-break-inside: avoid !important;
+            }
+
+            .a4-document-content strong {
+              font-weight: bold !important;
+            }
+
+            .a4-document-content em {
+              font-style: italic !important;
+            }
+
+            /* Print-ready styles */
+            @media print {
+              .a4-page {
+                box-shadow: none !important;
+                border: none !important;
+                margin: 0 !important;
+                page-break-after: always !important;
+              }
+              
+              .a4-page:last-child {
+                page-break-after: auto !important;
+              }
+
+              .page-footer {
+                position: fixed !important;
+                bottom: 10mm !important;
+              }
+            }
+
+            /* Ensure content doesn't overflow pages */
+            .page-content-area {
+              overflow: hidden !important;
+            }
+
+            /* Professional table styles if needed */
+            .a4-document-content table {
+              width: 100% !important;
+              border-collapse: collapse !important;
+              margin: 12pt 0 !important;
+              page-break-inside: avoid !important;
+            }
+
+            .a4-document-content th, .a4-document-content td {
+              border: 1pt solid #000000 !important;
+              padding: 6pt !important;
+              text-align: left !important;
+            }
+
+            .a4-document-content th {
+              background-color: #f5f5f5 !important;
+              font-weight: bold !important;
+            }.6 !important;
               color: #000 !important;
               width: 210mm !important;
               max-width: 210mm !important;
@@ -955,12 +1018,12 @@ export function ProposalEditor({ showCanvas, onClose, grantId, extractedContent,
             
             .a4-document-content .ProseMirror {
               outline: none !important;
-              /* Standard A4 margins: 25mm top (header space), 20mm sides, 25mm bottom (footer space) */
-              padding: 25mm 20mm 25mm 20mm !important;
+              /* No padding here - handled by parent container */
+              padding: 0 !important;
               margin: 0 !important;
-              width: 210mm !important;
-              max-width: 210mm !important;
-              /* Content area height: 297mm - 50mm (top+bottom margins) = 247mm */
+              width: 100% !important;
+              max-width: 100% !important;
+              /* Minimum height for content */
               min-height: 247mm !important;
               background: white;
               position: relative;
@@ -968,16 +1031,6 @@ export function ProposalEditor({ showCanvas, onClose, grantId, extractedContent,
               /* Professional document formatting */
               orphans: 2;
               widows: 2;
-              
-              /* Page break indicators every 247mm of content */
-              background-image: repeating-linear-gradient(
-                to bottom,
-                transparent 0mm,
-                transparent 247mm,
-                rgba(229, 231, 235, 0.5) 247mm,
-                rgba(229, 231, 235, 0.5) calc(247mm + 8mm),
-                transparent calc(247mm + 8mm)
-              );
             }
             
             /* Page break simulation using CSS */
