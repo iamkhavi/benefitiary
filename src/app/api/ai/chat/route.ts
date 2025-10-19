@@ -106,15 +106,8 @@ export async function POST(request: NextRequest) {
       userMessage = `Please provide clarifying questions about: ${topic}`;
       mayaResponse = await maya.chat(userMessage);
     } else {
-      // Regular chat message - let the intelligent agent handle everything with timeout
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Maya response timeout')), 60000) // 60 second timeout
-      );
-      
-      mayaResponse = await Promise.race([
-        maya.chat(message),
-        timeoutPromise
-      ]) as any;
+      // Regular chat message - let the intelligent agent handle everything (no timeout)
+      mayaResponse = await maya.chat(message);
     }
 
     // Debug logging to see what Maya is actually returning
@@ -142,87 +135,58 @@ export async function POST(request: NextRequest) {
 
       const stream = new ReadableStream({
         start(controller) {
-          // Send initial metadata
-          const initialData = {
-            type: 'metadata',
-            sessionId: newSessionId,
-            messageId: messageId,
-            contentType: mayaResponse.contentType,
-            extractedContent: mayaResponse.extractedContent ? {
-              ...mayaResponse.extractedContent,
-              content: mayaResponse.extractedContent.content?.substring(0, 1000) || '' // Truncate large content
-            } : null,
-            confidence: mayaResponse.confidence,
-            suggestions: mayaResponse.suggestions,
-            reasoning: mayaResponse.reasoning
-          };
-
           try {
+            // Send initial metadata - simplified to avoid JSON issues
+            const initialData = {
+              type: 'metadata',
+              sessionId: newSessionId,
+              messageId: messageId,
+              contentType: mayaResponse.contentType || 'chat'
+            };
+
             controller.enqueue(encoder.encode(`data: ${JSON.stringify(initialData)}\n\n`));
+
+            // Send the complete content at once instead of streaming word by word
+            // This avoids JSON parsing issues with complex content
+            const content = mayaResponse.content || '';
+            
+            // Clean the content to prevent JSON issues
+            const cleanContent = content
+              .replace(/[\r\n]/g, ' ')
+              .replace(/"/g, '\\"')
+              .replace(/\\/g, '\\\\');
+
+            const contentData = {
+              type: 'content',
+              chunk: cleanContent,
+              isComplete: false
+            };
+
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify(contentData)}\n\n`));
+
+            // Send completion with extracted content if available
+            const completeData = {
+              type: 'complete',
+              isComplete: true,
+              response: content,
+              extractedContent: mayaResponse.extractedContent || null,
+              confidence: mayaResponse.confidence || 0.8,
+              suggestions: mayaResponse.suggestions || []
+            };
+
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify(completeData)}\n\n`));
+            controller.close();
+
           } catch (error) {
-            console.error('Metadata JSON error:', error);
-            // Send simplified metadata
-            const simpleData = { type: 'metadata', sessionId: newSessionId, messageId: messageId };
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify(simpleData)}\n\n`));
+            console.error('Streaming error:', error);
+            // Send error and close
+            const errorData = {
+              type: 'error',
+              error: 'Streaming failed'
+            };
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify(errorData)}\n\n`));
+            controller.close();
           }
-
-          // Stream the content character by character
-          const content = mayaResponse.content;
-          let currentIndex = 0;
-
-          const streamContent = () => {
-            if (currentIndex < content.length) {
-              // Send next chunk (word by word for better UX)
-              const words = (content || '').split(' ');
-              let wordIndex = 0;
-              let charIndex = 0;
-
-              // Find current word
-              for (let i = 0; i < words.length; i++) {
-                const wordEnd = charIndex + words[i].length + (i > 0 ? 1 : 0); // +1 for space
-                if (currentIndex < wordEnd) {
-                  wordIndex = i;
-                  break;
-                }
-                charIndex = wordEnd;
-              }
-
-              // Send current word
-              const currentWord = words[wordIndex];
-              const wordWithSpace = wordIndex > 0 ? ' ' + currentWord : currentWord;
-
-              const chunkData = {
-                type: 'content',
-                chunk: wordWithSpace.replace(/[\r\n]/g, ' '), // Remove line breaks that break JSON
-                isComplete: false
-              };
-
-              try {
-                controller.enqueue(encoder.encode(`data: ${JSON.stringify(chunkData)}\n\n`));
-              } catch (error) {
-                console.error('JSON stringify error:', error);
-                // Skip problematic chunks
-              }
-
-              currentIndex = charIndex + currentWord.length + (wordIndex > 0 ? 1 : 0);
-
-              // Continue streaming with delay
-              setTimeout(streamContent, Math.random() * 100 + 50); // 50-150ms delay
-            } else {
-              // Send completion signal with response content
-              const completeData = {
-                type: 'complete',
-                isComplete: true,
-                response: mayaResponse.content
-              };
-
-              controller.enqueue(encoder.encode(`data: ${JSON.stringify(completeData)}\n\n`));
-              controller.close();
-            }
-          };
-
-          // Start streaming after a brief delay
-          setTimeout(streamContent, 300);
         }
       });
 
@@ -250,10 +214,15 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('AI Chat API Error:', error);
 
-    // Simple error response
+    // Return a more helpful error response
     return NextResponse.json({
-      error: 'I apologize, but I\'m having trouble right now. Please try again in a moment.',
-      fallback: true
+      error: 'Maya is having trouble right now. Please try asking for something specific like "write a proposal" or "generate an executive summary".',
+      fallback: true,
+      suggestions: [
+        'Try asking: "Write a complete proposal"',
+        'Try asking: "Generate an executive summary"',
+        'Try asking: "Create a project timeline"'
+      ]
     }, { status: 500 });
   }
 }
