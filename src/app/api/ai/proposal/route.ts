@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { createMayaAgent } from '@/lib/ai/maya-agent';
+import { MayaAgent } from '@/lib/ai/maya-agent';
 
 export async function POST(request: NextRequest) {
   try {
@@ -41,7 +41,8 @@ export async function POST(request: NextRequest) {
 async function handleAIAssist(grantId: string, section: string, userId: string) {
   try {
     // Create Maya agent with context
-    const maya = await createMayaAgent(userId, grantId);
+    const maya = new MayaAgent();
+    await maya.initialize(userId, grantId);
 
     // Generate proposal section using Maya
     const mayaResponse = await maya.generateProposalSection(section);

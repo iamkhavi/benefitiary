@@ -32,21 +32,21 @@ export class IntentDetector {
         type: 'complaint',
         emotion,
         urgency: 'high',
-        section: this.detectRequestedSection(message),
+        section: this.detectRequestedSection(message) || 'complete_proposal',
         specifics: { hasComplaint: true }
       };
     }
     
-    // Check for proposal requests
-    if (this.isProposalRequest(message)) {
+    // Check for proposal requests (be more aggressive)
+    if (this.isProposalRequest(message) || this.isCompleteProposalRequest(message)) {
       return {
         type: 'proposal_request',
         emotion,
         urgency,
-        section: this.detectRequestedSection(message),
+        section: this.detectRequestedSection(message) || 'complete_proposal',
         specifics: {
           isRewrite: this.isRewriteRequest(message),
-          isComplete: this.isCompleteProposalRequest(message)
+          isComplete: this.isCompleteProposalRequest(message) || message.includes('proposal')
         }
       };
     }
@@ -141,7 +141,10 @@ export class IntentDetector {
     const complaintPhrases = [
       'nothing on the canvas', 'see nothing', 'nothing there', 'not seeing anything',
       'where is', 'missing', 'not working', 'not appearing', 'not showing',
-      'for sure i see nothing', 'turns out its all a lie', 'not there'
+      'for sure i see nothing', 'turns out its all a lie', 'not there',
+      'where are other sections', 'cannot see them', 'i cannot see',
+      'empty pages', 'pages empty', '10 empty', 'only 1 with content',
+      'start fresh', 'start a fresh', 'can we just start'
     ];
     
     return complaintPhrases.some(phrase => message.includes(phrase));
@@ -186,7 +189,9 @@ export class IntentDetector {
   private isCompleteProposalRequest(message: string): boolean {
     const completeWords = [
       'complete proposal', 'full proposal', 'entire proposal', 'whole proposal',
-      'complete document', 'full document', 'cover page', 'table of contents'
+      'complete document', 'full document', 'cover page', 'table of contents',
+      'rewrite the entire proposal', 'write the proposal', 'please write the proposal',
+      'kindly please write the proposal', 'the proposal'
     ];
     
     return completeWords.some(phrase => message.includes(phrase));
@@ -197,19 +202,28 @@ export class IntentDetector {
    */
   private detectRequestedSection(message: string): string | undefined {
     const sections = {
-      'executive': ['executive', 'summary'],
-      'project': ['project', 'description', 'methodology'],
+      'executive': ['executive summary', 'executive', 'summary'],
+      'project': ['project description', 'project', 'methodology'],
       'budget': ['budget', 'cost', 'financial'],
       'impact': ['impact', 'outcomes', 'results'],
       'timeline': ['timeline', 'schedule', 'milestones'],
       'team': ['team', 'staff', 'qualifications'],
-      'complete_proposal': ['complete', 'full', 'entire', 'whole', 'cover page']
+      'complete_proposal': [
+        'complete', 'full', 'entire', 'whole', 'cover page',
+        'rewrite the entire proposal', 'write the proposal', 
+        'the proposal', 'proposal'
+      ]
     };
     
     for (const [section, keywords] of Object.entries(sections)) {
       if (keywords.some(keyword => message.includes(keyword))) {
         return section;
       }
+    }
+    
+    // Default to complete proposal for general requests
+    if (message.includes('write') || message.includes('create') || message.includes('generate')) {
+      return 'complete_proposal';
     }
     
     return undefined;

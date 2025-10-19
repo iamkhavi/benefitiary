@@ -5,7 +5,69 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
-import { createMayaAgent } from '@/lib/ai/maya-agent-refactored';
+import { MayaAgent } from '@/lib/ai/maya-agent';
+import { prisma } from '@/lib/prisma';
+
+/**
+ * Save conversation to database
+ */
+async function saveConversation(
+  userId: string, 
+  grantId: string, 
+  sessionId: string | undefined, 
+  userMessage: string, 
+  mayaResponse: any
+): Promise<{ sessionId: string; messageId: string }> {
+  const session = await prisma.aIGrantSession.upsert({
+    where: {
+      userId_grantId: {
+        userId: userId,
+        grantId: grantId,
+      },
+    },
+    update: {
+      updatedAt: new Date(),
+    },
+    create: {
+      userId: userId,
+      grantId: grantId,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    },
+  });
+
+  const message = await prisma.aIMessage.create({
+    data: {
+      sessionId: session.id,
+      sender: 'USER',
+      messageType: 'TEXT',
+      content: userMessage,
+      metadata: {
+        timestamp: new Date().toISOString()
+      }
+    }
+  });
+
+  await prisma.aIMessage.create({
+    data: {
+      sessionId: session.id,
+      sender: 'AI',
+      messageType: 'TEXT',
+      content: mayaResponse.content,
+      metadata: {
+        model: 'gpt-4-agent',
+        confidence: mayaResponse.confidence,
+        reasoning: mayaResponse.reasoning,
+        suggestions: mayaResponse.suggestions
+      }
+    }
+  });
+
+  return {
+    sessionId: session.id,
+    messageId: message.id,
+  };
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -28,26 +90,23 @@ export async function POST(request: NextRequest) {
     }
 
     // Create Maya agent with context
-    const maya = await createMayaAgent(session.user.id, grantId, sessionId);
+    const maya = new MayaAgent();
+    await maya.initialize(session.user.id, grantId, sessionId);
 
     let mayaResponse;
     let userMessage = message;
 
     // Handle different types of requests
     if (action === 'analyze_file' && fileData) {
-      // File analysis request
-      mayaResponse = await maya.analyzeUploadedFile(
-        fileData.fileName,
-        fileData.content,
-        fileData.fileType
-      );
-      userMessage = `Uploaded file: ${fileData.fileName}`;
+      // File analysis request - let the agent handle it intelligently
+      userMessage = `I uploaded a file called "${fileData.fileName}". Please analyze it: ${fileData.content.substring(0, 1000)}...`;
+      mayaResponse = await maya.chat(userMessage);
     } else if (action === 'clarify' && topic) {
       // Clarifying questions request
-      mayaResponse = await maya.generateClarifyingQuestions(topic);
-      userMessage = `Asked for clarification about: ${topic}`;
+      userMessage = `Please provide clarifying questions about: ${topic}`;
+      mayaResponse = await maya.chat(userMessage);
     } else {
-      // Regular chat message
+      // Regular chat message - let the intelligent agent handle everything
       mayaResponse = await maya.chat(message);
     }
 
@@ -61,7 +120,13 @@ export async function POST(request: NextRequest) {
     console.log('========================');
 
     // Save conversation to database
-    const { sessionId: newSessionId, messageId } = await maya.saveConversation(userMessage, mayaResponse);
+    const { sessionId: newSessionId, messageId } = await saveConversation(
+      session.user.id, 
+      grantId, 
+      sessionId, 
+      userMessage, 
+      mayaResponse
+    );
 
     // Check if streaming is requested
     if (stream) {
