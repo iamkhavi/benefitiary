@@ -1,7 +1,14 @@
 /**
- * Simple AI System - Maya Grant Consultant
- * Clean, working implementation without over-engineering
+ * Maya AI System - Direct xAI Integration
+ * 
+ * The Maya system now uses direct API calls to /api/maya
+ * No complex orchestration needed - just clean xAI integration
+ * 
+ * Main components:
+ * - /api/maya - Direct xAI API with intelligent prompting
+ * - Canvas-aware Maya chat component
+ * - File upload and document analysis
  */
 
-// This will be implemented with the simple Maya agent
-export * from './maya-agent';
+// This file is kept for any legacy imports
+// The actual Maya system is now in /api/maya route

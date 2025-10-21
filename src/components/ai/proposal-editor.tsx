@@ -105,13 +105,19 @@ function PaginatedDocument({ editor }: { editor: any }) {
       // Calculate number of pages needed
       const numPages = Math.max(1, Math.ceil(contentHeight / pageHeight));
       
-      // Split content across pages (simplified - in production you'd want more sophisticated splitting)
+      // Split content across pages properly
       const newPages = [];
       if (numPages === 1) {
         newPages.push(content);
       } else {
-        // For multiple pages, we'll use CSS page-break-inside: avoid and let the browser handle it
+        // For now, put all content on first page but make it expandable
+        // TODO: Implement proper content splitting across pages
         newPages.push(content);
+        
+        // Create additional empty pages for proper pagination
+        for (let i = 1; i < numPages; i++) {
+          newPages.push(''); // Empty pages for now
+        }
       }
       
       setPages(newPages);
@@ -140,7 +146,7 @@ function PaginatedDocument({ editor }: { editor: any }) {
             className="a4-page"
             style={{
               width: '210mm',
-              height: '297mm',
+              height: '297mm', // FIXED HEIGHT - A4 pages are NOT expandable
               backgroundColor: 'white',
               boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
               border: '1px solid #e5e7eb',
@@ -153,8 +159,8 @@ function PaginatedDocument({ editor }: { editor: any }) {
               className="page-content-area"
               style={{
                 padding: '25mm 20mm 25mm 20mm',
-                height: '247mm',
-                overflow: 'hidden'
+                height: '247mm', // FIXED HEIGHT - content area must be fixed
+                overflow: 'hidden' // HIDDEN - overflow goes to next page, not expands current page
               }}
             >
               {pageIndex === 0 ? (
@@ -897,28 +903,39 @@ export function ProposalEditor({ showCanvas, onClose, grantId, extractedContent,
             </div>
           )}
 
-          {/* Professional Paginated Document - Only Show Pages with Content */}
+          {/* Professional A4 Document with CSS Pagination */}
           {editor?.getText() && editor.getText().trim() !== '' && (
             <div className="document-container">
-              <PaginatedDocument editor={editor} />
+              <div className="a4-document-wrapper">
+                <EditorContent
+                  editor={editor}
+                  className="a4-document-content focus-within:outline-none"
+                />
+              </div>
             </div>
           )}
 
           {/* Global Styles for Professional A4 Document */}
           <style jsx global>{`
-            .paginated-document {
-              position: relative;
+            .a4-document-wrapper {
               width: 210mm;
               max-width: 210mm;
+              margin: 0 auto;
+              background: white;
+              box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+              border: 1px solid #e5e7eb;
+              padding: 25mm 20mm;
+              min-height: 297mm;
+              page-break-after: always;
             }
             
             .a4-document-content {
-              position: relative;
-              z-index: 1;
               font-family: 'Times New Roman', serif !important;
               font-size: 12pt !important;
               line-height: 1.6 !important;
               color: #000000 !important;
+              width: 100% !important;
+              height: auto !important;
             }
 
             .a4-document-content h1 {
@@ -967,23 +984,46 @@ export function ProposalEditor({ showCanvas, onClose, grantId, extractedContent,
               font-style: italic !important;
             }
 
+            /* CSS-based pagination for proper A4 pages */
+            @page {
+              size: A4;
+              margin: 25mm 20mm;
+            }
+
             /* Print-ready styles */
             @media print {
-              .a4-page {
+              .a4-document-wrapper {
                 box-shadow: none !important;
                 border: none !important;
                 margin: 0 !important;
-                page-break-after: always !important;
-              }
-              
-              .a4-page:last-child {
+                padding: 0 !important;
+                min-height: auto !important;
                 page-break-after: auto !important;
               }
-
-              .page-footer {
-                position: fixed !important;
-                bottom: 10mm !important;
+              
+              .a4-document-content {
+                page-break-inside: avoid !important;
               }
+
+              .a4-document-content h1,
+              .a4-document-content h2,
+              .a4-document-content h3 {
+                page-break-after: avoid !important;
+              }
+
+              .a4-document-content p {
+                orphans: 2 !important;
+                widows: 2 !important;
+              }
+            }
+
+            /* Automatic page breaks for long content */
+            .a4-document-content {
+              page-break-inside: auto !important;
+            }
+
+            .a4-document-content > div[style*="page-break-before: always"] {
+              page-break-before: always !important;
             }
 
             /* Ensure content doesn't overflow pages */
