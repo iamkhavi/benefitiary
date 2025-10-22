@@ -82,16 +82,12 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Maya API Error:', error);
     
-    // Fallback to advisory response
+    // Return error response
     return NextResponse.json({
-      success: true,
+      success: false,
       intent: 'chat_advice',
-      content: "I'm here to help with your grant proposal. Could you tell me more about what you need assistance with?",
-      suggestions: [
-        'Ask about grant strategy',
-        'Request proposal content',
-        'Get writing guidance'
-      ]
+      content: "An error occurred, please try again.",
+      suggestions: []
     });
   }
 }
@@ -204,7 +200,7 @@ Be brutally honest about fit and gaps.`;
         'Authorization': `Bearer ${XAI_API_KEY}`,
       },
       body: JSON.stringify({
-        model: 'grok-beta',
+        model: 'grok-3',
         messages: [{ role: 'user', content: analysisPrompt }],
         temperature: 0.3,
         max_tokens: 1500,
@@ -266,7 +262,7 @@ Be specific and actionable. Focus on strategic implications for grant success.`;
         'Authorization': `Bearer ${XAI_API_KEY}`,
       },
       body: JSON.stringify({
-        model: 'grok-beta',
+        model: 'grok-3',
         messages: [{ role: 'user', content: analysisPrompt }],
         temperature: 0.2,
         max_tokens: 2000,
@@ -499,7 +495,7 @@ async function callGrok(systemPrompt: string, userMessage: string): Promise<Maya
       'Authorization': `Bearer ${XAI_API_KEY}`,
     },
     body: JSON.stringify({
-      model: 'grok-beta',
+      model: 'grok-3',
       messages: [
         {
           role: 'system',
@@ -599,7 +595,7 @@ async function saveConversation(
         messageType: 'TEXT',
         content: mayaResponse.content,
         metadata: {
-          model: 'grok-beta',
+          model: 'grok-3',
           intent: mayaResponse.intent,
           hasExtractedContent: !!mayaResponse.extractedContent,
           suggestions: mayaResponse.suggestions
@@ -617,7 +613,7 @@ async function saveConversation(
 export async function GET() {
   return NextResponse.json({
     status: 'Maya xAI wrapper ready',
-    model: 'grok-beta',
+    model: 'grok-3',
     features: ['direct_ai_communication', 'intent_detection', 'canvas_integration']
   });
 }
