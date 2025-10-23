@@ -71,9 +71,151 @@ interface AIWritingSession {
   progress: number;
 }
 
+// Professional Document Structure Components
+interface DocumentStructure {
+  coverPage: {
+    title: string;
+    organizationName: string;
+    grantTitle: string;
+    funderName: string;
+    submissionDate: string;
+  };
+  tableOfContents: Array<{
+    title: string;
+    page: number;
+    level: number;
+  }>;
+  sections: Array<{
+    id: string;
+    title: string;
+    content: string;
+    pageStart: number;
+  }>;
+}
+
+// Cover Page Component
+function CoverPage({ coverData }: { coverData: DocumentStructure['coverPage'] }) {
+  return (
+    <div className="a4-page cover-page" style={{
+      width: '210mm',
+      height: '297mm',
+      backgroundColor: 'white',
+      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+      border: '1px solid #e5e7eb',
+      position: 'relative',
+      pageBreakAfter: 'always',
+      marginBottom: '8mm'
+    }}>
+      <div style={{
+        padding: '40mm 30mm',
+        height: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'center',
+        textAlign: 'center',
+        fontFamily: 'Times New Roman, serif'
+      }}>
+        {/* Main Title */}
+        <h1 style={{
+          fontSize: '24pt',
+          fontWeight: 'bold',
+          marginBottom: '30mm',
+          lineHeight: '1.2',
+          color: '#1f2937'
+        }}>
+          {coverData.title}
+        </h1>
+
+        {/* Grant Information */}
+        <div style={{ fontSize: '14pt', lineHeight: '1.8', marginBottom: '40mm' }}>
+          <p style={{ marginBottom: '10mm' }}>
+            <strong>Grant Opportunity:</strong><br />
+            {coverData.grantTitle}
+          </p>
+          <p style={{ marginBottom: '10mm' }}>
+            <strong>Funding Organization:</strong><br />
+            {coverData.funderName}
+          </p>
+          <p style={{ marginBottom: '10mm' }}>
+            <strong>Submitted by:</strong><br />
+            {coverData.organizationName}
+          </p>
+        </div>
+
+        {/* Submission Date */}
+        <div style={{
+          position: 'absolute',
+          bottom: '30mm',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          fontSize: '12pt'
+        }}>
+          <p>Submission Date: {coverData.submissionDate}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Table of Contents Component
+function TableOfContents({ tocData }: { tocData: DocumentStructure['tableOfContents'] }) {
+  return (
+    <div className="a4-page toc-page" style={{
+      width: '210mm',
+      height: '297mm',
+      backgroundColor: 'white',
+      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+      border: '1px solid #e5e7eb',
+      position: 'relative',
+      pageBreakAfter: 'always',
+      marginBottom: '8mm'
+    }}>
+      <div style={{
+        padding: '25mm 20mm',
+        fontFamily: 'Times New Roman, serif'
+      }}>
+        <h2 style={{
+          fontSize: '18pt',
+          fontWeight: 'bold',
+          marginBottom: '20mm',
+          textAlign: 'center'
+        }}>
+          Table of Contents
+        </h2>
+
+        <div style={{ fontSize: '12pt', lineHeight: '1.6' }}>
+          {tocData.map((item, index) => (
+            <div key={index} style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              marginBottom: '5mm',
+              paddingLeft: `${item.level * 10}mm`
+            }}>
+              <span>{item.title}</span>
+              <span style={{ 
+                borderBottom: '1px dotted #666',
+                flexGrow: 1,
+                marginLeft: '5mm',
+                marginRight: '5mm'
+              }}></span>
+              <span>{item.page}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // Professional Paginated Document Component
-function PaginatedDocument({ editor }: { editor: any }) {
-  const [pages, setPages] = useState<string[]>([]);
+function PaginatedDocument({ 
+  editor, 
+  documentStructure 
+}: { 
+  editor: any;
+  documentStructure?: DocumentStructure;
+}) {
+  const [pages, setPages] = useState<Array<{ type: 'cover' | 'toc' | 'content'; content: string; pageNumber: number }>>([]);
   const contentRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -81,121 +223,132 @@ function PaginatedDocument({ editor }: { editor: any }) {
 
     const updatePagination = () => {
       const content = editor.getHTML();
-      if (!content || content.trim() === '') {
-        setPages([]);
-        return;
+      const newPages: Array<{ type: 'cover' | 'toc' | 'content'; content: string; pageNumber: number }> = [];
+      
+      // If we have document structure, add cover and TOC
+      if (documentStructure) {
+        newPages.push({ type: 'cover', content: '', pageNumber: 1 });
+        newPages.push({ type: 'toc', content: '', pageNumber: 2 });
       }
 
-      // Create a temporary container to measure content
-      const tempContainer = document.createElement('div');
-      tempContainer.style.position = 'absolute';
-      tempContainer.style.visibility = 'hidden';
-      tempContainer.style.width = '170mm'; // A4 width minus margins (210mm - 40mm)
-      tempContainer.style.fontFamily = 'Times New Roman, serif';
-      tempContainer.style.fontSize = '12pt';
-      tempContainer.style.lineHeight = '1.6';
-      tempContainer.innerHTML = content;
-      document.body.appendChild(tempContainer);
-
-      const contentHeight = tempContainer.scrollHeight;
-      const pageHeight = 247 * 3.779527559; // 247mm in pixels (A4 height minus margins)
-      
-      document.body.removeChild(tempContainer);
-
-      // Calculate number of pages needed
-      const numPages = Math.max(1, Math.ceil(contentHeight / pageHeight));
-      
-      // Split content across pages properly
-      const newPages = [];
-      if (numPages === 1) {
-        newPages.push(content);
-      } else {
-        // For now, put all content on first page but make it expandable
-        // TODO: Implement proper content splitting across pages
-        newPages.push(content);
-        
-        // Create additional empty pages for proper pagination
-        for (let i = 1; i < numPages; i++) {
-          newPages.push(''); // Empty pages for now
-        }
+      if (content && content.trim() !== '') {
+        // Split content into pages based on A4 dimensions
+        const contentPages = splitContentIntoPages(content);
+        contentPages.forEach((pageContent, index) => {
+          newPages.push({
+            type: 'content',
+            content: pageContent,
+            pageNumber: newPages.length + 1
+          });
+        });
       }
       
       setPages(newPages);
     };
 
-    // Update pagination when content changes
     const updateHandler = () => {
       setTimeout(updatePagination, 100);
     };
 
     editor.on('update', updateHandler);
-    updatePagination(); // Initial pagination
+    updatePagination();
 
     return () => {
       editor.off('update', updateHandler);
     };
-  }, [editor]);
+  }, [editor, documentStructure]);
+
+  // Split content into A4-sized pages
+  const splitContentIntoPages = (htmlContent: string): string[] => {
+    if (!htmlContent || htmlContent.trim() === '') return [];
+    
+    // For now, return single page - TODO: implement proper content splitting
+    return [htmlContent];
+  };
 
   if (pages.length === 0) return null;
 
   return (
     <div className="paginated-document">
-      {pages.map((pageContent, pageIndex) => (
-        <div key={pageIndex} className="a4-page-wrapper" style={{ marginBottom: '8mm' }}>
-          <div
-            className="a4-page"
-            style={{
-              width: '210mm',
-              height: '297mm', // FIXED HEIGHT - A4 pages are NOT expandable
-              backgroundColor: 'white',
-              boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-              border: '1px solid #e5e7eb',
-              position: 'relative',
-              pageBreakAfter: 'always'
-            }}
-          >
-            {/* Content Area */}
-            <div
-              className="page-content-area"
-              style={{
-                padding: '25mm 20mm 25mm 20mm',
-                height: '247mm', // FIXED HEIGHT - content area must be fixed
-                overflow: 'hidden' // HIDDEN - overflow goes to next page, not expands current page
-              }}
-            >
-              {pageIndex === 0 ? (
-                // First page gets the live editor
-                <EditorContent
-                  editor={editor}
-                  className="a4-document-content focus-within:outline-none"
-                />
-              ) : (
-                // Subsequent pages show static content (for overflow)
-                <div 
-                  className="a4-document-content"
-                  dangerouslySetInnerHTML={{ __html: pageContent }}
-                />
-              )}
-            </div>
+      {pages.map((page, pageIndex) => {
+        if (page.type === 'cover' && documentStructure) {
+          return (
+            <CoverPage 
+              key={`cover-${pageIndex}`}
+              coverData={documentStructure.coverPage}
+            />
+          );
+        }
+        
+        if (page.type === 'toc' && documentStructure) {
+          return (
+            <TableOfContents 
+              key={`toc-${pageIndex}`}
+              tocData={documentStructure.tableOfContents}
+            />
+          );
+        }
 
-            {/* Page Footer with Number */}
+        return (
+          <div key={pageIndex} className="a4-page-wrapper" style={{ marginBottom: '8mm' }}>
             <div
-              className="page-footer"
+              className="a4-page"
               style={{
-                position: 'absolute',
-                bottom: '10mm',
-                left: '50%',
-                transform: 'translateX(-50%)',
-                fontSize: '10pt',
-                color: '#6b7280',
-                fontFamily: 'Times New Roman, serif'
+                width: '210mm',
+                height: '297mm',
+                backgroundColor: 'white',
+                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                border: '1px solid #e5e7eb',
+                position: 'relative',
+                pageBreakAfter: 'always'
               }}
             >
-              <span>Page {pageIndex + 1}</span>
+              {/* Content Area */}
+              <div
+                className="page-content-area"
+                style={{
+                  padding: '25mm 20mm 25mm 20mm',
+                  height: '247mm',
+                  overflow: 'hidden',
+                  fontFamily: 'Times New Roman, serif',
+                  fontSize: '12pt',
+                  lineHeight: '1.6'
+                }}
+              >
+                {page.type === 'content' && pageIndex === (documentStructure ? 2 : 0) ? (
+                  // First content page gets the live editor
+                  <EditorContent
+                    editor={editor}
+                    className="a4-document-content focus-within:outline-none"
+                  />
+                ) : (
+                  // Other pages show static content
+                  <div 
+                    className="a4-document-content"
+                    dangerouslySetInnerHTML={{ __html: page.content }}
+                  />
+                )}
+              </div>
+
+              {/* Page Footer with Number */}
+              <div
+                className="page-footer"
+                style={{
+                  position: 'absolute',
+                  bottom: '10mm',
+                  left: '50%',
+                  transform: 'translateX(-50%)',
+                  fontSize: '10pt',
+                  color: '#6b7280',
+                  fontFamily: 'Times New Roman, serif'
+                }}
+              >
+                <span>Page {page.pageNumber}</span>
+              </div>
             </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
     </div>
   );
 }
@@ -241,11 +394,32 @@ export function ProposalEditor({ showCanvas, onClose, grantId, extractedContent,
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [wordCount, setWordCount] = useState(0);
   const [pageCount, setPageCount] = useState(1);
+  const [documentStructure, setDocumentStructure] = useState<DocumentStructure | undefined>(undefined);
+  const [grantData, setGrantData] = useState<any>(null);
   const editorContainerRef = useRef<HTMLDivElement>(null);
   const [collaborators] = useState([
     { id: 'ai', name: 'AI Assistant', color: '#8B5CF6', isActive: true },
     { id: 'user', name: 'You', color: '#3B82F6', isActive: true }
   ]);
+
+  // Load grant data for document structure
+  useEffect(() => {
+    if (!grantId) return;
+
+    const loadGrantData = async () => {
+      try {
+        const response = await fetch(`/api/grants/${grantId}`);
+        if (response.ok) {
+          const data = await response.json();
+          setGrantData(data.grant);
+        }
+      } catch (error) {
+        console.error('Failed to load grant data:', error);
+      }
+    };
+
+    loadGrantData();
+  }, [grantId]);
 
   const editor = useEditor({
     extensions: [
@@ -405,6 +579,51 @@ export function ProposalEditor({ showCanvas, onClose, grantId, extractedContent,
     return () => clearTimeout(timer);
   }, [editor, updateWordCount]);
 
+  // Create document structure for complete proposals
+  const createDocumentStructure = (content: string): DocumentStructure => {
+    const organizationName = 'Your Organization'; // TODO: Get from user context
+    const grantTitle = grantData?.title || 'Grant Opportunity';
+    const funderName = grantData?.funder?.name || 'Funding Organization';
+    
+    // Extract sections from content for TOC
+    const sections = extractSectionsFromContent(content);
+    
+    return {
+      coverPage: {
+        title: `Grant Proposal: ${grantTitle}`,
+        organizationName,
+        grantTitle,
+        funderName,
+        submissionDate: new Date().toLocaleDateString()
+      },
+      tableOfContents: sections.map((section, index) => ({
+        title: section.title,
+        page: index + 3, // Cover=1, TOC=2, Content starts at 3
+        level: section.level
+      })),
+      sections: sections.map((section, index) => ({
+        id: section.id,
+        title: section.title,
+        content: section.content,
+        pageStart: index + 3
+      }))
+    };
+  };
+
+  // Extract sections from HTML content for TOC generation
+  const extractSectionsFromContent = (htmlContent: string) => {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(htmlContent, 'text/html');
+    const headings = doc.querySelectorAll('h1, h2, h3, h4, h5, h6');
+    
+    return Array.from(headings).map((heading, index) => ({
+      id: `section-${index}`,
+      title: heading.textContent || `Section ${index + 1}`,
+      level: parseInt(heading.tagName.charAt(1)),
+      content: '' // Content extraction would be more complex
+    }));
+  };
+
   // Handle extracted content from Maya
   useEffect(() => {
     if (!editor || !extractedContent) return;
@@ -433,14 +652,20 @@ export function ProposalEditor({ showCanvas, onClose, grantId, extractedContent,
 
       // Handle different editing intents
       if (editingIntent?.intent === 'rewrite') {
-        if (editingIntent.target === 'document' || !editingIntent.target) {
-          // Rewrite entire document
+        if (editingIntent.target === 'document' || !editingIntent.target || sectionName === 'complete_proposal') {
+          // Complete document rewrite - create full document structure
           editor.chain()
             .focus()
             .selectAll()
             .deleteSelection()
             .insertContent(content)
             .run();
+          
+          // Create document structure for complete proposals
+          if (sectionName === 'complete_proposal' || title.toLowerCase().includes('complete') || title.toLowerCase().includes('proposal')) {
+            const structure = createDocumentStructure(content);
+            setDocumentStructure(structure);
+          }
         } else {
           // Rewrite specific section
           let sectionFound = false;
@@ -873,8 +1098,14 @@ export function ProposalEditor({ showCanvas, onClose, grantId, extractedContent,
             </div>
           )}
 
+          {/* Professional Document Pages */}
+          <PaginatedDocument 
+            editor={editor} 
+            documentStructure={documentStructure}
+          />
+
           {/* Empty State - No Pages Shown */}
-          {(!editor?.getText() || editor.getText().trim() === '') && (
+          {(!editor?.getText() || editor.getText().trim() === '') && !documentStructure && (
             <div className="empty-canvas-state flex items-center justify-center" style={{ minHeight: '400px' }}>
               <div className="text-center max-w-md">
                 <div className="mb-6">
@@ -882,24 +1113,34 @@ export function ProposalEditor({ showCanvas, onClose, grantId, extractedContent,
                     <FileText className="w-8 h-8 text-gray-400" />
                   </div>
                   <h3 className="text-lg font-medium text-gray-900 mb-2">
-                    Ready to Create Your Document
+                    Ready to Create Your Professional Proposal
                   </h3>
                   <p className="text-gray-500 text-sm leading-relaxed">
-                    Ask Maya to generate content and professional pages will appear here. Each page will be properly formatted for submission.
+                    Ask Maya to "draft a complete proposal" and a professional document with cover page, table of contents, and structured sections will appear here.
                   </p>
                 </div>
 
                 <div className="space-y-2">
-                  <div className="text-xs text-gray-400 uppercase tracking-wide font-medium">
-                    Try asking Maya:
+                  <div className="text-xs text-gray-400 uppercase tracking-wide font-medium mb-2">
+                    Try saying:
                   </div>
                   <div className="space-y-1 text-sm text-gray-600">
-                    <div>"Write a complete proposal"</div>
-                    <div>"Generate an executive summary"</div>
-                    <div>"Create a project timeline"</div>
+                    <div>"Draft a complete grant proposal"</div>
+                    <div>"Create a full proposal document"</div>
+                    <div>"Generate the entire proposal"</div>
                   </div>
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* Document Structure Indicator */}
+          {documentStructure && (
+            <div className="fixed top-32 right-8 z-50">
+              <Badge className="bg-green-100 text-green-800 text-xs">
+                <FileText className="h-3 w-3 mr-1" />
+                Professional Structure
+              </Badge>
             </div>
           )}
 

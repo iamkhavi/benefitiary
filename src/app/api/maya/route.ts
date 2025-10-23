@@ -71,11 +71,12 @@ export async function POST(request: NextRequest) {
     const mayaResponse = await callGrok(systemPrompt, userMessage);
 
     // Save conversation to database
-    await saveConversation(session.user.id, grantId, userMessage, mayaResponse, sessionId);
+    const savedSessionId = await saveConversation(session.user.id, grantId, userMessage, mayaResponse, sessionId);
 
     // Return response
     return NextResponse.json({
       success: true,
+      sessionId: savedSessionId,
       ...mayaResponse
     });
 
@@ -390,6 +391,63 @@ ${historyStr}
 
 ${canvasStr}
 
+**Section-Specific Formatting Guidelines:**
+Each proposal section has optimal presentation formats. Apply these intelligently based on content:
+
+**Budget Section:** ALWAYS use tabular format with:
+- Clear categories (Personnel, Equipment, Travel, etc.)
+- Amount columns with proper currency formatting
+- Percentage breakdowns
+- Detailed justification column
+- Subtotals and grand total
+- Cost-per-unit calculations where applicable
+
+**Timeline Section:** Use tables or structured lists with:
+- Phase/milestone columns
+- Duration/dates
+- Key activities and deliverables
+- Dependencies and critical path indicators
+
+**Goals & Objectives:** Use SMART format:
+- Specific, Measurable, Achievable, Relevant, Time-bound
+- Numbered lists with clear metrics
+- Outcome vs. output distinction
+
+**Team/Organizational Capacity:** Use structured format:
+- Role-based organization
+- Qualifications and experience bullets
+- Time allocation percentages
+- Organizational chart when relevant
+
+**Evaluation Plan:** Use metrics tables:
+- Quantitative vs. qualitative measures
+- Baseline, target, and measurement methods
+- Data collection timeline
+
+**Methodology:** Use process flows:
+- Step-by-step approaches
+- Logic models when appropriate
+- Visual representation of processes
+
+**Complete Proposal Detection:**
+When users request complete proposals using phrases like:
+- "draft a complete proposal" / "create a full proposal" / "generate the entire proposal"
+- "write me a proposal" / "help me draft a proposal" / "create a proposal document"
+- "I need a complete grant proposal" / "generate a full application"
+
+You MUST create a comprehensive, professionally structured proposal with:
+1. Cover page elements
+2. Executive Summary
+3. Project Description/Statement of Need
+4. Goals and Objectives (SMART format)
+5. Methodology/Approach (process-oriented)
+6. Timeline (tabular with phases)
+7. Budget and Budget Justification (detailed tables)
+8. Organizational Capacity/Team (structured roles)
+9. Evaluation Plan (metrics tables)
+10. Sustainability Plan
+11. Conclusion
+
 **Intent Classification:**
 Classify each message as one of:
 - 'chat_advice': User seeking advice, strategy, tips, or has questions
@@ -411,6 +469,26 @@ Respond with JSON only:
   },
   "suggestions": ["suggestion1", "suggestion2", "suggestion3"]
 }
+
+**Section-Specific Examples:**
+
+**Budget Section Example:**
+Input: "Create a budget section" / "Help with the budget" / "Budget breakdown needed"
+Output: Always use detailed tables with:
+- Category breakdown (Personnel, Equipment, Travel, etc.)
+- Amount and percentage columns
+- Detailed justification for each line item
+- Subtotals and grand total
+- Cost-effectiveness metrics
+- Professional table styling with borders and headers
+
+**Timeline Section Example:**
+Input: "Create a timeline" / "Project schedule needed"
+Output: Use structured tables with phases, durations, activities, and deliverables
+
+**Goals Section Example:**
+Input: "Write project goals" / "Create objectives"
+Output: Use SMART format (Specific, Measurable, Achievable, Relevant, Time-bound) with numbered lists
 
 **Few-Shot Examples:**
 
@@ -434,17 +512,17 @@ Output: {
   "suggestions": ["Provide partnership details", "Share past project outcomes", "Clarify organizational capacity"]
 }
 
-Input: "Write me a complete proposal"
+Input: "Draft a complete proposal" / "Create a full proposal" / "Generate the entire proposal"
 Output: {
   "intent": "canvas_write",
-  "content": "I've created your complete grant proposal with all essential sections. It's now live on your document canvas, professionally formatted and ready for customization.",
+  "content": "I've created a comprehensive grant proposal with professional structure including cover page, table of contents, and all essential sections. The document is now ready on your canvas with proper formatting for ${fullContext.funderName}.",
   "extractedContent": {
     "section": "complete_proposal",
-    "title": "Complete Grant Proposal",
-    "content": "<div class=\\"cover-page\\"><h1>Grant Proposal</h1><p>Submitted to: [Funder]</p></div><div class=\\"page-break\\"></div><h2>Executive Summary</h2><p>This proposal outlines...</p><h2>Project Description</h2><p>Our approach involves...</p>",
+    "title": "Grant Proposal: ${fullContext.grantTitle}",
+    "content": "<h1>Executive Summary</h1><p>This proposal requests ${fullContext.fundingAmountMax} from ${fullContext.funderName} to support [project name] over ${fullContext.grantDurationMonths} months. Our ${fullContext.orgType} organization, ${fullContext.orgName}, is uniquely positioned to address [key challenge] through innovative approaches that align with your focus on ${fullContext.funderFocusAreas}.</p><div class=\\"page-break\\"></div><h1>Statement of Need</h1><p>The challenge we address is critical in ${fullContext.orgCountry} and directly aligns with ${fullContext.funderName}'s mission. Current gaps in ${fullContext.grantCategory} create significant barriers that our project will systematically address.</p><div class=\\"page-break\\"></div><h1>Project Description</h1><p>Our comprehensive approach combines evidence-based strategies with innovative methodologies to achieve measurable impact. The project will be implemented over ${fullContext.grantDurationMonths} months with clear phases and deliverables.</p><h2>Goals and Objectives</h2><ul><li>Primary Goal: [Specific, measurable outcome aligned with funder priorities]</li><li>Objective 1: [Specific deliverable with timeline]</li><li>Objective 2: [Measurable outcome with metrics]</li></ul><div class=\\"page-break\\"></div><h1>Methodology and Approach</h1><p>Our methodology employs best practices in ${fullContext.grantCategory} with proven strategies that ensure sustainable impact. We will utilize a multi-phase approach designed to maximize effectiveness and align with ${fullContext.funderName}'s strategic priorities.</p><div class=\\"page-break\\"></div><h1>Timeline</h1><table><tr><th>Phase</th><th>Duration</th><th>Key Activities</th><th>Deliverables</th></tr><tr><td>Phase 1: Planning</td><td>Months 1-2</td><td>Project setup, team assembly</td><td>Project plan, baseline assessment</td></tr><tr><td>Phase 2: Implementation</td><td>Months 3-${Math.max(6, fullContext.grantDurationMonths - 2)}</td><td>Core project activities</td><td>Progress reports, interim outcomes</td></tr><tr><td>Phase 3: Evaluation</td><td>Final 2 months</td><td>Assessment, reporting</td><td>Final report, sustainability plan</td></tr></table><div class=\\"page-break\\"></div><h1>Budget and Budget Justification</h1><p>Total Project Budget: ${fullContext.fundingAmountMax}</p><table><tr><th>Category</th><th>Amount</th><th>Percentage</th><th>Justification</th></tr><tr><td>Personnel</td><td>${Math.round(parseFloat(fullContext.fundingAmountMax?.replace(/[^0-9]/g, '') || '100000') * 0.6).toLocaleString()}</td><td>60%</td><td>Experienced project team with proven expertise</td></tr><tr><td>Direct Costs</td><td>${Math.round(parseFloat(fullContext.fundingAmountMax?.replace(/[^0-9]/g, '') || '100000') * 0.25).toLocaleString()}</td><td>25%</td><td>Equipment, materials, and operational expenses</td></tr><tr><td>Evaluation</td><td>${Math.round(parseFloat(fullContext.fundingAmountMax?.replace(/[^0-9]/g, '') || '100000') * 0.1).toLocaleString()}</td><td>10%</td><td>Independent evaluation and assessment</td></tr><tr><td>Administrative</td><td>${Math.round(parseFloat(fullContext.fundingAmountMax?.replace(/[^0-9]/g, '') || '100000') * 0.05).toLocaleString()}</td><td>5%</td><td>Project management and oversight</td></tr></table><div class=\\"page-break\\"></div><h1>Organizational Capacity</h1><p>${fullContext.orgName} brings extensive experience in ${fullContext.orgIndustries} with a proven track record of successful project implementation. Our ${fullContext.orgSize} organization has the infrastructure and expertise necessary to deliver exceptional results.</p><h2>Key Personnel</h2><ul><li>Project Director: [Name and qualifications]</li><li>Lead Researcher: [Relevant expertise]</li><li>Community Coordinator: [Local knowledge and connections]</li></ul><div class=\\"page-break\\"></div><h1>Evaluation Plan</h1><p>Our comprehensive evaluation framework includes both formative and summative assessment strategies to ensure project effectiveness and continuous improvement. We will track key performance indicators aligned with ${fullContext.funderName}'s priorities.</p><h2>Key Metrics</h2><ul><li>Quantitative: [Specific numbers and targets]</li><li>Qualitative: [Stakeholder feedback and case studies]</li><li>Impact: [Long-term outcomes and sustainability measures]</li></ul><div class=\\"page-break\\"></div><h1>Sustainability Plan</h1><p>Beyond the ${fullContext.grantDurationMonths}-month funding period, we have developed a comprehensive sustainability strategy to ensure lasting impact. This includes diversified funding sources, community ownership, and institutional partnerships.</p><div class=\\"page-break\\"></div><h1>Conclusion</h1><p>This proposal represents a strategic investment in ${fullContext.grantCategory} that aligns perfectly with ${fullContext.funderName}'s mission and priorities. ${fullContext.orgName} is uniquely positioned to deliver exceptional results and create lasting positive change. We respectfully request ${fullContext.fundingAmountMax} to implement this transformative initiative.</p>",
     "editingIntent": { "intent": "rewrite" }
   },
-  "suggestions": ["Customize with your details", "Review each section", "Add supporting documents"]
+  "suggestions": ["Customize organizational details", "Add specific project metrics", "Include supporting documents", "Review budget allocations"]
 }
 
 **Document Analysis Examples:**
@@ -556,21 +634,27 @@ async function saveConversation(
   userMessage: string,
   mayaResponse: MayaResponse,
   sessionId?: string
-): Promise<void> {
+): Promise<string> {
   try {
-    // Create or update session
+    // Find or create session for this user-grant combination
     const session = await prisma.aIGrantSession.upsert({
       where: {
-        id: sessionId || 'new-session'
+        userId_grantId: {
+          userId: userId,
+          grantId: grantId
+        }
       },
       update: {
         updatedAt: new Date(),
+        lastMessageAt: new Date(),
       },
       create: {
         userId: userId,
         grantId: grantId,
+        title: `Grant Discussion - ${new Date().toLocaleDateString()}`,
         createdAt: new Date(),
         updatedAt: new Date(),
+        lastMessageAt: new Date(),
       },
     });
 
@@ -603,9 +687,12 @@ async function saveConversation(
       }
     });
 
+    return session.id;
+
   } catch (error) {
     console.error('Failed to save conversation:', error);
-    // Don't throw - conversation saving shouldn't break the main flow
+    // Return a fallback session ID
+    return sessionId || 'error-session';
   }
 }
 
