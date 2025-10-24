@@ -32,18 +32,11 @@ export function CanvasAwareMayaChat({ grantId, userContext, editor, className }:
     return editor.getHTML(); // Get current HTML from Tiptap
   };
 
-  // Handle canvas updates
+  // Handle canvas updates - this should trigger the proposal editor's extractedContent handling
   const handleCanvasUpdate = (content: any) => {
-    if (!editor) return;
-    
-    if (content.editingIntent?.intent === 'rewrite') {
-      // Replace all content
-      editor.commands.setContent(content.content);
-    } else if (content.editingIntent?.intent === 'append') {
-      // Append to existing content
-      const currentContent = editor.getHTML();
-      editor.commands.setContent(currentContent + content.content);
-    }
+    // Don't handle canvas updates here - let the proposal editor handle them
+    // The proposal editor already has proper extractedContent handling
+    console.log('Canvas update triggered:', content);
   };
 
   const { messages, isLoading, sendMessage } = useMayaWithCanvas({
