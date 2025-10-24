@@ -995,7 +995,7 @@ async function callGrok(systemPrompt: string, userMessage: string, isCanvasActio
           ],
           temperature,
           max_tokens: maxTokens,
-          stream: true // Always stream for better UX - streaming is not the performance bottleneck
+          stream: true // Enable streaming for better UX
         }),
       });
 
@@ -1008,28 +1008,23 @@ async function callGrok(systemPrompt: string, userMessage: string, isCanvasActio
         throw new Error(`xAI API failed: ${response.status} - ${errorText}`);
       }
 
-      // Handle streaming response with proper chunk boundary management
+      // Handle streaming response - collect all content then parse as complete JSON
       const reader = response.body?.getReader();
       if (!reader) {
         throw new Error('No response body reader available');
       }
 
       const decoder = new TextDecoder();
-      let content = '';
+      let fullContent = '';
       let usage: any;
-      let buffer = ''; // Buffer for incomplete lines
 
       try {
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
 
-          // Add new chunk to buffer
-          buffer += decoder.decode(value, { stream: true });
-          
-          // Process complete lines
-          const lines = buffer.split('\n');
-          buffer = lines.pop() || ''; // Keep incomplete line in buffer
+          const chunk = decoder.decode(value, { stream: true });
+          const lines = chunk.split('\n');
 
           for (const line of lines) {
             if (line.startsWith('data: ')) {
@@ -1041,42 +1036,23 @@ async function callGrok(systemPrompt: string, userMessage: string, isCanvasActio
                 const parsed = JSON.parse(data);
                 const delta = parsed.choices?.[0]?.delta?.content;
                 if (delta) {
-                  content += delta;
+                  fullContent += delta;
                 }
                 if (parsed.usage) {
                   usage = parsed.usage;
                 }
               } catch (e) {
-                // Only log if it's not just a truncated chunk
-                if (data.length > 50) {
-                  console.log('Skipping invalid JSON chunk:', data.substring(0, 100));
-                }
+                // Skip invalid streaming chunks - we'll parse the final content
+                continue;
               }
-            }
-          }
-        }
-
-        // Process any remaining buffer
-        if (buffer.startsWith('data: ')) {
-          const data = buffer.slice(6).trim();
-          if (data && data !== '[DONE]') {
-            try {
-              const parsed = JSON.parse(data);
-              const delta = parsed.choices?.[0]?.delta?.content;
-              if (delta) {
-                content += delta;
-              }
-              if (parsed.usage) {
-                usage = parsed.usage;
-              }
-            } catch (e) {
-              console.log('Skipping final invalid JSON chunk:', data.substring(0, 100));
             }
           }
         }
       } finally {
         reader.releaseLock();
       }
+
+      const content = fullContent;
 
       if (!content) {
         console.error('No content in xAI response');
@@ -1086,43 +1062,65 @@ async function callGrok(systemPrompt: string, userMessage: string, isCanvasActio
       // Log response metrics
       console.log(`Maya response: ${content.length} characters, ${usage?.total_tokens || 'unknown'} tokens`);
 
-      // Validate and repair JSON structure before returning
+      // Parse final content as JSON with robust error handling
       try {
-        // First, try to parse as-is
         let parsedResponse;
+        
         try {
+          // First attempt: parse as-is
           parsedResponse = JSON.parse(content);
         } catch (parseError) {
-          console.log('Initial JSON parse failed, attempting repair...');
+          console.log('Direct JSON parse failed, attempting smart extraction...');
           
-          // Try to repair common streaming JSON issues
-          let repairedContent = content;
+          // Smart extraction: find the JSON structure within the content
+          let jsonContent = content.trim();
           
-          // Fix common truncation issues
-          if (!repairedContent.endsWith('}')) {
-            // Find the last complete JSON structure
-            const lastBraceIndex = repairedContent.lastIndexOf('}');
-            if (lastBraceIndex > 0) {
-              repairedContent = repairedContent.substring(0, lastBraceIndex + 1);
+          // Find the start of JSON (first {)
+          const jsonStart = jsonContent.indexOf('{');
+          if (jsonStart === -1) {
+            throw new Error('No JSON structure found in response');
+          }
+          
+          // Find the end of JSON (last complete })
+          let braceCount = 0;
+          let jsonEnd = -1;
+          
+          for (let i = jsonStart; i < jsonContent.length; i++) {
+            if (jsonContent[i] === '{') braceCount++;
+            if (jsonContent[i] === '}') {
+              braceCount--;
+              if (braceCount === 0) {
+                jsonEnd = i;
+                break;
+              }
             }
           }
           
-          // Fix incomplete string values
-          repairedContent = repairedContent.replace(/"([^"]*?)$/g, '"$1"');
+          if (jsonEnd === -1) {
+            // If no complete JSON found, try to find the last valid closing brace
+            jsonEnd = jsonContent.lastIndexOf('}');
+          }
           
-          // Try parsing the repaired content
-          try {
-            parsedResponse = JSON.parse(repairedContent);
-            console.log('JSON repair successful');
-          } catch (repairError) {
-            console.error('JSON repair failed:', repairError);
-            throw new Error(`Invalid JSON structure: ${parseError instanceof Error ? parseError.message : String(parseError)}`);
+          if (jsonEnd > jsonStart) {
+            const extractedJson = jsonContent.substring(jsonStart, jsonEnd + 1);
+            try {
+              parsedResponse = JSON.parse(extractedJson);
+              console.log('Smart JSON extraction successful');
+            } catch (extractError) {
+              throw new Error(`JSON extraction failed: ${extractError instanceof Error ? extractError.message : String(extractError)}`);
+            }
+          } else {
+            throw new Error(`No valid JSON structure found: ${parseError instanceof Error ? parseError.message : String(parseError)}`);
           }
         }
 
         // Validate required fields
+        if (!parsedResponse || typeof parsedResponse !== 'object') {
+          throw new Error('Response is not a valid object');
+        }
+        
         if (!parsedResponse.intent || !parsedResponse.content) {
-          throw new Error('Response missing required fields');
+          throw new Error('Response missing required fields (intent or content)');
         }
 
         // Additional validation for canvas_write responses
