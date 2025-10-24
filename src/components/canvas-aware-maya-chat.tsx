@@ -5,7 +5,7 @@
 
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState } from 'react';
 import { useMayaWithCanvas } from '@/hooks/useMayaWithCanvas';
 import { MayaFileUpload } from './maya-file-upload';
 import { Button } from '@/components/ui/button';
@@ -79,7 +79,7 @@ export function CanvasAwareMayaChat({ grantId, userContext, editor, className }:
     setShowFileUpload(false);
   };
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
+  const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSend();
@@ -154,6 +154,29 @@ export function CanvasAwareMayaChat({ grantId, userContext, editor, className }:
           </div>
         )}
 
+        {/* Loading Indicator */}
+        {isLoading && (
+          <div className="flex justify-start">
+            <div className="flex items-start space-x-2 max-w-[80%]">
+              <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 bg-gradient-to-r from-purple-500 to-blue-500">
+                <Bot className="w-4 h-4 text-white" />
+              </div>
+              <Card className="p-3 bg-white border-gray-200">
+                <div className="flex items-center space-x-2">
+                  <div className="flex space-x-1">
+                    <div className="w-2 h-2 bg-purple-500 rounded-full animate-bounce"></div>
+                    <div className="w-2 h-2 bg-purple-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                    <div className="w-2 h-2 bg-purple-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                  </div>
+                  <span className="text-xs text-gray-600">
+                    {currentCanvasContent ? 'Analyzing canvas content and preparing response...' : 'Thinking and preparing response...'}
+                  </span>
+                </div>
+              </Card>
+            </div>
+          </div>
+        )}
+
         {messages.map((message, index) => (
           <div key={index} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
             <div className={`flex items-start space-x-2 max-w-[80%] ${message.role === 'user' ? 'flex-row-reverse space-x-reverse' : ''}`}>
@@ -176,12 +199,35 @@ export function CanvasAwareMayaChat({ grantId, userContext, editor, className }:
                   ? 'bg-blue-500 text-white' 
                   : 'bg-white border-gray-200'
               }`}>
-                <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                {message.role === 'assistant' ? (
+                  // Render Maya's formatted responses with markdown-like styling
+                  <div 
+                    className="text-sm prose prose-sm max-w-none"
+                    dangerouslySetInnerHTML={{ 
+                      __html: message.content
+                        .replace(/## (.*?)$/gm, '<h3 class="font-bold text-gray-900 mt-3 mb-2">$1</h3>')
+                        .replace(/### (.*?)$/gm, '<h4 class="font-semibold text-gray-800 mt-2 mb-1">$1</h4>')
+                        .replace(/\*\*(.*?)\*\*/g, '<strong class="font-semibold text-gray-900">$1</strong>')
+                        .replace(/- (.*?)$/gm, '<li class="ml-4 mb-1">• $1</li>')
+                        .replace(/(\d+)\. (.*?)$/gm, '<li class="ml-4 mb-1">$1. $2</li>')
+                        .replace(/✅/g, '<span class="text-green-600">✅</span>')
+                        .replace(/⚠️/g, '<span class="text-yellow-600">⚠️</span>')
+                        .replace(/🎯/g, '<span class="text-blue-600">🎯</span>')
+                        .replace(/🚀/g, '<span class="text-purple-600">🚀</span>')
+                        .replace(/❓/g, '<span class="text-orange-600">❓</span>')
+                        .replace(/📄/g, '<span class="text-indigo-600">📄</span>')
+                        .replace(/\n\n/g, '</p><p class="mb-2">')
+                        .replace(/^\s*$\n/gm, '')
+                    }}
+                  />
+                ) : (
+                  <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                )}
                 
                 {/* Canvas Update Indicator */}
                 {message.extractedContent && (
                   <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded text-xs text-green-700">
-                    ✅ {message.extractedContent.editingIntent?.intent === 'rewrite' ? 'Replaced' : 'Updated'} "{message.extractedContent.title}" on canvas
+                    ✅ Updated "{message.extractedContent.title}" on canvas
                   </div>
                 )}
 
@@ -246,7 +292,7 @@ export function CanvasAwareMayaChat({ grantId, userContext, editor, className }:
           <Input
             value={inputMessage}
             onChange={(e) => setInputMessage(e.target.value)}
-            onKeyPress={handleKeyPress}
+            onKeyDown={handleKeyDown}
             placeholder={pendingDocuments.length > 0
               ? "Ask Maya to analyze your uploaded documents..."
               : currentCanvasContent 

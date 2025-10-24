@@ -192,7 +192,7 @@ function TableOfContents({ tocData }: { tocData: DocumentStructure['tableOfConte
               paddingLeft: `${item.level * 10}mm`
             }}>
               <span>{item.title}</span>
-              <span style={{ 
+              <span style={{
                 borderBottom: '1px dotted #666',
                 flexGrow: 1,
                 marginLeft: '5mm',
@@ -208,10 +208,10 @@ function TableOfContents({ tocData }: { tocData: DocumentStructure['tableOfConte
 }
 
 // Professional Paginated Document Component
-function PaginatedDocument({ 
-  editor, 
-  documentStructure 
-}: { 
+function PaginatedDocument({
+  editor,
+  documentStructure
+}: {
   editor: any;
   documentStructure?: DocumentStructure;
 }) {
@@ -224,7 +224,7 @@ function PaginatedDocument({
     const updatePagination = () => {
       const content = editor.getHTML();
       const newPages: Array<{ type: 'cover' | 'toc' | 'content'; content: string; pageNumber: number }> = [];
-      
+
       // If we have document structure, add cover and TOC
       if (documentStructure) {
         newPages.push({ type: 'cover', content: '', pageNumber: 1 });
@@ -242,7 +242,7 @@ function PaginatedDocument({
           });
         });
       }
-      
+
       setPages(newPages);
     };
 
@@ -261,28 +261,41 @@ function PaginatedDocument({
   // Split content into A4-sized pages
   const splitContentIntoPages = (htmlContent: string): string[] => {
     if (!htmlContent || htmlContent.trim() === '') return [];
-    
-    // For now, return single page - TODO: implement proper content splitting
+
+    // Check for explicit page breaks first
+    if (htmlContent.includes('class="page-break"')) {
+      const pages = htmlContent.split(/<div class="page-break"[^>]*><\/div>/);
+      return pages.filter(page => page.trim() !== '');
+    }
+
+    // For content without explicit page breaks, return as single page
+    // The editor will handle overflow naturally
     return [htmlContent];
   };
 
-  if (pages.length === 0) return null;
+  // Filter out empty pages
+  const nonEmptyPages = pages.filter(page => {
+    if (page.type === 'cover' || page.type === 'toc') return true;
+    return page.content && page.content.trim() !== '' && page.content !== '<p></p>';
+  });
+
+  if (nonEmptyPages.length === 0) return null;
 
   return (
     <div className="paginated-document">
-      {pages.map((page, pageIndex) => {
+      {nonEmptyPages.map((page, pageIndex) => {
         if (page.type === 'cover' && documentStructure) {
           return (
-            <CoverPage 
+            <CoverPage
               key={`cover-${pageIndex}`}
               coverData={documentStructure.coverPage}
             />
           );
         }
-        
+
         if (page.type === 'toc' && documentStructure) {
           return (
-            <TableOfContents 
+            <TableOfContents
               key={`toc-${pageIndex}`}
               tocData={documentStructure.tableOfContents}
             />
@@ -315,16 +328,18 @@ function PaginatedDocument({
                   lineHeight: '1.6'
                 }}
               >
-                {page.type === 'content' && pageIndex === (documentStructure ? 2 : 0) ? (
-                  // First content page gets the live editor
+                {page.type === 'content' ? (
+                  // All content pages get the live editor for inline editing
                   <EditorContent
                     editor={editor}
                     className="a4-document-content focus-within:outline-none"
+                    style={{ height: '100%', overflow: 'hidden' }}
                   />
                 ) : (
-                  // Other pages show static content
-                  <div 
+                  // Static pages (cover, TOC) show static content
+                  <div
                     className="a4-document-content"
+                    style={{ height: '100%', overflow: 'hidden' }}
                     dangerouslySetInnerHTML={{ __html: page.content }}
                   />
                 )}
@@ -488,13 +503,17 @@ export function ProposalEditor({ showCanvas, onClose, grantId, extractedContent,
     },
   });
 
-  // Simple word count update - no complex pagination needed
+  // Update word count and page count
   const updateWordCount = useCallback(() => {
     if (!editor) return;
-    
+
     const text = editor.getText();
     const words = text.split(/\s+/).filter(word => word.length > 0).length;
     setWordCount(words);
+
+    // Estimate page count (roughly 250 words per page for A4)
+    const estimatedPages = Math.max(1, Math.ceil(words / 250));
+    setPageCount(estimatedPages);
   }, [editor]);
 
   // Simulate AI writing in real-time
@@ -584,10 +603,10 @@ export function ProposalEditor({ showCanvas, onClose, grantId, extractedContent,
     const organizationName = 'Your Organization'; // TODO: Get from user context
     const grantTitle = grantData?.title || 'Grant Opportunity';
     const funderName = grantData?.funder?.name || 'Funding Organization';
-    
+
     // Extract sections from content for TOC
     const sections = extractSectionsFromContent(content);
-    
+
     return {
       coverPage: {
         title: `Grant Proposal: ${grantTitle}`,
@@ -615,7 +634,7 @@ export function ProposalEditor({ showCanvas, onClose, grantId, extractedContent,
     const parser = new DOMParser();
     const doc = parser.parseFromString(htmlContent, 'text/html');
     const headings = doc.querySelectorAll('h1, h2, h3, h4, h5, h6');
-    
+
     return Array.from(headings).map((heading, index) => ({
       id: `section-${index}`,
       title: heading.textContent || `Section ${index + 1}`,
@@ -660,9 +679,9 @@ export function ProposalEditor({ showCanvas, onClose, grantId, extractedContent,
             .deleteSelection()
             .insertContent(content)
             .run();
-          
+
           // Create document structure for complete proposals
-          if (sectionName === 'complete_proposal' || title.toLowerCase().includes('complete') || title.toLowerCase().includes('proposal')) {
+          if (sectionName === 'complete_proposal') {
             const structure = createDocumentStructure(content);
             setDocumentStructure(structure);
           }
@@ -770,6 +789,8 @@ export function ProposalEditor({ showCanvas, onClose, grantId, extractedContent,
 
       // Trigger AI writing animation
       simulateAIWriting(sectionName, '');
+
+      // Content has been updated on canvas
 
       // Clear the extracted content
       if (onContentUpdate) {
@@ -883,6 +904,7 @@ export function ProposalEditor({ showCanvas, onClose, grantId, extractedContent,
 
   return (
     <div className="h-full flex flex-col bg-gray-50">
+
       {/* Toolbar */}
       <div className="px-6 py-3 border-b bg-white shadow-sm">
         <div className="flex items-center justify-between">
@@ -915,7 +937,7 @@ export function ProposalEditor({ showCanvas, onClose, grantId, extractedContent,
               {wordCount} words
             </Badge>
             <Badge variant="outline" className="text-xs">
-              Document
+              {pageCount} page{pageCount !== 1 ? 's' : ''}
             </Badge>
 
             {/* Last Saved */}
@@ -1056,12 +1078,7 @@ export function ProposalEditor({ showCanvas, onClose, grantId, extractedContent,
         {isAIWriting.isActive && (
           <div className="mt-3 p-2 bg-purple-50 border border-purple-200 rounded-lg">
             <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-2">
-                <Sparkles className="h-4 w-4 text-purple-600 animate-pulse" />
-                <span className="text-sm text-purple-700">
-                  AI is writing: {isAIWriting.currentSection}
-                </span>
-              </div>
+
               <div className="flex items-center space-x-2">
                 <div className="w-24 h-2 bg-purple-200 rounded-full overflow-hidden">
                   <div
@@ -1099,8 +1116,8 @@ export function ProposalEditor({ showCanvas, onClose, grantId, extractedContent,
           )}
 
           {/* Professional Document Pages */}
-          <PaginatedDocument 
-            editor={editor} 
+          <PaginatedDocument
+            editor={editor}
             documentStructure={documentStructure}
           />
 
