@@ -1008,57 +1008,48 @@ async function callGrok(systemPrompt: string, userMessage: string, isCanvasActio
         throw new Error(`xAI API failed: ${response.status} - ${errorText}`);
       }
 
-      let content: string;
+      // Always handle streaming response since we set stream: true
+      const reader = response.body?.getReader();
+      if (!reader) {
+        throw new Error('No response body reader available');
+      }
+
+      const decoder = new TextDecoder();
+      let content = '';
       let usage: any;
 
-      if (isCanvasAction && !isSimpleChat) {
-        // Handle streaming response for long content
-        const reader = response.body?.getReader();
-        if (!reader) {
-          throw new Error('No response body reader available');
-        }
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
 
-        const decoder = new TextDecoder();
-        let fullContent = '';
+          const chunk = decoder.decode(value);
+          const lines = chunk.split('\n');
 
-        try {
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
+          for (const line of lines) {
+            if (line.startsWith('data: ')) {
+              const data = line.slice(6).trim();
+              if (data === '[DONE]') continue;
+              if (!data) continue;
 
-            const chunk = decoder.decode(value);
-            const lines = chunk.split('\n');
-
-            for (const line of lines) {
-              if (line.startsWith('data: ')) {
-                const data = line.slice(6);
-                if (data === '[DONE]') continue;
-
-                try {
-                  const parsed = JSON.parse(data);
-                  const delta = parsed.choices?.[0]?.delta?.content;
-                  if (delta) {
-                    fullContent += delta;
-                  }
-                  if (parsed.usage) {
-                    usage = parsed.usage;
-                  }
-                } catch (e) {
-                  // Skip invalid JSON chunks
+              try {
+                const parsed = JSON.parse(data);
+                const delta = parsed.choices?.[0]?.delta?.content;
+                if (delta) {
+                  content += delta;
                 }
+                if (parsed.usage) {
+                  usage = parsed.usage;
+                }
+              } catch (e) {
+                // Skip invalid JSON chunks
+                console.log('Skipping invalid JSON chunk:', data.substring(0, 100));
               }
             }
           }
-        } finally {
-          reader.releaseLock();
         }
-
-        content = fullContent;
-      } else {
-        // Handle regular JSON response for simple chat
-        const data = await response.json();
-        content = data.choices[0]?.message?.content;
-        usage = data.usage;
+      } finally {
+        reader.releaseLock();
       }
 
       if (!content) {
