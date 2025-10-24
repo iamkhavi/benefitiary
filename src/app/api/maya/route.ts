@@ -1008,7 +1008,7 @@ async function callGrok(systemPrompt: string, userMessage: string, isCanvasActio
         throw new Error(`xAI API failed: ${response.status} - ${errorText}`);
       }
 
-      // Always handle streaming response since we set stream: true
+      // Handle streaming response with proper chunk boundary management
       const reader = response.body?.getReader();
       if (!reader) {
         throw new Error('No response body reader available');
@@ -1017,14 +1017,19 @@ async function callGrok(systemPrompt: string, userMessage: string, isCanvasActio
       const decoder = new TextDecoder();
       let content = '';
       let usage: any;
+      let buffer = ''; // Buffer for incomplete lines
 
       try {
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
 
-          const chunk = decoder.decode(value);
-          const lines = chunk.split('\n');
+          // Add new chunk to buffer
+          buffer += decoder.decode(value, { stream: true });
+          
+          // Process complete lines
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || ''; // Keep incomplete line in buffer
 
           for (const line of lines) {
             if (line.startsWith('data: ')) {
@@ -1042,9 +1047,30 @@ async function callGrok(systemPrompt: string, userMessage: string, isCanvasActio
                   usage = parsed.usage;
                 }
               } catch (e) {
-                // Skip invalid JSON chunks
-                console.log('Skipping invalid JSON chunk:', data.substring(0, 100));
+                // Only log if it's not just a truncated chunk
+                if (data.length > 50) {
+                  console.log('Skipping invalid JSON chunk:', data.substring(0, 100));
+                }
               }
+            }
+          }
+        }
+
+        // Process any remaining buffer
+        if (buffer.startsWith('data: ')) {
+          const data = buffer.slice(6).trim();
+          if (data && data !== '[DONE]') {
+            try {
+              const parsed = JSON.parse(data);
+              const delta = parsed.choices?.[0]?.delta?.content;
+              if (delta) {
+                content += delta;
+              }
+              if (parsed.usage) {
+                usage = parsed.usage;
+              }
+            } catch (e) {
+              console.log('Skipping final invalid JSON chunk:', data.substring(0, 100));
             }
           }
         }
@@ -1060,22 +1086,52 @@ async function callGrok(systemPrompt: string, userMessage: string, isCanvasActio
       // Log response metrics
       console.log(`Maya response: ${content.length} characters, ${usage?.total_tokens || 'unknown'} tokens`);
 
-      // Validate JSON structure before returning
+      // Validate and repair JSON structure before returning
       try {
-        const testParse = JSON.parse(content);
-        if (!testParse.intent || !testParse.content) {
+        // First, try to parse as-is
+        let parsedResponse;
+        try {
+          parsedResponse = JSON.parse(content);
+        } catch (parseError) {
+          console.log('Initial JSON parse failed, attempting repair...');
+          
+          // Try to repair common streaming JSON issues
+          let repairedContent = content;
+          
+          // Fix common truncation issues
+          if (!repairedContent.endsWith('}')) {
+            // Find the last complete JSON structure
+            const lastBraceIndex = repairedContent.lastIndexOf('}');
+            if (lastBraceIndex > 0) {
+              repairedContent = repairedContent.substring(0, lastBraceIndex + 1);
+            }
+          }
+          
+          // Fix incomplete string values
+          repairedContent = repairedContent.replace(/"([^"]*?)$/g, '"$1"');
+          
+          // Try parsing the repaired content
+          try {
+            parsedResponse = JSON.parse(repairedContent);
+            console.log('JSON repair successful');
+          } catch (repairError) {
+            console.error('JSON repair failed:', repairError);
+            throw new Error(`Invalid JSON structure: ${parseError instanceof Error ? parseError.message : String(parseError)}`);
+          }
+        }
+
+        // Validate required fields
+        if (!parsedResponse.intent || !parsedResponse.content) {
           throw new Error('Response missing required fields');
         }
 
         // Additional validation for canvas_write responses
-        if (testParse.intent === 'canvas_write' && (!testParse.extractedContent || !testParse.extractedContent.editingIntent)) {
+        if (parsedResponse.intent === 'canvas_write' && (!parsedResponse.extractedContent || !parsedResponse.extractedContent.editingIntent)) {
           throw new Error('Canvas write response missing extractedContent structure');
         }
 
         console.log('Response validation passed');
-
-        // Parse and return the validated response
-        return JSON.parse(content);
+        return parsedResponse;
 
       } catch (validationError) {
         console.error(`Response validation failed (attempt ${attempt}):`, validationError);
