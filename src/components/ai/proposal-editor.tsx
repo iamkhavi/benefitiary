@@ -1074,25 +1074,7 @@ export function ProposalEditor({ showCanvas, onClose, grantId, extractedContent,
           </Button>
         </div>
 
-        {/* AI Writing Indicator */}
-        {isAIWriting.isActive && (
-          <div className="mt-3 p-2 bg-purple-50 border border-purple-200 rounded-lg">
-            <div className="flex items-center justify-between">
 
-              <div className="flex items-center space-x-2">
-                <div className="w-24 h-2 bg-purple-200 rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-purple-600 transition-all duration-300"
-                    style={{ width: `${isAIWriting.progress}%` }}
-                  />
-                </div>
-                <span className="text-xs text-purple-600">
-                  {Math.round(isAIWriting.progress)}%
-                </span>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Editor Canvas - A4 Size with Pagination */}

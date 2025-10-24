@@ -35,7 +35,124 @@ interface MayaResponse {
   suggestions: string[];
 }
 
+// Cache for context data (5 minute TTL)
+const contextCache = new Map<string, { data: any; timestamp: number }>();
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+/**
+ * Load persistent conversation history for continuity
+ */
+async function loadConversationHistory(userId: string, grantId: string, sessionId?: string): Promise<Array<{ role: string; content: string }>> {
+  try {
+    // Find the session for this user-grant combination
+    const session = await prisma.aIGrantSession.findUnique({
+      where: {
+        userId_grantId: {
+          userId: userId,
+          grantId: grantId
+        }
+      },
+      include: {
+        messages: {
+          orderBy: { createdAt: 'desc' },
+          take: 20, // Last 20 messages for context
+          select: {
+            sender: true,
+            content: true,
+            createdAt: true
+          }
+        }
+      }
+    });
+
+    if (!session || !session.messages.length) {
+      return [];
+    }
+
+    // Convert to Maya's expected format
+    return session.messages
+      .reverse() // Oldest first
+      .map(msg => ({
+        role: msg.sender === 'USER' ? 'user' : 'assistant',
+        content: msg.content
+      }));
+
+  } catch (error) {
+    console.error('Failed to load conversation history:', error);
+    return [];
+  }
+}
+
+/**
+ * Build intelligent conversation context that helps Maya carry on naturally
+ */
+function buildConversationContext(history: Array<{ role: string; content: string }>, currentCanvasContent?: string): string {
+  if (history.length === 0) {
+    return currentCanvasContent 
+      ? `**Canvas:** ${Math.round(currentCanvasContent.length / 1000)}k chars of existing content\n**Conversation:** Starting fresh`
+      : `**Canvas:** Empty\n**Conversation:** Starting fresh`;
+  }
+
+  // Get recent meaningful exchanges (last 6 messages)
+  const recentHistory = history.slice(-6);
+  
+  // Identify conversation themes and progress
+  const themes = extractConversationThemes(recentHistory);
+  const canvasProgress = analyzeCanvasProgress(currentCanvasContent, recentHistory);
+  
+  // Build contextual summary for Maya
+  const recentExchange = recentHistory
+    .slice(-2) // Just the last exchange for immediate context
+    .map(msg => `${msg.role}: ${msg.content.substring(0, 150)}${msg.content.length > 150 ? '...' : ''}`)
+    .join('\n');
+
+  return `**Canvas:** ${canvasProgress}
+**Conversation Themes:** ${themes}
+**Recent Exchange:**
+${recentExchange}`;
+}
+
+/**
+ * Extract key themes from conversation history
+ */
+function extractConversationThemes(history: Array<{ role: string; content: string }>): string {
+  const content = history.map(h => h.content.toLowerCase()).join(' ');
+  
+  const themes = [];
+  if (content.includes('budget') || content.includes('cost') || content.includes('financial')) themes.push('budget');
+  if (content.includes('timeline') || content.includes('schedule') || content.includes('deadline')) themes.push('timeline');
+  if (content.includes('team') || content.includes('staff') || content.includes('personnel')) themes.push('team');
+  if (content.includes('fit') || content.includes('eligible') || content.includes('qualify')) themes.push('fit-analysis');
+  if (content.includes('proposal') || content.includes('application') || content.includes('complete')) themes.push('full-proposal');
+  if (content.includes('executive') || content.includes('summary')) themes.push('executive-summary');
+  
+  return themes.length > 0 ? themes.join(', ') : 'general discussion';
+}
+
+/**
+ * Analyze canvas progress and state
+ */
+function analyzeCanvasProgress(currentCanvasContent?: string, history?: Array<{ role: string; content: string }>): string {
+  if (!currentCanvasContent) return 'Empty - ready for new content';
+  
+  const size = Math.round(currentCanvasContent.length / 1000);
+  
+  // Check if Maya recently updated the canvas
+  const recentCanvasWork = history?.some(h => 
+    h.role === 'assistant' && 
+    (h.content.includes('created') || h.content.includes('updated') || h.content.includes('added'))
+  ) || false;
+  
+  if (recentCanvasWork) {
+    return `${size}k chars - just updated by Maya`;
+  } else {
+    return `${size}k chars - existing content to build on`;
+  }
+}
+
 export async function POST(request: NextRequest) {
+  const startTime = Date.now();
+
   try {
     // Authentication
     const session = await auth.api.getSession({
@@ -53,36 +170,64 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing userMessage or grantId' }, { status: 400 });
     }
 
-    // Load comprehensive context from database
-    const fullContext = await loadComprehensiveContext(session.user.id, grantId, userContext);
+    // Fast intent detection first
+    const isCanvasAction = detectCanvasIntent(userMessage, currentCanvasContent);
+    const isSimpleChat = isSimpleChatMessage(userMessage);
 
-    // Perform critical analysis of grant-org fit
-    const criticalAnalysis = await performCriticalAnalysis(fullContext);
-    
-    // Analyze uploaded documents if present
-    const documentAnalysis = uploadedDocuments && uploadedDocuments.length > 0 
-      ? await analyzeUploadedDocuments(uploadedDocuments, fullContext)
-      : null;
-    
-    // Build Maya system prompt with full context and analysis
-    const systemPrompt = buildMayaPrompt(fullContext, history, currentCanvasContent, uploadedDocuments, criticalAnalysis, documentAnalysis || undefined);
+    // Load context with caching
+    const fullContext = await loadContextWithCache(session.user.id, grantId, userContext);
 
-    // Call xAI Grok directly
-    const mayaResponse = await callGrok(systemPrompt, userMessage);
+    // Load persistent conversation history for continuity (prioritize over frontend history)
+    const persistentHistory = await loadConversationHistory(session.user.id, grantId, sessionId);
+    const conversationHistory = persistentHistory.length > 0 ? persistentHistory : (history || []);
 
-    // Save conversation to database
-    const savedSessionId = await saveConversation(session.user.id, grantId, userMessage, mayaResponse, sessionId);
+    // Skip expensive operations for simple chat
+    let criticalAnalysis = 'Analysis available on request';
+    let documentAnalysis = null;
+
+    if (!isSimpleChat) {
+      // Only do expensive analysis for complex requests
+      const hasDocuments = uploadedDocuments && uploadedDocuments.length > 0;
+      const needsAnalysis = userMessage.toLowerCase().includes('analyz') ||
+        userMessage.toLowerCase().includes('assess') ||
+        userMessage.toLowerCase().includes('fit') ||
+        hasDocuments;
+
+      if (needsAnalysis) {
+        criticalAnalysis = await performCriticalAnalysis(fullContext);
+      }
+
+      // Only analyze documents if they were uploaded
+      if (hasDocuments) {
+        documentAnalysis = await analyzeUploadedDocuments(uploadedDocuments, fullContext);
+      }
+    }
+
+    // Build optimized system prompt
+    const systemPrompt = isSimpleChat
+      ? buildLightweightPrompt(fullContext, conversationHistory, currentCanvasContent)
+      : buildMayaPrompt(fullContext, conversationHistory, currentCanvasContent, uploadedDocuments, criticalAnalysis, documentAnalysis || undefined);
+
+    // Call xAI Grok directly with optimized settings
+    const mayaResponse = await callGrok(systemPrompt, userMessage, isCanvasAction, isSimpleChat);
+
+    // Async save conversation (don't wait for it)
+    saveConversation(session.user.id, grantId, userMessage, mayaResponse, sessionId).catch(console.error);
+
+    const processingTime = Date.now() - startTime;
+    console.log(`Maya response completed in ${processingTime}ms`);
 
     // Return response
     return NextResponse.json({
       success: true,
-      sessionId: savedSessionId,
+      sessionId: sessionId || 'temp-session',
+      processingTime,
       ...mayaResponse
     });
 
   } catch (error) {
     console.error('CRITICAL Maya API Error:', error);
-    
+
     // Simple, clean error message
     return NextResponse.json({
       success: false,
@@ -94,22 +239,30 @@ export async function POST(request: NextRequest) {
 }
 
 /**
- * Load comprehensive context from database
+ * Load context with caching for performance
  */
-async function loadComprehensiveContext(userId: string, grantId: string, userOverrides?: any) {
+async function loadContextWithCache(userId: string, grantId: string, userOverrides?: any) {
+  const cacheKey = `${userId}-${grantId}`;
+  const cached = contextCache.get(cacheKey);
+
+  // Return cached data if still valid
+  if (cached && (Date.now() - cached.timestamp) < CACHE_TTL) {
+    return { ...cached.data, ...userOverrides };
+  }
+
   try {
     // Load user + organization + grant + funder details
     const [user, grant] = await Promise.all([
       prisma.user.findUnique({
         where: { id: userId },
-        include: { 
-          organization: true 
+        include: {
+          organization: true
         }
       }),
       prisma.grant.findUnique({
         where: { id: grantId },
-        include: { 
-          funder: true 
+        include: {
+          funder: true
         }
       })
     ]);
@@ -119,8 +272,8 @@ async function loadComprehensiveContext(userId: string, grantId: string, userOve
     }
 
     const org = user.organization;
-    
-    return {
+
+    const contextData = {
       // Organization Details
       orgName: org?.name || 'Organization',
       orgType: org?.orgType?.replace(/_/g, ' ') || 'Not specified',
@@ -128,7 +281,7 @@ async function loadComprehensiveContext(userId: string, grantId: string, userOve
       orgCountry: org?.country || 'Not specified',
       orgIndustries: org?.industries?.join(', ') || 'Not specified',
       orgWebsite: org?.website || 'Not specified',
-      
+
       // Grant Details
       grantTitle: grant.title || 'Grant Opportunity',
       grantDescription: grant.description || 'Not specified',
@@ -137,23 +290,28 @@ async function loadComprehensiveContext(userId: string, grantId: string, userOve
       grantProgramGoals: Array.isArray(grant.programGoals) ? grant.programGoals.join(', ') : (grant.programGoals as string) || 'Not specified',
       grantLocationEligibility: Array.isArray(grant.locationEligibility) ? grant.locationEligibility.join(', ') : (grant.locationEligibility as string) || 'Not specified',
       grantDurationMonths: grant.durationMonths || 'Not specified',
-      
+
       // Funder Details
       funderName: grant.funder?.name || 'Funding Organization',
       funderType: grant.funder?.type?.replace(/_/g, ' ') || 'Not specified',
       funderMission: grant.funder?.mission || 'Not specified',
       funderFocusAreas: Array.isArray(grant.funder?.focusAreas) ? grant.funder.focusAreas.join(', ') : (grant.funder?.focusAreas as string) || 'Not specified',
-      
+
       // Financial Details
       fundingAmountMin: grant.fundingAmountMin?.toLocaleString() || 'Not specified',
       fundingAmountMax: grant.fundingAmountMax?.toLocaleString() || 'Not specified',
-      
+
       // Timeline
       deadline: grant.deadline ? new Date(grant.deadline).toLocaleDateString() : 'Not specified',
-      
-      // Override with any user-provided context
-      ...userOverrides
     };
+
+    // Cache the result
+    contextCache.set(cacheKey, {
+      data: contextData,
+      timestamp: Date.now()
+    });
+
+    return { ...contextData, ...userOverrides };
   } catch (error) {
     console.error('Failed to load context:', error);
     return userOverrides || {};
@@ -161,11 +319,41 @@ async function loadComprehensiveContext(userId: string, grantId: string, userOve
 }
 
 /**
+ * Check if this is a simple chat message that doesn't need heavy processing
+ */
+function isSimpleChatMessage(userMessage: string): boolean {
+  const message = userMessage.toLowerCase();
+
+  // Simple question patterns
+  const simplePatterns = [
+    /^(hi|hello|hey|thanks|thank you)/,
+    /^(what|how|why|when|where|who|can you|could you|should i|would you)/,
+    /\?$/,
+    /^(tell me|explain|describe)/,
+    /^(i need help|help me|can you help)/
+  ];
+
+  // Complex action patterns that need full processing
+  const complexPatterns = [
+    /(write|create|generate|build|draft|make)/,
+    /(budget|timeline|proposal|section)/,
+    /(rewrite|modify|update|improve|enhance|expand|fix|change|edit)/,
+    /(analyze|assess|review|evaluate)/
+  ];
+
+  // If it matches simple patterns and doesn't match complex ones, it's simple
+  const isSimple = simplePatterns.some(pattern => pattern.test(message));
+  const isComplex = complexPatterns.some(pattern => pattern.test(message));
+
+  return isSimple && !isComplex;
+}
+
+/**
  * Perform critical analysis of grant-organization fit
  */
 async function performCriticalAnalysis(fullContext: any): Promise<string> {
   const XAI_API_KEY = process.env.XAI_API_KEY;
-  
+
   if (!XAI_API_KEY) {
     return 'Analysis unavailable - API key not configured';
   }
@@ -201,7 +389,7 @@ Be brutally honest about fit and gaps.`;
         'Authorization': `Bearer ${XAI_API_KEY}`,
       },
       body: JSON.stringify({
-        model: 'grok-3',
+        model: 'grok-4-fast-non-reasoning',
         messages: [{ role: 'user', content: analysisPrompt }],
         temperature: 0.3,
         max_tokens: 1500,
@@ -226,12 +414,12 @@ Be brutally honest about fit and gaps.`;
  */
 async function analyzeUploadedDocuments(documents: Array<any>, fullContext: any): Promise<string> {
   const XAI_API_KEY = process.env.XAI_API_KEY;
-  
+
   if (!XAI_API_KEY) {
     return 'Document analysis unavailable - API key not configured';
   }
 
-  const documentContent = documents.map(doc => 
+  const documentContent = documents.map(doc =>
     `DOCUMENT: ${doc.fileName} (${doc.type})\nCONTENT: ${doc.content}`
   ).join('\n\n');
 
@@ -263,7 +451,7 @@ Be specific and actionable. Focus on strategic implications for grant success.`;
         'Authorization': `Bearer ${XAI_API_KEY}`,
       },
       body: JSON.stringify({
-        model: 'grok-3',
+        model: 'grok-4-fast-non-reasoning',
         messages: [{ role: 'user', content: analysisPrompt }],
         temperature: 0.2,
         max_tokens: 2000,
@@ -284,11 +472,45 @@ Be specific and actionable. Focus on strategic implications for grant success.`;
 }
 
 /**
+ * Build lightweight prompt that trusts Grok-4's native capabilities
+ */
+function buildLightweightPrompt(
+  fullContext: any,
+  history: Array<{ role: string; content: string }>,
+  currentCanvasContent?: string
+): string {
+  const historyStr = history.length > 0
+    ? history.slice(-4).map(msg => `${msg.role}: ${msg.content}`).join('\n')
+    : 'No previous conversation';
+
+  const canvasStr = currentCanvasContent
+    ? `**Canvas:** ${Math.round(currentCanvasContent.length / 1000)}k chars - user has existing content`
+    : '**Canvas:** Empty - no existing content';
+
+  return `You are Maya, an enthusiastic grant consultant helping ${fullContext.orgName} win their ${fullContext.grantTitle} grant from ${fullContext.funderName}.
+
+**Context:** ${fullContext.orgName} (${fullContext.orgType}) • ${fullContext.grantTitle} • ${fullContext.fundingAmountMin}-${fullContext.fundingAmountMax} • Deadline: ${fullContext.deadline}
+
+**History:** ${historyStr}
+
+**${canvasStr}**
+
+Detect intent semantically and respond with JSON only:
+{
+  "intent": "chat_advice" | "canvas_write" | "hybrid",
+  "content": "Your enthusiastic response with proactive questions",
+  "suggestions": ["actionable next step 1", "actionable next step 2", "actionable next step 3"]
+}
+
+Intent guide: advice (questions/strategy), canvas_write (create/modify content), hybrid (both). Trust your semantic understanding.`;
+}
+
+/**
  * Build Maya's system prompt with comprehensive context and analysis
  */
 function buildMayaPrompt(
-  fullContext: any, 
-  history: Array<{ role: string; content: string }>, 
+  fullContext: any,
+  history: Array<{ role: string; content: string }>,
   currentCanvasContent?: string,
   uploadedDocuments?: Array<any>,
   criticalAnalysis?: string,
@@ -329,64 +551,61 @@ ${criticalAnalysis || 'Analysis pending...'}
 ${documentAnalysis || 'No documents uploaded'}
 
 **UPLOADED DOCUMENTS:**
-${uploadedDocuments && uploadedDocuments.length > 0 
-  ? uploadedDocuments.map(doc => `- ${doc.fileName} (${doc.type})`).join('\n')
-  : 'No documents uploaded'
-}
+${uploadedDocuments && uploadedDocuments.length > 0
+      ? uploadedDocuments.map(doc => `- ${doc.fileName} (${doc.type})`).join('\n')
+      : 'No documents uploaded'
+    }
 
 **STRATEGIC CONTEXT:**
 This ${fullContext.orgType} organization (${fullContext.orgName}) is applying for a ${fullContext.grantCategory} grant from ${fullContext.funderName}. Based on the critical analysis above, you must be proactive in identifying gaps and asking clarifying questions to strengthen their application.`;
 
-  const historyStr = history.length > 0 
+  const historyStr = history.length > 0
     ? history.slice(-6).map(msg => `${msg.role}: ${msg.content}`).join('\n')
     : 'No previous conversation';
 
-  const canvasStr = currentCanvasContent 
+  const canvasStr = currentCanvasContent
     ? `**Current Canvas Content:**
 ${currentCanvasContent}
 
 **Important:** The user has existing content on their canvas. When they ask to "improve" or "modify" sections, work with what they already have. When they ask to "rewrite" or "create new", you can replace content.`
     : '**Current Canvas Content:** Empty canvas - no existing content';
 
-  return `You are Maya, an enthusiastic and experienced grant consultant who LOVES helping organizations win funding! You're genuinely excited about every project and approach each task with energy and expertise. You break down complex work into manageable steps and guide users through the process.
+  return `You are Maya, the ultimate grant-winning sidekick—energetic, honest, and laser-focused on turning ${fullContext.orgName}'s dreams into funded reality.
 
-**Your Analytical Approach:**
-- Critically analyze grant-organization fit based on the analysis provided
-- Identify gaps, risks, and missing information proactively
-- Ask specific clarifying questions when you need more details
-- Challenge assumptions and provide honest assessments
-- Process uploaded documents (RFPs, guidelines, previous proposals) to extract key insights
-- Position organizations strategically based on their unique strengths
+**Context:** ${fullContext.orgName} (${fullContext.orgType}) applying for ${fullContext.grantTitle} from ${fullContext.funderName} • ${fullContext.fundingAmountMin}-${fullContext.fundingAmountMax} • Deadline: ${fullContext.deadline}
 
-**COMPREHENSIVE CONTEXT:**
-${contextStr}
+**Strategic Fit:** ${criticalAnalysis || 'Analysis available on request'}
 
-**Your Proactive Behavior:**
-- When you identify gaps in the analysis, ASK SPECIFIC QUESTIONS to gather missing information
-- When you see risks, PROACTIVELY address them with solutions
-- When documents are uploaded, ANALYZE them thoroughly and extract actionable insights
-- When positioning advice is needed, reference the critical analysis to provide strategic guidance
-- Always consider: "What additional information would strengthen this application?"
+**History:** ${historyStr}
 
-**Document Processing Instructions:**
-- When documents are uploaded WITHOUT specific context, automatically analyze them and identify their type and strategic value
-- Provide a comprehensive summary of what you understood from each document
-- Explain how each document can be used strategically for the grant application
-- Offer specific ways you can help leverage the document (positioning, gap analysis, content creation, etc.)
-- Ask the user how they want to use the document and what they'd like you to focus on
-- Be proactive in suggesting multiple ways the document can strengthen their application
+${canvasStr}
 
-**Critical Questions You Should Ask:**
-Based on the analysis, proactively ask about missing information like:
-- Specific project details and methodologies
-- Organizational capacity and track record
-- Partnership and collaboration plans
-- Sustainability and long-term impact strategies
-- Budget justifications and cost-effectiveness
-- Timeline feasibility and risk mitigation
-- Evaluation methods and success metrics
+**Canvas Working Rules:**
+- When canvas has content and user says "improve/fix/change" → modify existing content
+- When user asks to "create/write/draft" → generate new content  
+- When canvas is empty → always create new content
+- Always include extractedContent for canvas_write/hybrid intents
 
-**Conversation History:**
+**Intent Detection (Trust Your Semantic Understanding):**
+Scan semantically for the user's emotional/cognitive state:
+- Hesitant questions = chat_advice
+- "Fix/tweak" + canvas reference = canvas_write  
+- Mixed signals = hybrid + probe
+- Grant lifecycle: fit check (advice), section build (write), full draft (hybrid)
+
+**Response Format (JSON Only):**
+{
+  "intent": "chat_advice" | "canvas_write" | "hybrid",
+  "content": "Empathetic response describing exact actions you're taking",
+  "extractedContent": {
+    "section": "budget" | "timeline" | "complete_proposal" | etc,
+    "title": "Section Title",
+    "content": "HTML formatted content with proper structure",
+    "editingIntent": { "intent": "append" | "rewrite" | "modify" }
+  },
+  "suggestions": ["actionable probe 1", "actionable probe 2", "actionable probe 3"]
+}
+**CONVERSATION HISTORY:**
 ${historyStr}
 
 ${canvasStr}
@@ -458,18 +677,31 @@ You have the intelligence to detect when users want comprehensive proposal conte
 - Evaluation sections → Always use metrics tables with measurement methods
 
 **Intent Classification:**
-Classify each message as one of:
-- 'chat_advice': User seeking advice, strategy, tips, or has questions
-- 'canvas_write': User wants you to generate/write proposal content
+Intelligently classify each message based on context and meaning, not rigid phrase matching:
+- 'chat_advice': User seeking advice, strategy, tips, questions, or general conversation
+- 'canvas_write': User wants you to generate/write/modify proposal content (detected through context, not specific phrases)
 - 'hybrid': Both advice and content generation needed
 
+**Examples of intelligent intent detection:**
+- "What should I focus on?" → chat_advice (seeking guidance)
+- "Help me with the budget" → canvas_write (implies content creation)
+- "How do I make this stronger?" → could be chat_advice or canvas_write depending on context
+- "Tell me about grant writing" → chat_advice (general information)
+- "Fix the timeline section" → canvas_write (clear content modification request)
+
 **CRITICAL: Always include complete JSON structure. Never truncate.**
+
+**MANDATORY FOR COMPLETE PROPOSALS:**
+When generating complete proposals, you MUST include ALL sections with proper page breaks:
+- Cover page, Executive Summary, Statement of Need, Project Description, Timeline, Budget, Team, Evaluation, Sustainability, Conclusion
+- Use <div class="page-break"></div> between major sections
+- Generate substantial content for each section, not just placeholders
 
 **Output Format:**
 Respond with JSON only - ENSURE the JSON is complete and valid:
 {
   "intent": "chat_advice" | "canvas_write" | "hybrid",
-  "content": "Your chat response text - MUST be well-formatted with clear structure using markdown formatting for easy scanning",
+  "content": "Your chat response - MUST accurately describe what you actually did in canvas (if any) and provide clear next steps",
   "extractedContent": {
     "section": "executive_summary" | "project_description" | "budget" | "timeline" | "team" | "complete_proposal",
     "title": "Section Title", 
@@ -478,8 +710,10 @@ Respond with JSON only - ENSURE the JSON is complete and valid:
       "intent": "append" | "rewrite" | "modify"
     }
   },
-  "suggestions": ["suggestion1", "suggestion2", "suggestion3"]
+  "suggestions": ["specific next action 1", "specific next action 2", "specific next action 3"]
 }
+
+**CRITICAL: Your "content" field must accurately reflect what you put in "extractedContent". Never describe actions you didn't take.**
 
 **IMPORTANT:** 
 - For complete proposals, keep content comprehensive but ensure JSON remains valid
@@ -493,7 +727,12 @@ Respond with JSON only - ENSURE the JSON is complete and valid:
 4. **Rewrite Intent:** When user asks to "rewrite entire proposal" or similar, use "rewrite" intent and create complete document structure
 
 **Natural Language Understanding:**
-You understand natural language and detect intent intelligently. Users don't need specific phrases - use context and meaning to determine what they need.
+You have advanced natural language understanding. Use context, conversation history, and semantic meaning to determine intent:
+- Don't rely on specific keywords or phrases
+- Consider the user's current situation and what would be most helpful
+- Understand implied requests (e.g., "this budget needs work" implies canvas modification)
+- Recognize when users want to continue working vs. just discussing
+- Use Grok's intelligence to understand nuanced requests and provide appropriate responses
 
 **Maya's Working Style:**
 1. **Always acknowledge the user's request enthusiastically**
@@ -536,31 +775,24 @@ Output: {
   "suggestions": ["Let's write the proposal", "Tell me about your partnerships", "Share your past successes", "Help me understand your impact measurement"]
 }
 
-Input: "write a proposal" | "create a complete proposal" | "rewrite the entire proposal" | "I need a full proposal"
-Output: {
-  "intent": "canvas_write",
-  "content": "YES! I'm absolutely thrilled to help you create a winning proposal for ${fullContext.funderName}! 🎉\n\n## Here's my game plan:\n\n### 📋 I'm going to create these sections:\n1. **Executive Summary** - Your compelling overview\n2. **Statement of Need** - Why this work matters\n3. **Project Description** - Your brilliant approach\n4. **Timeline & Milestones** - Clear implementation plan\n5. **Budget & Justification** - Strategic resource allocation\n6. **Team & Capacity** - Your amazing qualifications\n7. **Evaluation Plan** - How you'll measure success\n8. **Sustainability** - Long-term impact vision\n\n### 🚀 Starting with a solid first draft!\n\nI'm creating a comprehensive foundation that covers all the essentials. Once you see it, we can dive deeper into any section you'd like to strengthen!\n\n**What I'm putting on your canvas right now:** A complete proposal structure with substantive content for each section. After you review it, just tell me which section you'd like to expand or enhance first! ✨",
-  "extractedContent": {
-    "section": "complete_proposal",
-    "title": "Grant Proposal: ${fullContext.grantTitle}",
-    "content": "<div style=\\"text-align: center; padding: 60px 40px; page-break-after: always;\\"><h1 style=\\"font-size: 28pt; margin-bottom: 40px; color: #1f2937;\\">Grant Proposal</h1><h2 style=\\"font-size: 20pt; margin-bottom: 60px; color: #374151;\\">${fullContext.grantTitle}</h2><div style=\\"font-size: 16pt; line-height: 2; margin-bottom: 80px;\\"><p><strong>Submitted to:</strong><br/>${fullContext.funderName}</p><p><strong>Submitted by:</strong><br/>${fullContext.orgName}</p><p><strong>Date:</strong><br/>${new Date().toLocaleDateString()}</p></div><div style=\\"position: absolute; bottom: 40px; left: 50%; transform: translateX(-50%);\\"><p style=\\"font-size: 14pt;\\">Funding Request: ${fullContext.fundingAmountMax}</p></div></div><div class=\\"page-break\\"></div><h1>Executive Summary</h1><p>This proposal requests ${fullContext.fundingAmountMax} from ${fullContext.funderName} to support [project name] over ${fullContext.grantDurationMonths} months. Our ${fullContext.orgType} organization, ${fullContext.orgName}, is uniquely positioned to address [key challenge] through innovative approaches that align with your focus on ${fullContext.funderFocusAreas}.</p><p><strong>Project Impact:</strong> This initiative will directly benefit [target population] through [specific interventions], resulting in measurable improvements in [key outcomes]. Our evidence-based approach ensures sustainable results that extend beyond the funding period.</p><p><strong>Organizational Readiness:</strong> With our established presence in ${fullContext.orgCountry} and expertise in ${fullContext.orgIndustries}, we have the infrastructure and partnerships necessary for immediate implementation and long-term success.</p><div class=\\"page-break\\"></div><h1>Statement of Need</h1><p>The challenge we address is critical in ${fullContext.orgCountry} and directly aligns with ${fullContext.funderName}'s mission. Current gaps in ${fullContext.grantCategory} create significant barriers that our project will systematically address.</p><h2>Problem Definition</h2><p>[Specific problem statement with data and evidence]</p><h2>Target Population</h2><p>[Detailed description of beneficiaries and their needs]</p><h2>Geographic Focus</h2><p>[Location-specific challenges and opportunities]</p><div class=\\"page-break\\"></div><h1>Project Description</h1><p>Our comprehensive approach combines evidence-based strategies with innovative methodologies to achieve measurable impact. The project will be implemented over ${fullContext.grantDurationMonths} months with clear phases and deliverables.</p><h2>Goals and Objectives</h2><ul><li><strong>Primary Goal:</strong> [Specific, measurable outcome aligned with funder priorities]</li><li><strong>Objective 1:</strong> [Specific deliverable with timeline and metrics]</li><li><strong>Objective 2:</strong> [Measurable outcome with success indicators]</li><li><strong>Objective 3:</strong> [Long-term impact goal with sustainability measures]</li></ul><h2>Innovation and Approach</h2><p>[Description of unique methodology and evidence base]</p><div class=\\"page-break\\"></div><h1>Methodology and Implementation</h1><p>Our methodology employs best practices in ${fullContext.grantCategory} with proven strategies that ensure sustainable impact. We will utilize a multi-phase approach designed to maximize effectiveness and align with ${fullContext.funderName}'s strategic priorities.</p><h2>Phase 1: Foundation Building</h2><p>[Detailed implementation strategy for initial phase]</p><h2>Phase 2: Core Implementation</h2><p>[Main project activities and interventions]</p><h2>Phase 3: Evaluation and Sustainability</h2><p>[Assessment and transition planning]</p><div class=\\"page-break\\"></div><h1>Timeline and Milestones</h1><table style=\\"width: 100%; border-collapse: collapse; margin: 20px 0;\\"><tr style=\\"background-color: #f3f4f6;\\"><th style=\\"border: 1px solid #d1d5db; padding: 12px; text-align: left;\\">Phase</th><th style=\\"border: 1px solid #d1d5db; padding: 12px; text-align: left;\\">Duration</th><th style=\\"border: 1px solid #d1d5db; padding: 12px; text-align: left;\\">Key Activities</th><th style=\\"border: 1px solid #d1d5db; padding: 12px; text-align: left;\\">Deliverables</th></tr><tr><td style=\\"border: 1px solid #d1d5db; padding: 12px;\\">Phase 1: Planning & Setup</td><td style=\\"border: 1px solid #d1d5db; padding: 12px;\\">Months 1-2</td><td style=\\"border: 1px solid #d1d5db; padding: 12px;\\">Project setup, team assembly, stakeholder engagement</td><td style=\\"border: 1px solid #d1d5db; padding: 12px;\\">Project plan, baseline assessment, partnership agreements</td></tr><tr><td style=\\"border: 1px solid #d1d5db; padding: 12px;\\">Phase 2: Implementation</td><td style=\\"border: 1px solid #d1d5db; padding: 12px;\\">Months 3-${Math.max(6, fullContext.grantDurationMonths - 2)}</td><td style=\\"border: 1px solid #d1d5db; padding: 12px;\\">Core project activities, intervention delivery</td><td style=\\"border: 1px solid #d1d5db; padding: 12px;\\">Progress reports, interim outcomes, stakeholder feedback</td></tr><tr><td style=\\"border: 1px solid #d1d5db; padding: 12px;\\">Phase 3: Evaluation & Transition</td><td style=\\"border: 1px solid #d1d5db; padding: 12px;\\">Final 2 months</td><td style=\\"border: 1px solid #d1d5db; padding: 12px;\\">Impact assessment, sustainability planning</td><td style=\\"border: 1px solid #d1d5db; padding: 12px;\\">Final report, sustainability plan, knowledge transfer</td></tr></table><div class=\\"page-break\\"></div><h1>Budget and Budget Justification</h1><p><strong>Total Project Budget: ${fullContext.fundingAmountMax}</strong></p><table style=\\"width: 100%; border-collapse: collapse; margin: 20px 0;\\"><tr style=\\"background-color: #f3f4f6;\\"><th style=\\"border: 1px solid #d1d5db; padding: 12px; text-align: left;\\">Category</th><th style=\\"border: 1px solid #d1d5db; padding: 12px; text-align: right;\\">Amount</th><th style=\\"border: 1px solid #d1d5db; padding: 12px; text-align: center;\\">Percentage</th><th style=\\"border: 1px solid #d1d5db; padding: 12px; text-align: left;\\">Justification</th></tr><tr><td style=\\"border: 1px solid #d1d5db; padding: 12px;\\"><strong>Personnel</strong></td><td style=\\"border: 1px solid #d1d5db; padding: 12px; text-align: right;\\">$${Math.round(parseFloat(fullContext.fundingAmountMax?.replace(/[^0-9]/g, '') || '100000') * 0.6).toLocaleString()}</td><td style=\\"border: 1px solid #d1d5db; padding: 12px; text-align: center;\\">60%</td><td style=\\"border: 1px solid #d1d5db; padding: 12px;\\">Experienced project team with proven expertise in ${fullContext.grantCategory}</td></tr><tr><td style=\\"border: 1px solid #d1d5db; padding: 12px;\\"><strong>Direct Costs</strong></td><td style=\\"border: 1px solid #d1d5db; padding: 12px; text-align: right;\\">$${Math.round(parseFloat(fullContext.fundingAmountMax?.replace(/[^0-9]/g, '') || '100000') * 0.25).toLocaleString()}</td><td style=\\"border: 1px solid #d1d5db; padding: 12px; text-align: center;\\">25%</td><td style=\\"border: 1px solid #d1d5db; padding: 12px;\\">Equipment, materials, technology, and operational expenses</td></tr><tr><td style=\\"border: 1px solid #d1d5db; padding: 12px;\\"><strong>Evaluation</strong></td><td style=\\"border: 1px solid #d1d5db; padding: 12px; text-align: right;\\">$${Math.round(parseFloat(fullContext.fundingAmountMax?.replace(/[^0-9]/g, '') || '100000') * 0.1).toLocaleString()}</td><td style=\\"border: 1px solid #d1d5db; padding: 12px; text-align: center;\\">10%</td><td style=\\"border: 1px solid #d1d5db; padding: 12px;\\">Independent evaluation, data collection, and impact assessment</td></tr><tr><td style=\\"border: 1px solid #d1d5db; padding: 12px;\\"><strong>Administrative</strong></td><td style=\\"border: 1px solid #d1d5db; padding: 12px; text-align: right;\\">$${Math.round(parseFloat(fullContext.fundingAmountMax?.replace(/[^0-9]/g, '') || '100000') * 0.05).toLocaleString()}</td><td style=\\"border: 1px solid #d1d5db; padding: 12px; text-align: center;\\">5%</td><td style=\\"border: 1px solid #d1d5db; padding: 12px;\\">Project management, reporting, and oversight</td></tr><tr style=\\"background-color: #f9fafb; font-weight: bold;\\"><td style=\\"border: 1px solid #d1d5db; padding: 12px;\\"><strong>TOTAL</strong></td><td style=\\"border: 1px solid #d1d5db; padding: 12px; text-align: right;\\"><strong>${fullContext.fundingAmountMax}</strong></td><td style=\\"border: 1px solid #d1d5db; padding: 12px; text-align: center;\\"><strong>100%</strong></td><td style=\\"border: 1px solid #d1d5db; padding: 12px;\\">Strategic allocation aligned with ${fullContext.funderName} priorities</td></tr></table><div class=\\"page-break\\"></div><h1>Organizational Capacity and Team</h1><p>${fullContext.orgName} brings extensive experience in ${fullContext.orgIndustries} with a proven track record of successful project implementation. Our ${fullContext.orgSize} organization has the infrastructure and expertise necessary to deliver exceptional results.</p><h2>Organizational Strengths</h2><ul><li><strong>Experience:</strong> [Years of experience and relevant projects]</li><li><strong>Infrastructure:</strong> [Physical and technological capabilities]</li><li><strong>Partnerships:</strong> [Key collaborations and networks]</li><li><strong>Track Record:</strong> [Previous successes and outcomes]</li></ul><h2>Key Personnel</h2><ul><li><strong>Project Director:</strong> [Name and qualifications - overall leadership and strategic oversight]</li><li><strong>Lead Researcher:</strong> [Relevant expertise in methodology and evaluation]</li><li><strong>Community Coordinator:</strong> [Local knowledge and stakeholder relationships]</li><li><strong>Financial Manager:</strong> [Budget oversight and compliance expertise]</li></ul><div class=\\"page-break\\"></div><h1>Evaluation and Monitoring Plan</h1><p>Our comprehensive evaluation framework includes both formative and summative assessment strategies to ensure project effectiveness and continuous improvement. We will track key performance indicators aligned with ${fullContext.funderName}'s priorities.</p><h2>Evaluation Framework</h2><ul><li><strong>Logic Model:</strong> Clear theory of change linking activities to outcomes</li><li><strong>Mixed Methods:</strong> Quantitative metrics and qualitative insights</li><li><strong>Stakeholder Engagement:</strong> Participatory evaluation approaches</li><li><strong>Continuous Learning:</strong> Adaptive management based on findings</li></ul><h2>Key Performance Indicators</h2><ul><li><strong>Quantitative Metrics:</strong> [Specific numbers, percentages, and targets]</li><li><strong>Qualitative Measures:</strong> [Stakeholder feedback, case studies, and stories]</li><li><strong>Impact Indicators:</strong> [Long-term outcomes and systemic changes]</li></ul><div class=\\"page-break\\"></div><h1>Sustainability and Long-term Impact</h1><p>Beyond the ${fullContext.grantDurationMonths}-month funding period, we have developed a comprehensive sustainability strategy to ensure lasting impact. This includes diversified funding sources, community ownership, and institutional partnerships.</p><h2>Sustainability Strategy</h2><ul><li><strong>Financial Sustainability:</strong> [Diversified funding and revenue streams]</li><li><strong>Institutional Sustainability:</strong> [Organizational capacity and systems]</li><li><strong>Community Ownership:</strong> [Local engagement and leadership development]</li><li><strong>Knowledge Transfer:</strong> [Documentation and replication strategies]</li></ul><h2>Legacy and Replication</h2><p>[Plans for scaling and replicating successful interventions]</p><div class=\\"page-break\\"></div><h1>Conclusion</h1><p>This proposal represents a strategic investment in ${fullContext.grantCategory} that aligns perfectly with ${fullContext.funderName}'s mission and priorities. ${fullContext.orgName} is uniquely positioned to deliver exceptional results and create lasting positive change.</p><p><strong>Why Fund This Project:</strong></p><ul><li><strong>Strategic Alignment:</strong> Perfect fit with your ${fullContext.funderFocusAreas} focus areas</li><li><strong>Proven Capacity:</strong> Experienced team with track record of success</li><li><strong>Measurable Impact:</strong> Clear outcomes and evaluation framework</li><li><strong>Sustainability:</strong> Long-term vision beyond funding period</li><li><strong>Innovation:</strong> Evidence-based approaches with creative solutions</li></ul><p>We respectfully request ${fullContext.fundingAmountMax} to implement this transformative initiative and look forward to partnering with ${fullContext.funderName} to create meaningful, lasting change.</p>",
-    "editingIntent": { "intent": "rewrite" }
-  },
-  "suggestions": ["Expand the executive summary", "Strengthen the budget section", "Add more team details", "Enhance the evaluation plan"]
-}
+**CRITICAL INTEGRITY RULE: Maya must ONLY describe what she actually did in the canvas. Never claim something happened if you're not certain.**
 
-Input: "expand the budget section" | "improve the timeline" | "strengthen the executive summary"
-Output: {
-  "intent": "canvas_write",
-  "content": "Perfect! I'm excited to dive deeper into that section! 🎯\n\n## Here's what I'm enhancing:\n\n✨ **Adding more detail and strategic thinking**\n✨ **Including specific justifications and breakdowns**\n✨ **Aligning with ${fullContext.funderName}'s priorities**\n✨ **Making it more compelling and comprehensive**\n\nI'm working on this right now and will have the enhanced section ready for you in just a moment!\n\n**After this, I'd love to help you with:**\n- Expanding another section that catches your eye\n- Adding supporting data and evidence\n- Polishing the language and flow\n- Preparing for submission\n\nWhat would you like to tackle next? 🚀",
-  "extractedContent": {
-    "section": "budget",
-    "title": "Enhanced Budget Section",
-    "content": "[Detailed, expanded content for the specific section requested]",
-    "editingIntent": { "intent": "modify" }
-  },
-  "suggestions": ["Expand executive summary next", "Add team bios", "Strengthen evaluation metrics", "Review entire proposal"]
-}
+**CANVAS-CHAT SYNCHRONIZATION RULES:**
+1. **When you generate canvas content** - Your chat response MUST accurately describe what you actually created
+2. **When you modify canvas content** - Your chat response MUST accurately describe what you actually changed  
+3. **Never assume or guess** - Only describe what you know you did based on your extractedContent
+4. **Always provide next steps** - Based on what you actually accomplished, suggest specific next actions
+5. **For chat-only responses** - No canvas synchronization needed, just provide helpful advice and suggestions
+
+**RESPONSE PATTERNS:**
+- **Canvas actions**: "I just created/modified [specific description]. Here's what I included: [list]. Next steps: [suggestions]"
+- **Chat advice**: Provide helpful guidance, ask clarifying questions, suggest approaches without claiming canvas actions
+- **Hybrid**: Combine canvas action description with additional strategic advice
+
+**For Complete Proposals:**
+- Only claim "complete proposal" if you actually generate ALL sections with real content
+- If you generate partial content, be honest: "I created the first draft with [specific sections]"
+- Always suggest logical next steps based on what's actually missing
 
 **Document Analysis Examples:**
 
@@ -590,25 +822,159 @@ Output: {
 - Use HTML formatting for extractedContent with proper structure
 - Be honest about gaps and risks while remaining supportive
 
-Now respond to the user's message with appropriate intent classification, critical analysis, and proactive questioning.`;
+**CORRECT BEHAVIOR EXAMPLES:**
+
+✅ **GOOD - Honest about what was actually done:**
+"I just created a budget section for your proposal. Here's what I included: budget overview, cost categories table, and strategic alignment text. Next steps: review the percentages, add specific personnel costs, or create the timeline section."
+
+❌ **BAD - Claiming uncertain actions:**
+"I'll create a budget section..." (claiming future action)
+"I've generated a complete proposal..." (when only creating one section)
+"Your proposal now has..." (assuming what exists without knowing)
+
+**FINAL INTEGRITY CHECK:**
+Before responding, verify that if you claim to generate a "complete proposal" with multiple sections, you are actually generating ALL those sections with real content. Never lie about what you're creating. Users depend on your honesty.
+
+Your chat response must ONLY describe what you actually put in extractedContent. Be specific about what you created and suggest clear next steps.
+
+Respond with JSON only - trust your semantic understanding and build on our conversation naturally.`;
+
+  // Smart conversation context that builds continuity
+  const conversationContext = buildConversationContext(history, currentCanvasContent);
+  
+  // Condensed context for efficiency
+  const contextSummary = `${fullContext.orgName} (${fullContext.orgType}) → ${fullContext.grantTitle} from ${fullContext.funderName} • ${fullContext.fundingAmountMin}-${fullContext.fundingAmountMax} • Deadline: ${fullContext.deadline}`;
+  
+  const documentsInfo = uploadedDocuments?.length 
+    ? `**Documents:** ${uploadedDocuments?.map(d => d.fileName).join(', ')}`
+    : '';
+
+  return `You are Maya, the ultimate grant-winning sidekick for ${fullContext.orgName}—energetic, honest, and laser-focused on turning dreams into funded reality.
+
+**CONTEXT:** ${contextSummary}
+${documentsInfo}
+**FIT ANALYSIS:** ${criticalAnalysis || 'Available on request'}
+
+**CONVERSATION FLOW:**
+${conversationContext}
+
+**CANVAS INTELLIGENCE:**
+- Canvas empty → create new content
+- Canvas has content + "improve/fix/change" → modify existing  
+- Canvas has content + "create/write/draft" → add new sections
+- Always include extractedContent for canvas_write/hybrid
+
+**DOCUMENT PROCESSING INTELLIGENCE:**
+When documents are uploaded, you have access to comprehensive analysis including:
+- Document type identification (RFP, Guidelines, Previous Proposals, etc.)
+- Key insights and strategic value for the grant application
+- Specific opportunities and challenges revealed
+- Usage recommendations for leveraging each document
+
+**FILE INPUT EXPECTATIONS & ACTIONS:**
+- **RFP/Guidelines**: Extract requirements, scoring criteria, compliance needs → create targeted proposal sections
+- **Previous Proposals**: Identify successful patterns, language, structure → adapt and improve for current application
+- **Organizational Documents**: Extract capabilities, achievements, data → strengthen organizational capacity sections
+- **Research/Data**: Extract evidence, statistics, methodologies → support project justification and methodology
+- **Partnership Letters**: Extract commitments, resources, expertise → enhance collaboration and capacity sections
+
+**DOCUMENT-DRIVEN RESPONSES:**
+- Always acknowledge what documents were uploaded and what you understood from them
+- Reference specific insights from documents in your responses
+- Suggest how to strategically use document content in the proposal
+- Ask targeted questions based on gaps identified in the documents
+- Offer to create content that directly responds to document requirements
+
+**MAYA'S CONVERSATION STYLE:**
+- Build on previous exchanges naturally ("Building on the budget we just created...")
+- Reference what you've already discussed/created ("Looking at your timeline from earlier...")
+- Acknowledge user's progress and momentum ("Great! Now that we have the budget sorted...")
+- Ask 1-2 targeted follow-up questions to keep moving forward
+- Maintain enthusiasm while being strategic
+
+**SEMANTIC INTENT (Trust Your Understanding):**
+- Questions/strategy/advice → chat_advice
+- Create/modify content → canvas_write
+- Both advice + content → hybrid
+- When unsure → hybrid + probe
+
+Respond with JSON only:
+{
+  "intent": "chat_advice" | "canvas_write" | "hybrid",
+  "content": "Natural response building on our conversation and referencing previous work",
+  "extractedContent": {
+    "section": "budget|timeline|complete_proposal|etc",
+    "title": "Section Title", 
+    "content": "HTML content with proper structure",
+    "editingIntent": { "intent": "append|rewrite|modify" }
+  },
+  "suggestions": ["next step building on progress", "logical continuation", "strategic next move"]
+}`;
 }
 
 /**
- * Call xAI Grok API directly
+ * Detect if user message likely requires canvas action
  */
-async function callGrok(systemPrompt: string, userMessage: string): Promise<MayaResponse> {
+function detectCanvasIntent(userMessage: string, currentCanvasContent?: string): boolean {
+  const message = userMessage.toLowerCase();
+
+  // Canvas action indicators
+  const canvasKeywords = [
+    'write', 'create', 'generate', 'add', 'build', 'draft', 'make',
+    'budget', 'timeline', 'proposal', 'section', 'executive summary',
+    'project description', 'methodology', 'evaluation', 'team',
+    'rewrite', 'modify', 'update', 'improve', 'enhance', 'expand',
+    'fix', 'change', 'edit'
+  ];
+
+  // Chat-only indicators
+  const chatKeywords = [
+    'how', 'what', 'why', 'when', 'where', 'should i', 'can you explain',
+    'tell me about', 'advice', 'help me understand', 'question',
+    'think', 'opinion', 'suggest', 'recommend'
+  ];
+
+  // Check for canvas indicators
+  const hasCanvasKeywords = canvasKeywords.some(keyword => message.includes(keyword));
+
+  // Check for chat-only indicators
+  const hasChatKeywords = chatKeywords.some(keyword => message.includes(keyword));
+
+  // If user has existing canvas content and mentions improvement, likely canvas action
+  if (currentCanvasContent && (message.includes('improve') || message.includes('better') || message.includes('enhance'))) {
+    return true;
+  }
+
+  // If strong canvas indicators and no strong chat indicators, likely canvas action
+  if (hasCanvasKeywords && !hasChatKeywords) {
+    return true;
+  }
+
+  // Default to chat for ambiguous cases to be faster
+  return false;
+}
+
+/**
+ * Call xAI Grok API directly with optimizations
+ */
+async function callGrok(systemPrompt: string, userMessage: string, isCanvasAction: boolean = false, isSimpleChat: boolean = false): Promise<MayaResponse> {
   const XAI_API_KEY = process.env.XAI_API_KEY;
-  
+
   if (!XAI_API_KEY) {
     throw new Error('XAI_API_KEY not configured');
   }
 
+  // Optimize parameters based on request type
+  const maxTokens = isSimpleChat ? 800 : (isCanvasAction ? 6000 : 2000);
+  const temperature = isSimpleChat ? 0.3 : 0.7;
+  const maxRetries = isSimpleChat ? 1 : 2; // Fewer retries for simple chat
+
   // Retry logic for API reliability
   let lastError: Error = new Error('Unknown error');
-  for (let attempt = 1; attempt <= 3; attempt++) {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
-      console.log(`Grok API attempt ${attempt}/3`);
-      
+      const startTime = Date.now();
+
       const response = await fetch('https://api.x.ai/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -616,7 +982,7 @@ async function callGrok(systemPrompt: string, userMessage: string): Promise<Maya
           'Authorization': `Bearer ${XAI_API_KEY}`,
         },
         body: JSON.stringify({
-          model: 'grok-3',
+          model: 'grok-4-fast-non-reasoning',
           messages: [
             {
               role: 'system',
@@ -627,10 +993,14 @@ async function callGrok(systemPrompt: string, userMessage: string): Promise<Maya
               content: userMessage
             }
           ],
-          temperature: 0.7,
-          max_tokens: 32000,
+          temperature,
+          max_tokens: maxTokens,
+          stream: true // Always stream for better UX - streaming is not the performance bottleneck
         }),
       });
+
+      const apiTime = Date.now() - startTime;
+      console.log(`Grok API call completed in ${apiTime}ms (attempt ${attempt})`);
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -638,68 +1008,120 @@ async function callGrok(systemPrompt: string, userMessage: string): Promise<Maya
         throw new Error(`xAI API failed: ${response.status} - ${errorText}`);
       }
 
-      const data = await response.json();
-      const content = data.choices[0]?.message?.content;
+      let content: string;
+      let usage: any;
+
+      if (isCanvasAction && !isSimpleChat) {
+        // Handle streaming response for long content
+        const reader = response.body?.getReader();
+        if (!reader) {
+          throw new Error('No response body reader available');
+        }
+
+        const decoder = new TextDecoder();
+        let fullContent = '';
+
+        try {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            const chunk = decoder.decode(value);
+            const lines = chunk.split('\n');
+
+            for (const line of lines) {
+              if (line.startsWith('data: ')) {
+                const data = line.slice(6);
+                if (data === '[DONE]') continue;
+
+                try {
+                  const parsed = JSON.parse(data);
+                  const delta = parsed.choices?.[0]?.delta?.content;
+                  if (delta) {
+                    fullContent += delta;
+                  }
+                  if (parsed.usage) {
+                    usage = parsed.usage;
+                  }
+                } catch (e) {
+                  // Skip invalid JSON chunks
+                }
+              }
+            }
+          }
+        } finally {
+          reader.releaseLock();
+        }
+
+        content = fullContent;
+      } else {
+        // Handle regular JSON response for simple chat
+        const data = await response.json();
+        content = data.choices[0]?.message?.content;
+        usage = data.usage;
+      }
 
       if (!content) {
-        console.error('No content in xAI response:', data);
+        console.error('No content in xAI response');
         throw new Error('No content in xAI response');
       }
 
       // Log response metrics
-      console.log(`Maya response: ${content.length} characters, attempt ${attempt}`);
-      
+      console.log(`Maya response: ${content.length} characters, ${usage?.total_tokens || 'unknown'} tokens`);
+
       // Validate JSON structure before returning
       try {
         const testParse = JSON.parse(content);
         if (!testParse.intent || !testParse.content) {
           throw new Error('Response missing required fields');
         }
-        
+
         // Additional validation for canvas_write responses
         if (testParse.intent === 'canvas_write' && (!testParse.extractedContent || !testParse.extractedContent.editingIntent)) {
           throw new Error('Canvas write response missing extractedContent structure');
         }
-        
+
         console.log('Response validation passed');
-        
+
         // Parse and return the validated response
         return JSON.parse(content);
-        
+
       } catch (validationError) {
         console.error(`Response validation failed (attempt ${attempt}):`, validationError);
         lastError = new Error(`Invalid response structure: ${validationError instanceof Error ? validationError.message : String(validationError)}`);
-        
+
         // If this is the last attempt, don't retry
-        if (attempt === 3) {
+        if (attempt === maxRetries) {
           throw lastError;
         }
-        
-        // Wait before retry (exponential backoff)
-        await new Promise(resolve => setTimeout(resolve, attempt * 1000));
+
+        // Shorter wait for simple chat
+        const waitTime = isSimpleChat ? 500 : (attempt * 1000);
+        await new Promise(resolve => setTimeout(resolve, waitTime));
         continue;
       }
-      
+
     } catch (error) {
       console.error(`Grok API call failed (attempt ${attempt}):`, error);
       lastError = error instanceof Error ? error : new Error(String(error));
-      
+
       // If this is the last attempt, throw the error
-      if (attempt === 3) {
+      if (attempt === maxRetries) {
         throw lastError;
       }
-      
-      // Wait before retry (exponential backoff)
-      await new Promise(resolve => setTimeout(resolve, attempt * 1000));
+
+      // Shorter wait for simple chat
+      const waitTime = isSimpleChat ? 500 : (attempt * 1000);
+      await new Promise(resolve => setTimeout(resolve, waitTime));
     }
   }
-  
+
   // This should never be reached, but just in case
   throw lastError || new Error('All retry attempts failed');
 }
 
 /**
- * Save conversation to database
+ * Save conversation to database (async, non-blocking)
  */
 async function saveConversation(
   userId: string,
@@ -731,34 +1153,34 @@ async function saveConversation(
       },
     });
 
-    // Save user message
-    await prisma.aIMessage.create({
-      data: {
-        sessionId: session.id,
-        sender: 'USER',
-        messageType: 'TEXT',
-        content: userMessage,
-        metadata: {
-          timestamp: new Date().toISOString()
+    // Save both messages in parallel
+    await Promise.all([
+      prisma.aIMessage.create({
+        data: {
+          sessionId: session.id,
+          sender: 'USER',
+          messageType: 'TEXT',
+          content: userMessage,
+          metadata: {
+            timestamp: new Date().toISOString()
+          }
         }
-      }
-    });
-
-    // Save Maya response
-    await prisma.aIMessage.create({
-      data: {
-        sessionId: session.id,
-        sender: 'AI',
-        messageType: 'TEXT',
-        content: mayaResponse.content,
-        metadata: {
-          model: 'grok-3',
-          intent: mayaResponse.intent,
-          hasExtractedContent: !!mayaResponse.extractedContent,
-          suggestions: mayaResponse.suggestions
+      }),
+      prisma.aIMessage.create({
+        data: {
+          sessionId: session.id,
+          sender: 'AI',
+          messageType: 'TEXT',
+          content: mayaResponse.content,
+          metadata: {
+            model: 'grok-4-fast-non-reasoning',
+            intent: mayaResponse.intent,
+            hasExtractedContent: !!mayaResponse.extractedContent,
+            suggestions: mayaResponse.suggestions
+          }
         }
-      }
-    });
+      })
+    ]);
 
     return session.id;
 
@@ -769,11 +1191,36 @@ async function saveConversation(
   }
 }
 
-// Health check
+// Health check and performance monitoring
 export async function GET() {
+  const cacheStats = {
+    entries: contextCache.size,
+    oldestEntry: Math.min(...Array.from(contextCache.values()).map(v => v.timestamp)),
+    newestEntry: Math.max(...Array.from(contextCache.values()).map(v => v.timestamp))
+  };
+
   return NextResponse.json({
-    status: 'Maya xAI wrapper ready',
-    model: 'grok-3',
-    features: ['direct_ai_communication', 'intent_detection', 'canvas_integration']
+    status: 'Maya xAI wrapper ready - OPTIMIZED',
+    model: 'grok-4-fast-non-reasoning',
+    features: [
+      'direct_ai_communication',
+      'intent_detection',
+      'canvas_integration',
+      'context_caching',
+      'lightweight_chat_mode',
+      'async_database_saves',
+      'optimized_token_usage'
+    ],
+    performance: {
+      contextCache: cacheStats,
+      optimizations: [
+        'Context caching (5min TTL)',
+        'Simple chat detection',
+        'Lightweight prompts for basic questions',
+        'Reduced token limits for chat',
+        'Async database operations',
+        'Fewer API retries for simple requests'
+      ]
+    }
   });
 }
