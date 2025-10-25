@@ -32,11 +32,20 @@ export function CanvasAwareMayaChat({ grantId, userContext, editor, className }:
     return editor.getHTML(); // Get current HTML from Tiptap
   };
 
-  // Handle canvas updates - this should trigger the proposal editor's extractedContent handling
+  // Handle canvas updates - actually insert Maya's content into the editor
   const handleCanvasUpdate = (content: any) => {
-    // Don't handle canvas updates here - let the proposal editor handle them
-    // The proposal editor already has proper extractedContent handling
-    console.log('Canvas update triggered:', content);
+    if (!editor || !content || !content.content) {
+      console.log('Canvas update failed: missing editor or content', { editor: !!editor, content });
+      return;
+    }
+    
+    try {
+      // Insert Maya's generated content into the Tiptap editor
+      editor.commands.setContent(content.content);
+      console.log('Canvas updated successfully with Maya content');
+    } catch (error) {
+      console.error('Failed to update canvas:', error);
+    }
   };
 
   const { messages, isLoading, sendMessage } = useMayaWithCanvas({
@@ -172,7 +181,7 @@ export function CanvasAwareMayaChat({ grantId, userContext, editor, className }:
 
         {messages.map((message, index) => (
           <div key={index} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-            <div className={`flex items-start space-x-2 max-w-[80%] ${message.role === 'user' ? 'flex-row-reverse space-x-reverse' : ''}`}>
+            <div className={`flex items-start max-w-[80%] ${message.role === 'user' ? 'flex-row-reverse space-x-reverse space-x-2' : 'space-x-2'}`}>
               {/* Avatar */}
               <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
                 message.role === 'user' 
