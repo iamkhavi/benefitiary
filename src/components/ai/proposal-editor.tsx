@@ -11,7 +11,10 @@ import Underline from '@tiptap/extension-underline';
 import BulletList from '@tiptap/extension-bullet-list';
 import OrderedList from '@tiptap/extension-ordered-list';
 import ListItem from '@tiptap/extension-list-item';
-
+import { Table } from '@tiptap/extension-table';
+import { TableRow } from '@tiptap/extension-table-row';
+import { TableHeader } from '@tiptap/extension-table-header';
+import { TableCell } from '@tiptap/extension-table-cell';
 import TextAlign from '@tiptap/extension-text-align';
 import Highlight from '@tiptap/extension-highlight';
 import Link from '@tiptap/extension-link';
@@ -39,7 +42,7 @@ import {
   Highlighter,
   X,
   FileDown,
-
+  Table as TableIcon,
 } from 'lucide-react';
 import DOMPurify from 'dompurify';
 
@@ -90,7 +93,15 @@ export function ProposalEditor({ showCanvas, onClose, grantId, extractedContent,
       BulletList,
       OrderedList,
       ListItem,
-
+      Table.configure({
+        resizable: true,
+        HTMLAttributes: {
+          class: 'proposal-table',
+        },
+      }),
+      TableRow,
+      TableHeader,
+      TableCell,
       TextAlign.configure({ types: ['heading', 'paragraph'] }),
       Highlight,
       Link.configure({ openOnClick: false }),
@@ -330,6 +341,14 @@ export function ProposalEditor({ showCanvas, onClose, grantId, extractedContent,
           <Button
             variant="ghost"
             size="sm"
+            onClick={() => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()}
+          >
+            <TableIcon className="h-4 w-4" />
+          </Button>
+          
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={() => editor.chain().focus().insertContent('<hr class="page-break" style="page-break-before: always; border: none; margin: 2rem 0;" />').run()}
           >
             Page Break
@@ -337,26 +356,140 @@ export function ProposalEditor({ showCanvas, onClose, grantId, extractedContent,
         </div>
       </div>
 
-      {/* Clean A4 Canvas */}
+      {/* Paginated A4 Canvas */}
       <div className="flex-1 overflow-auto bg-gray-100 p-8">
         <div 
           ref={editorContainerRef}
-          className="mx-auto bg-white shadow-lg"
-          style={{
-            width: '210mm',
-            minHeight: '297mm',
-            padding: '25mm 20mm',
-            fontFamily: 'Times New Roman, serif',
-            fontSize: '12pt',
-            lineHeight: '1.6'
-          }}
+          className="mx-auto"
         >
-          <EditorContent 
-            editor={editor} 
-            className="focus:outline-none prose prose-sm max-w-none"
-          />
+          <div 
+            className="bg-white shadow-lg proposal-pages"
+            style={{
+              width: '210mm',
+              minHeight: '297mm',
+              padding: '25mm 20mm',
+              fontFamily: 'Times New Roman, serif',
+              fontSize: '12pt',
+              lineHeight: '1.6',
+              pageBreakInside: 'avoid'
+            }}
+          >
+            <EditorContent 
+              editor={editor} 
+              className="focus:outline-none"
+            />
+          </div>
         </div>
       </div>
+
+      {/* Professional Document Styles */}
+      <style jsx global>{`
+        /* Table Styles for Proposals */
+        .proposal-table {
+          width: 100%;
+          border-collapse: collapse;
+          margin: 1rem 0;
+          font-size: 11pt;
+        }
+        
+        .proposal-table th,
+        .proposal-table td {
+          border: 1px solid #333;
+          padding: 8px 12px;
+          text-align: left;
+          vertical-align: top;
+        }
+        
+        .proposal-table th {
+          background-color: #f5f5f5;
+          font-weight: bold;
+        }
+        
+        /* Page Break Styles */
+        .page-break {
+          page-break-before: always;
+          border: none;
+          margin: 2rem 0;
+          height: 1px;
+          background: transparent;
+        }
+        
+        @media screen {
+          .page-break {
+            border-top: 2px dashed #ccc;
+            position: relative;
+          }
+          
+          .page-break::after {
+            content: 'Page Break';
+            position: absolute;
+            top: -10px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: white;
+            padding: 0 8px;
+            font-size: 10px;
+            color: #666;
+          }
+        }
+        
+        /* Professional Document Formatting */
+        .proposal-pages h1 {
+          font-size: 18pt;
+          font-weight: bold;
+          margin: 2rem 0 1rem 0;
+          page-break-after: avoid;
+        }
+        
+        .proposal-pages h2 {
+          font-size: 16pt;
+          font-weight: bold;
+          margin: 1.5rem 0 0.75rem 0;
+          page-break-after: avoid;
+        }
+        
+        .proposal-pages h3 {
+          font-size: 14pt;
+          font-weight: bold;
+          margin: 1rem 0 0.5rem 0;
+          page-break-after: avoid;
+        }
+        
+        .proposal-pages p {
+          margin: 0.5rem 0;
+          text-align: justify;
+        }
+        
+        .proposal-pages ul,
+        .proposal-pages ol {
+          margin: 0.5rem 0;
+          padding-left: 1.5rem;
+        }
+        
+        .proposal-pages li {
+          margin: 0.25rem 0;
+        }
+        
+        /* Print Styles */
+        @media print {
+          .proposal-pages {
+            box-shadow: none !important;
+            margin: 0 !important;
+          }
+          
+          .page-break {
+            page-break-before: always;
+            border: none;
+            margin: 0;
+            height: 0;
+          }
+          
+          @page {
+            size: A4;
+            margin: 25mm 20mm;
+          }
+        }
+      `}</style>
     </div>
   );
 }
