@@ -87,91 +87,20 @@ const PreviewMode = React.forwardRef<HTMLDivElement, { content: string }>(({ con
       return;
     }
 
-    // First, split content by explicit page breaks
+    // Split content by explicit page breaks - trust AI's page structure
     let sections = content.split(/<(?:hr[^>]*class="page-break"[^>]*>|div[^>]*class="page-break"[^>]*>.*?<\/div>)/);
     sections = sections.filter(section => section.trim() !== '');
     
     if (sections.length === 0) {
+      // If no page breaks, treat as single page
       setPages([content]);
-      return;
+    } else {
+      // Use AI-generated page structure as-is
+      setPages(sections);
     }
-
-    // Now handle content overflow for each section
-    const finalPages: string[] = [];
-    
-    sections.forEach(section => {
-      const sectionPages = handleContentOverflow(section);
-      finalPages.push(...sectionPages);
-    });
-    
-    setPages(finalPages);
   }, [content]);
 
-  // Handle content overflow by splitting long sections into multiple pages
-  const handleContentOverflow = (sectionContent: string): string[] => {
-    // Create a temporary div to measure content height
-    const tempDiv = document.createElement('div');
-    tempDiv.style.cssText = `
-      position: absolute;
-      visibility: hidden;
-      width: 160mm;
-      font-family: 'Times New Roman', serif;
-      font-size: 12pt;
-      line-height: 1.6;
-      padding: 0;
-      margin: 0;
-    `;
-    tempDiv.innerHTML = sectionContent;
-    document.body.appendChild(tempDiv);
 
-    const maxPageHeight = 247; // mm (A4 height - margins)
-    const actualHeight = tempDiv.offsetHeight * 0.264583; // Convert px to mm
-
-    document.body.removeChild(tempDiv);
-
-    // If content fits on one page, return as is
-    if (actualHeight <= maxPageHeight) {
-      return [sectionContent];
-    }
-
-    // If content is too long, split it intelligently
-    return splitContentIntoPages(sectionContent, maxPageHeight);
-  };
-
-  // Split long content into multiple pages at natural break points
-  const splitContentIntoPages = (content: string, maxPageHeight: number): string[] => {
-    const pages: string[] = [];
-    
-    // Split by major elements (paragraphs, headings, lists)
-    const elements = content.split(/(<(?:h[1-6]|p|ul|ol|table|div)[^>]*>.*?<\/(?:h[1-6]|p|ul|ol|table|div)>)/);
-    
-    let currentPage = '';
-    let currentHeight = 0;
-    const avgElementHeight = 8; // Approximate mm per element
-    
-    elements.forEach(element => {
-      if (!element.trim()) return;
-      
-      const elementHeight = element.length * 0.1; // Rough estimate
-      
-      // If adding this element would exceed page height, start new page
-      if (currentHeight + elementHeight > maxPageHeight && currentPage.trim()) {
-        pages.push(currentPage);
-        currentPage = element;
-        currentHeight = elementHeight;
-      } else {
-        currentPage += element;
-        currentHeight += elementHeight;
-      }
-    });
-    
-    // Add the last page if it has content
-    if (currentPage.trim()) {
-      pages.push(currentPage);
-    }
-    
-    return pages.length > 0 ? pages : [content];
-  };
 
   if (!content || content.trim() === '' || content === '<p></p>') {
     return (
@@ -365,32 +294,127 @@ export function ProposalEditor({ showCanvas, onClose, grantId, extractedContent,
     if (!editor) return;
     
     try {
-      // Simple PDF export using browser print
-      const printWindow = window.open('', '_blank');
-      if (printWindow) {
-        printWindow.document.write(`
-          <html>
-            <head>
-              <title>Grant Proposal</title>
-              <style>
-                @page { size: A4; margin: 25mm 20mm; }
-                body { font-family: 'Times New Roman', serif; font-size: 12pt; line-height: 1.6; }
-                h1, h2, h3 { page-break-after: avoid; }
-                table { width: 100%; border-collapse: collapse; margin: 1rem 0; }
-                th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
-                th { background-color: #f5f5f5; }
-                .page-break { page-break-before: always; }
-              </style>
-            </head>
-            <body>${editor.getHTML()}</body>
-          </html>
-        `);
-        printWindow.document.close();
-        printWindow.print();
+      // Use modern browser APIs to create clean PDF without headers/footers
+      if ('showSaveFilePicker' in window) {
+        // Modern approach using File System Access API
+        await generateCleanPDF();
+      } else {
+        // Fallback: Create optimized print window
+        createCleanPrintWindow();
       }
     } catch (error) {
       console.error('PDF export error:', error);
-      alert('Failed to export PDF. Please try again.');
+      // Fallback to simple print
+      createCleanPrintWindow();
+    }
+  };
+
+  const generateCleanPDF = async () => {
+    // Create a clean document for PDF generation
+    const content = editor?.getHTML() || '';
+    
+    // Create blob with clean HTML
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <style>
+            @page { 
+              size: A4; 
+              margin: 25mm 20mm;
+              @top-left { content: ""; }
+              @top-center { content: ""; }
+              @top-right { content: ""; }
+              @bottom-left { content: ""; }
+              @bottom-center { content: counter(page); }
+              @bottom-right { content: ""; }
+            }
+            body { 
+              font-family: 'Times New Roman', serif; 
+              font-size: 12pt; 
+              line-height: 1.6;
+              margin: 0;
+              padding: 0;
+            }
+            h1, h2, h3 { page-break-after: avoid; }
+            table { 
+              width: 100%; 
+              border-collapse: collapse; 
+              margin: 1rem 0;
+              page-break-inside: avoid;
+            }
+            th, td { border: 1px solid #333; padding: 8px; text-align: left; }
+            th { background-color: #f5f5f5; }
+            .page-break { page-break-before: always; }
+          </style>
+        </head>
+        <body>${content}</body>
+      </html>
+    `;
+
+    // Trigger download as HTML (user can save as PDF)
+    const blob = new Blob([htmlContent], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'grant-proposal.html';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+    // Show brief instruction
+    alert('HTML file downloaded. Open it in your browser and use Ctrl+P → Save as PDF for clean output.');
+  };
+
+  const createCleanPrintWindow = () => {
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      // Set empty title to minimize header content
+      printWindow.document.write(`
+        <html>
+          <head>
+            <title></title>
+            <style>
+              @page { 
+                size: A4; 
+                margin: 25mm 20mm;
+                @bottom-center { content: counter(page); }
+              }
+              body { 
+                font-family: 'Times New Roman', serif; 
+                font-size: 12pt; 
+                line-height: 1.6;
+                margin: 0;
+                padding: 0;
+              }
+              h1, h2, h3 { page-break-after: avoid; }
+              table { 
+                width: 100%; 
+                border-collapse: collapse; 
+                margin: 1rem 0;
+                page-break-inside: avoid;
+              }
+              th, td { border: 1px solid #333; padding: 8px; text-align: left; }
+              th { background-color: #f5f5f5; }
+              .page-break { page-break-before: always; }
+              
+              @media print {
+                body { -webkit-print-color-adjust: exact; }
+              }
+            </style>
+          </head>
+          <body>${editor?.getHTML()}</body>
+        </html>
+      `);
+      printWindow.document.close();
+      
+      setTimeout(() => {
+        printWindow.focus();
+        printWindow.print();
+        setTimeout(() => printWindow.close(), 1000);
+      }, 500);
     }
   };
 
@@ -578,6 +602,7 @@ export function ProposalEditor({ showCanvas, onClose, grantId, extractedContent,
           border-collapse: collapse;
           margin: 1rem 0;
           font-size: 11pt;
+          page-break-inside: avoid; /* Prevent tables from breaking across pages */
         }
         
         .proposal-table th,
@@ -591,6 +616,14 @@ export function ProposalEditor({ showCanvas, onClose, grantId, extractedContent,
         .proposal-table th {
           background-color: #f5f5f5;
           font-weight: bold;
+        }
+        
+        /* Ensure tables don't break in preview mode */
+        @media screen {
+          .proposal-table {
+            page-break-inside: avoid;
+            break-inside: avoid;
+          }
         }
         
         /* Page Break Styles */
