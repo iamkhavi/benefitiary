@@ -18,6 +18,7 @@ interface MayaRequest {
     content: string;
     type: 'pdf' | 'doc' | 'txt';
   }>;
+  stream?: boolean; // Enable streaming status updates
 }
 
 interface MayaResponse {
@@ -34,9 +35,48 @@ interface MayaResponse {
   suggestions: string[];
 }
 
+interface StreamingStatus {
+  type: 'status' | 'final';
+  status?: string;
+  progress?: number;
+  data?: MayaResponse;
+}
+
 // Cache for context data with invalidation support
 const contextCache = new Map<string, { data: any; timestamp: number; version: string }>();
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+// Streaming helper function
+function createStreamingResponse() {
+  const encoder = new TextEncoder();
+  let controller: ReadableStreamDefaultController<Uint8Array>;
+
+  const stream = new ReadableStream({
+    start(ctrl) {
+      controller = ctrl;
+    }
+  });
+
+  const sendStatus = (status: string, progress?: number) => {
+    const statusUpdate: StreamingStatus = {
+      type: 'status',
+      status,
+      progress
+    };
+    controller.enqueue(encoder.encode(`data: ${JSON.stringify(statusUpdate)}\n\n`));
+  };
+
+  const sendFinal = (data: MayaResponse) => {
+    const finalUpdate: StreamingStatus = {
+      type: 'final',
+      data
+    };
+    controller.enqueue(encoder.encode(`data: ${JSON.stringify(finalUpdate)}\n\n`));
+    controller.close();
+  };
+
+  return { stream, sendStatus, sendFinal };
+}
 
 // Cache invalidation helpers
 function invalidateUserCache(userId: string) {
@@ -61,6 +101,102 @@ function generateCacheVersion(user: any, grant: any): string {
   return `${userVersion}-${orgVersion}-${grantVersion}-${funderVersion}`;
 }
 
+// Streaming request handler with real-time status updates
+async function handleStreamingRequest(
+  request: NextRequest,
+  session: any,
+  userMessage: string,
+  sessionId: string | undefined,
+  grantId: string,
+  userContext: any,
+  history: Array<{ role: 'user' | 'assistant'; content: string }> | undefined,
+  currentCanvasContent: string | undefined,
+  uploadedDocuments: Array<any> | undefined
+) {
+  const { stream, sendStatus, sendFinal } = createStreamingResponse();
+
+  // Run the processing in the background
+  (async () => {
+    try {
+      // Fast intent detection first
+      const isCanvasAction = detectCanvasIntent(userMessage, currentCanvasContent);
+      const hasDocuments = uploadedDocuments && uploadedDocuments.length > 0;
+      const isSimpleChat = isSimpleChatMessage(userMessage) && !hasDocuments;
+      const isCompleteProposal = isCompleteProposalRequest(userMessage, currentCanvasContent);
+
+      // Show initial thinking status
+      sendStatus("💭 Thinking...", 30);
+
+      // Load context with caching (fast, cached)
+      const fullContext = await loadContextWithCache(session.user.id, grantId, userContext);
+
+      // Load persistent conversation history for continuity (fast, cached)
+      const persistentHistory = await loadConversationHistory(session.user.id, grantId, sessionId);
+      const conversationHistory = persistentHistory.length > 0 ? persistentHistory : (history || []);
+
+      // Skip expensive operations for simple chat
+      let criticalAnalysis = 'Analysis available on request';
+      let documentAnalysis = null;
+
+      if (!isSimpleChat) {
+        // Only do expensive analysis for complex requests
+        const needsAnalysis = userMessage.toLowerCase().includes('analyz') ||
+          userMessage.toLowerCase().includes('assess') ||
+          userMessage.toLowerCase().includes('fit') ||
+          hasDocuments;
+
+        if (needsAnalysis) {
+          criticalAnalysis = await performCriticalAnalysis(fullContext);
+        }
+
+        // Only analyze documents if they were uploaded
+        if (hasDocuments) {
+          documentAnalysis = await analyzeUploadedDocuments(uploadedDocuments, fullContext);
+        }
+      }
+
+      // Build optimized system prompt with persistent conversation context
+      const systemPrompt = isSimpleChat
+        ? buildLightweightPrompt(fullContext, conversationHistory, currentCanvasContent)
+        : buildMayaPrompt(fullContext, conversationHistory, currentCanvasContent, uploadedDocuments, criticalAnalysis, documentAnalysis || undefined, isCompleteProposal);
+
+      // Now actually working on the response
+      sendStatus("✍️ Working...", 70);
+
+      // Call xAI Grok directly with optimized settings
+      const mayaResponse = await callGrok(systemPrompt, userMessage, isCanvasAction, isSimpleChat, isCompleteProposal);
+
+      // Save conversation async (don't wait for it)
+      saveConversation(session.user.id, grantId, userMessage, mayaResponse, sessionId).catch(console.error);
+
+      // Send final response
+      sendFinal({
+        success: true,
+        sessionId: sessionId || 'temp-session',
+        processingTime: Date.now() - Date.now(),
+        ...mayaResponse
+      } as any);
+
+    } catch (error) {
+      console.error('Streaming Maya API Error:', error);
+      sendFinal({
+        success: false,
+        intent: 'chat_advice',
+        content: "An error occurred. Please try again.",
+        suggestions: ['Try again', 'Ask for help', 'Start over']
+      } as any);
+    }
+  })();
+
+  return new Response(stream, {
+    headers: {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive',
+    },
+  });
+}
+
 export async function POST(request: NextRequest) {
   const startTime = Date.now();
 
@@ -75,15 +211,21 @@ export async function POST(request: NextRequest) {
     }
 
     // Parse request
-    const { userMessage, sessionId, grantId, userContext, history, currentCanvasContent, uploadedDocuments }: MayaRequest = await request.json();
+    const { userMessage, sessionId, grantId, userContext, history, currentCanvasContent, uploadedDocuments, stream }: MayaRequest = await request.json();
 
     if (!userMessage || !grantId) {
       return NextResponse.json({ error: 'Missing userMessage or grantId' }, { status: 400 });
     }
 
+    // Check if streaming is requested
+    if (stream) {
+      return handleStreamingRequest(request, session, userMessage, sessionId, grantId, userContext, history, currentCanvasContent, uploadedDocuments);
+    }
+
     // Fast intent detection first
     const isCanvasAction = detectCanvasIntent(userMessage, currentCanvasContent);
-    const isSimpleChat = isSimpleChatMessage(userMessage);
+    const hasDocuments = uploadedDocuments && uploadedDocuments.length > 0;
+    const isSimpleChat = isSimpleChatMessage(userMessage) && !hasDocuments; // Never lightweight if documents uploaded
     const isCompleteProposal = isCompleteProposalRequest(userMessage, currentCanvasContent);
 
     // Load context with caching
@@ -121,7 +263,7 @@ export async function POST(request: NextRequest) {
       : buildMayaPrompt(fullContext, conversationHistory, currentCanvasContent, uploadedDocuments, criticalAnalysis, documentAnalysis || undefined, isCompleteProposal);
 
     // Call xAI Grok directly with optimized settings
-    const mayaResponse = await callGrok(systemPrompt, userMessage, isCanvasAction, isSimpleChat);
+    const mayaResponse = await callGrok(systemPrompt, userMessage, isCanvasAction, isSimpleChat, isCompleteProposal);
 
     // Async save conversation (don't wait for it)
     saveConversation(session.user.id, grantId, userMessage, mayaResponse, sessionId).catch(console.error);
@@ -289,53 +431,71 @@ async function loadConversationHistory(userId: string, grantId: string, sessionI
 function isCompleteProposalRequest(userMessage: string, currentCanvasContent?: string): boolean {
   const message = userMessage.toLowerCase();
 
-  // Complete proposal indicators
+  // Complete proposal indicators - expanded for better detection
   const completeProposalKeywords = [
     'full proposal', 'complete proposal', 'entire proposal', 'whole proposal',
     'draft proposal', 'new proposal', 'proposal from scratch', 'start proposal',
     'write proposal', 'create proposal', 'generate proposal', 'write the proposal',
-    'create the proposal', 'draft the proposal', 'build the proposal'
+    'create the proposal', 'draft the proposal', 'build the proposal',
+    '10 page', '15 page', '20 page', 'comprehensive proposal', 'detailed proposal',
+    'professional proposal', 'grant proposal', 'funding proposal'
   ];
 
   // If canvas is empty and user asks for proposal content, assume complete
-  const isEmptyCanvas = !currentCanvasContent || currentCanvasContent.trim().length < 100;
+  const isEmptyCanvas = !currentCanvasContent || currentCanvasContent.trim().length < 500;
   const mentionsProposal = message.includes('proposal');
 
-  if (isEmptyCanvas && mentionsProposal && !message.includes('section')) {
+  // Enhanced detection for empty canvas
+  if (isEmptyCanvas && mentionsProposal && !message.includes('section') && !message.includes('part')) {
     return true;
   }
 
-  return completeProposalKeywords.some(keyword => message.includes(keyword));
+  // Direct keyword matching
+  if (completeProposalKeywords.some(keyword => message.includes(keyword))) {
+    return true;
+  }
+
+  // Context-based detection
+  if (isEmptyCanvas && (message.includes('write') || message.includes('create') || message.includes('generate'))) {
+    return true;
+  }
+
+  return false;
 }
 
 /**
  * Check if this is a simple chat message that doesn't need heavy processing
+ * Lightweight = greetings, advice, clarification questions (NO document processing or content generation)
  */
 function isSimpleChatMessage(userMessage: string): boolean {
   const message = userMessage.toLowerCase();
 
-  // Simple question patterns
-  const simplePatterns = [
-    /^(hi|hello|hey|thanks|thank you)/,
-    /^(what|how|why|when|where|who|can you|could you|should i|would you)/,
-    /\?$/,
-    /^(tell me|explain|describe)/,
-    /^(i need help|help me|can you help)/
-  ];
-
-  // Complex action patterns that need full processing
-  const complexPatterns = [
+  // ALWAYS use full prompt for any content generation or document processing
+  const alwaysFullPromptPatterns = [
     /(write|create|generate|build|draft|make)/,
     /(budget|timeline|proposal|section)/,
     /(rewrite|modify|update|improve|enhance|expand|fix|change|edit)/,
-    /(analyze|assess|review|evaluate)/
+    /(analyze|assess|review|evaluate)/,
+    /upload|document|file|rfp|sample/
   ];
 
-  // If it matches simple patterns and doesn't match complex ones, it's simple
-  const isSimple = simplePatterns.some(pattern => pattern.test(message));
-  const isComplex = complexPatterns.some(pattern => pattern.test(message));
+  // If it requires content generation or document processing, NOT simple
+  if (alwaysFullPromptPatterns.some(pattern => pattern.test(message))) {
+    return false;
+  }
 
-  return isSimple && !isComplex;
+  // True lightweight patterns - advice, greetings, clarification only
+  const lightweightPatterns = [
+    /^(hi|hello|hey|thanks|thank you|good morning|good afternoon)/,
+    /^(what do you think|what are my chances|should i apply|is this competitive)/,
+    /^(any tips|any advice|what should i focus on|what matters most)/,
+    /^(tell me about|explain|describe|what does.*mean|what is)/,
+    /^(how competitive|what are the odds|what do funders look for)/,
+    /\?$/ // Questions that end with ? (but not content generation questions)
+  ];
+
+  // Only lightweight if it matches lightweight patterns AND doesn't involve content creation
+  return lightweightPatterns.some(pattern => pattern.test(message));
 }
 
 /**
@@ -352,7 +512,7 @@ function buildLightweightPrompt(
 
   const canvasStr = currentCanvasContent
     ? `Canvas: ${Math.round(currentCanvasContent.length / 1000)}k chars of existing content.`
-    : 'Canvas: Empty.';
+    : 'Canvas: Empty - ready for complete proposal generation.';
 
   const orgType = fullContext.orgType || 'organization';
   const grantCategory = fullContext.grantCategory || 'grant';
@@ -363,20 +523,22 @@ History: ${historyStr}
 
 ${canvasStr}
 
+LIGHTWEIGHT CHAT MODE: This is for simple advice, greetings, and clarification questions only. For any content generation (proposals, sections, analysis), the system will automatically use the full Maya prompt with comprehensive capabilities.
+
 CHAT RESPONSE STRUCTURE:
-- FIRST TWO LINES: Acknowledge user prompt warmly, show you're walking with them in their quest
-- MIDDLE SECTION: If canvas action taken, summarize the EXACT SPECIFIC content you created - actual dollar amounts, specific project details, unique organizational strengths used, concrete timeline elements, specific funder alignment points. NO GENERIC DESCRIPTIONS.
-- FINAL SECTION: Suggest next steps or offer specific help like "I can help you expand this section" or "Share more details and I'll show you how to use them" - end with "Just tell me which one to proceed with"
+- FIRST TWO LINES: Acknowledge user prompt warmly and personally
+- MIDDLE SECTION: Provide helpful advice, insights, or clarification based on their grant context
+- FINAL SECTION: Offer specific next steps like "I can create your complete 10-20 page proposal", "Analyze your fit for this grant", or "Help you understand the funder's priorities" - end with "What would be most helpful?"
 - Use scannable format: bullets, lists, clear structure - avoid long paragraphs
 - Be conversational and supportive throughout
-- CRITICAL: Summarize actual extracted content details, not generic process descriptions
+- Always offer to help with comprehensive proposal generation when relevant
 
-Respond with valid JSON only—no extras. Escape inner quotes with \\". Classify intent semantically (chat_advice for questions/strategy; canvas_write for create/modify content; hybrid for both). Be proactive: Ask gaps, suggest steps.
+Respond with valid JSON only—no extras. Escape inner quotes with \\". Classify intent semantically (chat_advice for questions/strategy; canvas_write for create/modify content; hybrid for both). Be proactive in offering comprehensive help.
 
 {
   "intent": "chat_advice" | "canvas_write" | "hybrid",
-  "content": "Follow the response structure above - acknowledge, summarize actions, suggest next steps",
-  "suggestions": ["next step 1", "next step 2", "next step 3"]
+  "content": "Follow the response structure above - acknowledge warmly, provide helpful advice, offer comprehensive proposal generation",
+  "suggestions": ["Create complete 10-20 page proposal", "Analyze grant fit", "Explain funder priorities"]
 }`;
 }
 
@@ -423,37 +585,47 @@ Canvas: ${canvasStr}
 
 Intent: Semantic only—chat_advice (Q/strategy), canvas_write (create/modify content), hybrid (mix + probe).
 
-CRITICAL DOCUMENT STRUCTURE RULES:
+CRITICAL DOCUMENT STRUCTURE RULES - GENERATE FULL 10-20 PAGE PROPOSAL:
 ${isCompleteProposal ? `
-- COMPLETE PROPOSAL REQUESTED: Generate full professional document with ALL sections
-- A4 PAGE STRUCTURE: Fixed scalable A4 size pages ready for printing/submission
-- Page 1: Professional cover page with title, organization, funder, date, funding amount
-- Page 2: Table of Contents with numbered sections and page references
-- Pages 3+: Executive Summary, Statement of Need, Project Description, Methodology, Timeline, Budget, Organizational Capacity, Evaluation Plan, Sustainability, Conclusion
-- CONTENT FLOW: No truncation or expandable sections - content flows naturally to next pages
-- Each major section separated by <div class="page-break"></div>
-- Budget section MUST be comprehensive table with categories, amounts, percentages, detailed justifications
-- Timeline MUST be table format with phases, durations, activities, deliverables
-- Professional formatting throughout with proper headings, styling, and structure
+- COMPLETE PROPOSAL: Generate comprehensive 10-20 page professional document following standard grant proposal structure
+- LEVERAGE GROK-4 CAPACITY: Use full 15,000 tokens to create detailed, substantive content for each section
+
+MANDATORY PAGE STRUCTURE (following real-world grant standards):
+- Page 1: Cover Letter/Title Page (organization name, funder, date, funding amount, brief impact teaser)
+- Page 2: Executive Summary (1 full page, 300-400 words - project summary, funding need, expected impact)
+- Pages 3-4: Statement of Need (1-2 pages, 600-800 words - data/statistics, target population impact, gap analysis)
+- Page 5: Objectives/Goals (1 page, 300-400 words - SMART goals, short/long-term outcomes, funder alignment)
+- Pages 6-10: Project Description/Methodology (3-5 pages, 1500-2500 words - detailed step-by-step plan, team roles, evidence of feasibility)
+- Page 11: Timeline (1 page - comprehensive Gantt chart/table with dates, tasks, deliverables, milestones)
+- Pages 12-13: Budget (1-2 pages - detailed line-item tables with personnel, supplies, indirect costs, narrative justifications)
+- Page 14: Evaluation Plan (1 page, 300-400 words - metrics/KPIs, measurement tools, adjustment strategies)
+- Pages 15-16: Organizational Capacity (1-2 pages, 600-800 words - track record, staff expertise, sustainability plan)
+
+CONTENT REQUIREMENTS:
+- Each section MUST contain substantial, detailed content appropriate for page length
+- Use comprehensive paragraphs, not bullet points or summaries
+- Include specific data, statistics, and evidence-based arguments
+- Generate detailed HTML tables for budget and timeline sections
+- Use <div class="page-break"></div> between major sections for proper pagination
+- For long sections (like Project Description), add page breaks every 2-3 pages: <div class="page-break"></div>
+- Professional formatting with proper headings, subheadings, and structure
+- Content should flow naturally across pages - preview mode will handle overflow automatically
 ` : `
-- For INITIAL proposal creation: Always generate COMPLETE documents with professional structure
-- A4 PAGE STRUCTURE: Fixed scalable A4 size pages ready for printing/submission
-- Page 1: Professional cover page with title, organization, funder, date, funding amount
-- Page 2: Table of Contents with page numbers and section links
-- Subsequent pages: Full proposal content with proper sections
-- CONTENT FLOW: No truncation or expandable sections - content flows naturally to next pages
-- Budget sections: MUST use HTML tables with columns for categories, amounts, percentages, justifications
+- For SECTION UPDATES: Generate comprehensive content for requested sections while maintaining document integrity
+- A4 PAGE STRUCTURE: Professional formatting ready for printing/submission
+- SUBSTANTIAL CONTENT: Generate detailed, evidence-based content appropriate for professional proposals
+- Budget/Timeline sections: MUST use comprehensive HTML tables with detailed justifications
 - Use <div class="page-break"></div> between major sections for professional presentation
-- For modifications: Only update requested sections while maintaining document integrity
+- For modifications: Update requested sections with full detail while maintaining overall document flow
 `}
 
 CHAT RESPONSE STRUCTURE:
-- FIRST TWO LINES: Acknowledge user prompt warmly, show you're walking with them in their quest
-- MIDDLE SECTION: If canvas action taken, summarize the EXACT SPECIFIC content you created - actual dollar amounts, specific project details, unique organizational strengths used, concrete timeline elements, specific funder alignment points. NO GENERIC DESCRIPTIONS.
-- FINAL SECTION: Suggest next steps or offer specific help like "I can help you expand the budget section" or "Share additional information and I'll show you how to use it" - end with "Just tell me which one to proceed with"
+- FIRST TWO LINES: Acknowledge user prompt enthusiastically, show you're creating their complete professional proposal
+- MIDDLE SECTION: If complete proposal generated, summarize the COMPREHENSIVE CONTENT created - specific sections completed (Executive Summary, Statement of Need, Project Description, Budget, Timeline, etc.), actual page count generated, key project details, funding amounts, organizational strengths highlighted, timeline milestones, budget categories. NO GENERIC DESCRIPTIONS.
+- FINAL SECTION: Offer specific next steps like "I can refine any section", "Add more detail to specific areas", or "Customize for funder requirements" - end with "Which section would you like me to enhance?"
 - Use scannable format: bullets, lists, clear structure - avoid long paragraphs
 - Be conversational and supportive throughout
-- CRITICAL: Summarize actual extracted content details, not generic process descriptions
+- CRITICAL: Summarize the actual comprehensive content details generated, not generic process descriptions
 
 Format: HTML for extractedContent. Tables required for budgets/timelines. SMART lists for goals.
 
@@ -473,9 +645,14 @@ CRITICAL: When canvas action taken, "content" must summarize SPECIFIC details fr
   "suggestions": ["probe 1", "probe 2", "probe 3"]
 }
 
-CRITICAL REMINDER: When you create canvas content, your chat response must reference the ACTUAL SPECIFIC details you put in that content - real dollar amounts, specific project names, actual organizational strengths, concrete timeline elements, specific funder alignment points. Never give generic summaries.
+CRITICAL REMINDERS:
+- LEVERAGE FULL CAPACITY: Use Grok-4's enhanced token limit to generate comprehensive, detailed content
+- COMPLETE PROPOSALS: When generating full proposals, create ALL sections with substantial content (10-20 pages total)
+- SPECIFIC DETAILS: Your chat response must reference ACTUAL SPECIFIC details from the comprehensive content - real dollar amounts, specific project components, actual organizational strengths, concrete timeline milestones, detailed budget categories, specific funder alignment points
+- NO GENERIC SUMMARIES: Always reference the actual comprehensive content you generated, not generic process descriptions
+- PROFESSIONAL QUALITY: Generate content that matches real-world grant proposal standards with evidence, data, and detailed explanations
 
-Trust your intelligence—respond naturally following the structure above to: [userMessage]`;
+Trust your enhanced capabilities—generate comprehensive professional proposals following the structure above to: [userMessage]`;
 }
 
 /**
@@ -536,15 +713,17 @@ function detectCanvasIntent(userMessage: string, currentCanvasContent?: string):
 /**
  * Call xAI Grok API directly with optimizations
  */
-async function callGrok(systemPrompt: string, userMessage: string, isCanvasAction: boolean = false, isSimpleChat: boolean = false): Promise<MayaResponse> {
+async function callGrok(systemPrompt: string, userMessage: string, isCanvasAction: boolean = false, isSimpleChat: boolean = false, isCompleteProposal: boolean = false): Promise<MayaResponse> {
   const XAI_API_KEY = process.env.XAI_API_KEY;
 
   if (!XAI_API_KEY) {
     throw new Error('XAI_API_KEY not configured');
   }
 
-  // Optimize parameters based on request type
-  const maxTokens = isSimpleChat ? 1500 : (isCanvasAction ? 4000 : 1500);
+  // Optimize parameters based on request type - leveraging Grok-4's 2M token capacity
+  const maxTokens = isCompleteProposal ? 15000 : 
+                   (isCanvasAction ? 8000 : 
+                   (isSimpleChat ? 1500 : 4000));
   const maxRetries = isSimpleChat ? 1 : 2; // Fewer retries for simple chat
 
   // Retry logic for API reliability

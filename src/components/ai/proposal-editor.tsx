@@ -77,7 +77,7 @@ const PageBreak = Extension.create({
   }
 })
 
-// Preview Mode Component - Shows properly paginated document
+// Preview Mode Component - Shows properly paginated document with overflow handling
 const PreviewMode = React.forwardRef<HTMLDivElement, { content: string }>(({ content }, ref) => {
   const [pages, setPages] = useState<string[]>([]);
 
@@ -87,17 +87,91 @@ const PreviewMode = React.forwardRef<HTMLDivElement, { content: string }>(({ con
       return;
     }
 
-    // Split content into pages based on page breaks
-    const pageBreaks = content.split(/<hr[^>]*class="page-break"[^>]*>/);
-    const processedPages = pageBreaks.filter(page => page.trim() !== '');
+    // First, split content by explicit page breaks
+    let sections = content.split(/<(?:hr[^>]*class="page-break"[^>]*>|div[^>]*class="page-break"[^>]*>.*?<\/div>)/);
+    sections = sections.filter(section => section.trim() !== '');
     
-    if (processedPages.length === 0) {
-      // If no explicit page breaks, treat as single page
+    if (sections.length === 0) {
       setPages([content]);
-    } else {
-      setPages(processedPages);
+      return;
     }
+
+    // Now handle content overflow for each section
+    const finalPages: string[] = [];
+    
+    sections.forEach(section => {
+      const sectionPages = handleContentOverflow(section);
+      finalPages.push(...sectionPages);
+    });
+    
+    setPages(finalPages);
   }, [content]);
+
+  // Handle content overflow by splitting long sections into multiple pages
+  const handleContentOverflow = (sectionContent: string): string[] => {
+    // Create a temporary div to measure content height
+    const tempDiv = document.createElement('div');
+    tempDiv.style.cssText = `
+      position: absolute;
+      visibility: hidden;
+      width: 160mm;
+      font-family: 'Times New Roman', serif;
+      font-size: 12pt;
+      line-height: 1.6;
+      padding: 0;
+      margin: 0;
+    `;
+    tempDiv.innerHTML = sectionContent;
+    document.body.appendChild(tempDiv);
+
+    const maxPageHeight = 247; // mm (A4 height - margins)
+    const actualHeight = tempDiv.offsetHeight * 0.264583; // Convert px to mm
+
+    document.body.removeChild(tempDiv);
+
+    // If content fits on one page, return as is
+    if (actualHeight <= maxPageHeight) {
+      return [sectionContent];
+    }
+
+    // If content is too long, split it intelligently
+    return splitContentIntoPages(sectionContent, maxPageHeight);
+  };
+
+  // Split long content into multiple pages at natural break points
+  const splitContentIntoPages = (content: string, maxPageHeight: number): string[] => {
+    const pages: string[] = [];
+    
+    // Split by major elements (paragraphs, headings, lists)
+    const elements = content.split(/(<(?:h[1-6]|p|ul|ol|table|div)[^>]*>.*?<\/(?:h[1-6]|p|ul|ol|table|div)>)/);
+    
+    let currentPage = '';
+    let currentHeight = 0;
+    const avgElementHeight = 8; // Approximate mm per element
+    
+    elements.forEach(element => {
+      if (!element.trim()) return;
+      
+      const elementHeight = element.length * 0.1; // Rough estimate
+      
+      // If adding this element would exceed page height, start new page
+      if (currentHeight + elementHeight > maxPageHeight && currentPage.trim()) {
+        pages.push(currentPage);
+        currentPage = element;
+        currentHeight = elementHeight;
+      } else {
+        currentPage += element;
+        currentHeight += elementHeight;
+      }
+    });
+    
+    // Add the last page if it has content
+    if (currentPage.trim()) {
+      pages.push(currentPage);
+    }
+    
+    return pages.length > 0 ? pages : [content];
+  };
 
   if (!content || content.trim() === '' || content === '<p></p>') {
     return (
