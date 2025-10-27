@@ -475,8 +475,6 @@ CRITICAL: When canvas action taken, "content" must summarize SPECIFIC details fr
 
 CRITICAL REMINDER: When you create canvas content, your chat response must reference the ACTUAL SPECIFIC details you put in that content - real dollar amounts, specific project names, actual organizational strengths, concrete timeline elements, specific funder alignment points. Never give generic summaries.
 
-CRITICAL REMINDER: When you create canvas content, your chat response must reference the ACTUAL SPECIFIC details you put in that content - real dollar amounts, specific project names, actual organizational strengths, concrete timeline elements, specific funder alignment points. Never give generic summaries.
-
 Trust your intelligence—respond naturally following the structure above to: [userMessage]`;
 }
 

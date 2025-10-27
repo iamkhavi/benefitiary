@@ -20,7 +20,7 @@ import Highlight from '@tiptap/extension-highlight';
 import Link from '@tiptap/extension-link';
 import Placeholder from '@tiptap/extension-placeholder';
 import { Extension } from '@tiptap/core';
-import { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -43,6 +43,8 @@ import {
   X,
   FileDown,
   Table as TableIcon,
+  Eye,
+  Edit,
 } from 'lucide-react';
 import DOMPurify from 'dompurify';
 
@@ -75,11 +77,101 @@ const PageBreak = Extension.create({
   }
 })
 
+// Preview Mode Component - Shows properly paginated document
+const PreviewMode = React.forwardRef<HTMLDivElement, { content: string }>(({ content }, ref) => {
+  const [pages, setPages] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (!content) {
+      setPages([]);
+      return;
+    }
+
+    // Split content into pages based on page breaks
+    const pageBreaks = content.split(/<hr[^>]*class="page-break"[^>]*>/);
+    const processedPages = pageBreaks.filter(page => page.trim() !== '');
+    
+    if (processedPages.length === 0) {
+      // If no explicit page breaks, treat as single page
+      setPages([content]);
+    } else {
+      setPages(processedPages);
+    }
+  }, [content]);
+
+  if (!content || content.trim() === '' || content === '<p></p>') {
+    return (
+      <div className="mx-auto" style={{ width: '210mm' }}>
+        <div 
+          className="bg-white shadow-lg border"
+          style={{
+            width: '210mm',
+            height: '297mm',
+            padding: '25mm 20mm',
+            fontFamily: 'Times New Roman, serif',
+            fontSize: '12pt',
+            lineHeight: '1.6'
+          }}
+        >
+          <div className="flex items-center justify-center h-full text-gray-400">
+            <div className="text-center">
+              <FileText className="w-16 h-16 mx-auto mb-4" />
+              <p>Document preview will appear here</p>
+              <p className="text-sm">Switch to Edit mode to start writing</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div ref={ref} className="mx-auto space-y-8" style={{ width: '210mm' }}>
+      {pages.map((pageContent, index) => (
+        <div 
+          key={index}
+          className="bg-white shadow-lg border preview-page"
+          style={{
+            width: '210mm',
+            height: '297mm',
+            padding: '25mm 20mm',
+            fontFamily: 'Times New Roman, serif',
+            fontSize: '12pt',
+            lineHeight: '1.6',
+            position: 'relative',
+            pageBreakAfter: 'always'
+          }}
+        >
+          {/* Page Content */}
+          <div 
+            className="preview-content"
+            dangerouslySetInnerHTML={{ __html: pageContent }}
+            style={{ height: '247mm', overflow: 'hidden' }}
+          />
+          
+          {/* Page Number */}
+          <div 
+            className="absolute bottom-4 left-1/2 transform -translate-x-1/2 text-gray-500"
+            style={{ fontSize: '10pt' }}
+          >
+            Page {index + 1}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+});
+
+PreviewMode.displayName = 'PreviewMode';
+
 export function ProposalEditor({ showCanvas, onClose, grantId, extractedContent, onContentUpdate }: ProposalEditorProps) {
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [wordCount, setWordCount] = useState(0);
   const [pageCount, setPageCount] = useState(1);
+  const [isPreviewMode, setIsPreviewMode] = useState(false);
+  const [documentContent, setDocumentContent] = useState('');
   const editorContainerRef = useRef<HTMLDivElement>(null);
+  const previewRef = useRef<HTMLDivElement>(null);
 
   const editor = useEditor({
     extensions: [
@@ -118,9 +210,11 @@ export function ProposalEditor({ showCanvas, onClose, grantId, extractedContent,
     },
     onUpdate: ({ editor }) => {
       const text = editor.getText();
+      const html = editor.getHTML();
       const words = text.split(/\s+/).filter(word => word.length > 0).length;
       setWordCount(words);
       setPageCount(Math.max(1, Math.ceil(words / 250))); // ~250 words per page
+      setDocumentContent(html);
       
       onContentUpdate?.();
     },
@@ -149,7 +243,7 @@ export function ProposalEditor({ showCanvas, onClose, grantId, extractedContent,
     }
   }, [editor, grantId]);
 
-  // Handle AI-inserted content (Clean implementation following guide)
+  // Handle AI-inserted content and auto-switch to preview
   useEffect(() => {
     if (!editor || !extractedContent) return;
 
@@ -171,7 +265,12 @@ export function ProposalEditor({ showCanvas, onClose, grantId, extractedContent,
         editor.chain().focus().setTextSelection(editor.state.doc.content.size).insertContent(safeHtml).run();
       }
 
-      console.log('AI content inserted successfully');
+      // Auto-switch to preview mode after AI content insertion
+      setTimeout(() => {
+        setIsPreviewMode(true);
+      }, 500);
+
+      console.log('AI content inserted successfully, switching to preview mode');
       onContentUpdate?.();
 
     } catch (err) {
@@ -263,6 +362,15 @@ export function ProposalEditor({ showCanvas, onClose, grantId, extractedContent,
               Export PDF
             </Button>
 
+            <Button 
+              variant={isPreviewMode ? "default" : "outline"} 
+              size="sm" 
+              onClick={() => setIsPreviewMode(!isPreviewMode)}
+            >
+              {isPreviewMode ? <Edit className="h-4 w-4 mr-2" /> : <Eye className="h-4 w-4 mr-2" />}
+              {isPreviewMode ? 'Edit' : 'Preview'}
+            </Button>
+
             <Button size="sm" onClick={saveDraft}>
               <Save className="h-4 w-4 mr-2" />
               Save
@@ -276,8 +384,9 @@ export function ProposalEditor({ showCanvas, onClose, grantId, extractedContent,
           </div>
         </div>
 
-        {/* Simple Formatting Toolbar */}
-        <div className="flex items-center space-x-1 mt-3 pt-3 border-t">
+        {/* Simple Formatting Toolbar - Only show in edit mode */}
+        {!isPreviewMode && (
+          <div className="flex items-center space-x-1 mt-3 pt-3 border-t">
           <Button
             variant={editor.isActive('bold') ? 'default' : 'ghost'}
             size="sm"
@@ -353,33 +462,38 @@ export function ProposalEditor({ showCanvas, onClose, grantId, extractedContent,
           >
             Page Break
           </Button>
-        </div>
+          </div>
+        )}
       </div>
 
-      {/* Paginated A4 Canvas */}
+      {/* Canvas Area - Edit or Preview Mode */}
       <div className="flex-1 overflow-auto bg-gray-100 p-8">
-        <div 
-          ref={editorContainerRef}
-          className="mx-auto"
-        >
+        {isPreviewMode ? (
+          <PreviewMode content={documentContent} ref={previewRef} />
+        ) : (
           <div 
-            className="bg-white shadow-lg proposal-pages"
-            style={{
-              width: '210mm',
-              minHeight: '297mm',
-              padding: '25mm 20mm',
-              fontFamily: 'Times New Roman, serif',
-              fontSize: '12pt',
-              lineHeight: '1.6',
-              pageBreakInside: 'avoid'
-            }}
+            ref={editorContainerRef}
+            className="mx-auto"
           >
-            <EditorContent 
-              editor={editor} 
-              className="focus:outline-none"
-            />
+            <div 
+              className="bg-white shadow-lg proposal-pages"
+              style={{
+                width: '210mm',
+                minHeight: '297mm',
+                padding: '25mm 20mm',
+                fontFamily: 'Times New Roman, serif',
+                fontSize: '12pt',
+                lineHeight: '1.6',
+                pageBreakInside: 'avoid'
+              }}
+            >
+              <EditorContent 
+                editor={editor} 
+                className="focus:outline-none"
+              />
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* Professional Document Styles */}
@@ -470,9 +584,70 @@ export function ProposalEditor({ showCanvas, onClose, grantId, extractedContent,
           margin: 0.25rem 0;
         }
         
+        /* Preview Mode Styles */
+        .preview-page {
+          break-after: page;
+        }
+        
+        .preview-content table {
+          width: 100%;
+          border-collapse: collapse;
+          margin: 1rem 0;
+          font-size: 11pt;
+        }
+        
+        .preview-content table th,
+        .preview-content table td {
+          border: 1px solid #333;
+          padding: 8px 12px;
+          text-align: left;
+          vertical-align: top;
+        }
+        
+        .preview-content table th {
+          background-color: #f5f5f5;
+          font-weight: bold;
+        }
+        
+        .preview-content h1 {
+          font-size: 18pt;
+          font-weight: bold;
+          margin: 2rem 0 1rem 0;
+          page-break-after: avoid;
+        }
+        
+        .preview-content h2 {
+          font-size: 16pt;
+          font-weight: bold;
+          margin: 1.5rem 0 0.75rem 0;
+          page-break-after: avoid;
+        }
+        
+        .preview-content h3 {
+          font-size: 14pt;
+          font-weight: bold;
+          margin: 1rem 0 0.5rem 0;
+          page-break-after: avoid;
+        }
+        
+        .preview-content p {
+          margin: 0.5rem 0;
+          text-align: justify;
+        }
+        
+        .preview-content ul,
+        .preview-content ol {
+          margin: 0.5rem 0;
+          padding-left: 1.5rem;
+        }
+        
+        .preview-content li {
+          margin: 0.25rem 0;
+        }
+
         /* Print Styles */
         @media print {
-          .proposal-pages {
+          .proposal-pages, .preview-page {
             box-shadow: none !important;
             margin: 0 !important;
           }

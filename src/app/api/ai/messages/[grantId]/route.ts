@@ -16,7 +16,7 @@ export async function GET(
     }
 
     const userId = session.user.id;
-    const { grantId } = params;
+    const { grantId } = await params;
 
     // Find existing session for this user and grant
     const aiSession = await prisma.aIGrantSession.findUnique({
