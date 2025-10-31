@@ -10,7 +10,8 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Loader2, AlertCircle, Building2 } from "lucide-react";
-import { organizationSchema, type OrganizationFormData, countries } from "@/lib/validations/onboarding";
+import { organizationSchema, type OrganizationFormData } from "@/lib/validations/onboarding";
+import { COUNTRIES } from "@/lib/utils/email-utils";
 
 export default function OrganizationPage() {
   const [isLoading, setIsLoading] = useState(false);
@@ -177,8 +178,8 @@ export default function OrganizationPage() {
                   <SelectTrigger className={errors.country ? "border-red-500" : ""}>
                     <SelectValue placeholder="Select country" />
                   </SelectTrigger>
-                  <SelectContent>
-                    {countries.map((country) => (
+                  <SelectContent className="max-h-60">
+                    {COUNTRIES.map((country) => (
                       <SelectItem key={country} value={country}>
                         {country}
                       </SelectItem>

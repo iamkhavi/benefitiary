@@ -55,10 +55,10 @@ const getMainMenuItems = (stats: UserStats | null) => [
 
 const getFeatureItems = (stats: UserStats | null) => [
   {
-    title: "AI Assistant",
-    href: "/ai-assistant",
+    title: "Maya Assistant",
+    href: "/maya",
     icon: Zap,
-    badge: "Pro"
+    badge: "AI"
   },
   {
     title: "Analytics",
@@ -103,13 +103,18 @@ export function AppSidebar() {
   useEffect(() => {
     const fetchStats = async () => {
       try {
+        console.log('🔍 Fetching user stats...')
         const response = await fetch('/api/user/stats')
+        console.log('📊 Stats response status:', response.status)
         if (response.ok) {
           const data = await response.json()
+          console.log('📈 Stats data received:', data)
           setStats(data.stats)
+        } else {
+          console.error('❌ Stats API error:', response.status, response.statusText)
         }
       } catch (error) {
-        console.error('Error fetching user stats:', error)
+        console.error('❌ Error fetching user stats:', error)
       }
     }
 
@@ -129,6 +134,12 @@ export function AppSidebar() {
           </div>
           <span className="font-semibold text-gray-900">Benefitiary</span>
         </div>
+        {/* Debug info - remove in production */}
+        {process.env.NODE_ENV === 'development' && (
+          <div className="text-xs text-gray-400 mt-1">
+            Stats: {stats ? JSON.stringify(stats) : 'Loading...'}
+          </div>
+        )}
       </div>
 
       {/* Navigation */}
@@ -161,7 +172,7 @@ export function AppSidebar() {
                       {item.badge}
                     </Badge>
                   )}
-                  {item.count && (
+                  {typeof item.count === 'number' && (
                     <span className="text-xs text-gray-500">{item.count}</span>
                   )}
                 </Link>
@@ -198,7 +209,7 @@ export function AppSidebar() {
                       {item.badge}
                     </Badge>
                   )}
-                  {item.count && (
+                  {typeof item.count === 'number' && (
                     <span className="text-xs text-gray-500">{item.count}</span>
                   )}
                 </Link>

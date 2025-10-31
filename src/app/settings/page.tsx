@@ -17,12 +17,11 @@ import {
   Palette,
   Building2,
   Trash2,
-  MapPin,
-  Users,
   Tag,
   Loader2,
   Save
 } from 'lucide-react';
+import { COUNTRIES } from '@/lib/utils/email-utils';
 
 interface Organization {
   id: string;
@@ -64,6 +63,13 @@ export default function SettingsPage() {
 
     fetchUserData();
   }, [session, isPending, router]);
+
+  // Update editedOrg when organization data is loaded
+  useEffect(() => {
+    if (organization) {
+      setEditedOrg(organization);
+    }
+  }, [organization]);
 
   const fetchUserData = async () => {
     try {
@@ -227,11 +233,11 @@ export default function SettingsPage() {
                     Organization Type
                   </label>
                   <Select 
-                    value={editedOrg.orgType} 
+                    value={editedOrg.orgType || ''} 
                     onValueChange={(value) => setEditedOrg({...editedOrg, orgType: value})}
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="Select organization type" />
+                      <SelectValue placeholder={organization?.orgType || "Select organization type"} />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="BUSINESS">Business</SelectItem>
@@ -248,11 +254,11 @@ export default function SettingsPage() {
                     Organization Size
                   </label>
                   <Select 
-                    value={editedOrg.orgSize} 
+                    value={editedOrg.orgSize || ''} 
                     onValueChange={(value) => setEditedOrg({...editedOrg, orgSize: value})}
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="Select organization size" />
+                      <SelectValue placeholder={organization?.orgSize || "Select organization size"} />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="SOLO_1">Solo (1 person)</SelectItem>
@@ -268,25 +274,18 @@ export default function SettingsPage() {
                     Country
                   </label>
                   <Select 
-                    value={editedOrg.country} 
+                    value={editedOrg.country || ''} 
                     onValueChange={(value) => setEditedOrg({...editedOrg, country: value})}
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="Select country" />
+                      <SelectValue placeholder={organization?.country || "Select country"} />
                     </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="United States">United States</SelectItem>
-                      <SelectItem value="Canada">Canada</SelectItem>
-                      <SelectItem value="United Kingdom">United Kingdom</SelectItem>
-                      <SelectItem value="Germany">Germany</SelectItem>
-                      <SelectItem value="France">France</SelectItem>
-                      <SelectItem value="Australia">Australia</SelectItem>
-                      <SelectItem value="Kenya">Kenya</SelectItem>
-                      <SelectItem value="Nigeria">Nigeria</SelectItem>
-                      <SelectItem value="South Africa">South Africa</SelectItem>
-                      <SelectItem value="India">India</SelectItem>
-                      <SelectItem value="Brazil">Brazil</SelectItem>
-                      <SelectItem value="Mexico">Mexico</SelectItem>
+                    <SelectContent className="max-h-60">
+                      {COUNTRIES.map((country) => (
+                        <SelectItem key={country} value={country}>
+                          {country}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 </div>

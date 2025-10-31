@@ -4,14 +4,18 @@ import { getCurrentUserWithRole } from '@/lib/auth-helpers';
 
 export async function GET(request: NextRequest) {
   try {
+    console.log('🔍 User stats API called');
     const user = await getCurrentUserWithRole();
-    
+
     if (!user) {
+      console.log('❌ No user found in stats API');
       return NextResponse.json(
         { error: 'Authentication required' },
         { status: 401 }
       );
     }
+
+    console.log('✅ User found in stats API:', user.id);
 
     // Get user's applications count
     const applicationsCount = await prisma.submission.count({
@@ -20,7 +24,7 @@ export async function GET(request: NextRequest) {
 
     // Get user's saved matches count
     const savedMatchesCount = await prisma.grantMatch.count({
-      where: { 
+      where: {
         userId: user.id,
         status: 'SAVED'
       }
@@ -78,26 +82,30 @@ export async function GET(request: NextRequest) {
 
     // Get analytics count (could be notifications, activities, etc.)
     const analyticsCount = await prisma.notification.count({
-      where: { 
+      where: {
         userId: user.id,
         read: false
       }
     });
 
+    const statsData = {
+      applications: applicationsCount,
+      matches: availableMatchesCount,
+      savedMatches: savedMatchesCount,
+      analytics: analyticsCount
+    };
+
+    console.log('📊 Returning stats data:', statsData);
+
     return NextResponse.json({
       success: true,
-      stats: {
-        applications: applicationsCount,
-        matches: availableMatchesCount,
-        savedMatches: savedMatchesCount,
-        analytics: analyticsCount
-      }
+      stats: statsData
     });
 
   } catch (error) {
     console.error('❌ Error fetching user stats:', error);
     return NextResponse.json(
-      { 
+      {
         error: 'Failed to fetch user statistics',
         details: error instanceof Error ? error.message : undefined
       },
