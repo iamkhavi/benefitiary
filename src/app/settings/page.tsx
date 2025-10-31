@@ -1,15 +1,15 @@
-import { auth } from '@/lib/auth';
-import { redirect } from 'next/navigation';
-import { headers } from 'next/headers';
+'use client';
 
-export const dynamic = 'force-dynamic';
+import { useEffect, useState } from 'react';
+import { useSession } from '@/lib/auth-client';
+import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
-import { PrismaClient } from '@prisma/client';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { 
   User,
   Bell,
@@ -19,29 +19,117 @@ import {
   Trash2,
   MapPin,
   Users,
-  Tag
+  Tag,
+  Loader2,
+  Save
 } from 'lucide-react';
 
-const prisma = new PrismaClient();
+interface Organization {
+  id: string;
+  name: string;
+  website?: string;
+  orgType: string;
+  orgSize: string;
+  industries: string[];
+  country: string;
+  grantSizeRange?: string;
+  fundingNeeds?: string[];
+  createdAt: string;
+  updatedAt: string;
+}
 
-export default async function SettingsPage() {
-  const session = await auth.api.getSession({
-    headers: await headers(),
-  });
+interface UserPreferences {
+  id: string;
+  categories: string[];
+  createdAt: string;
+  updatedAt: string;
+}
 
-  if (!session?.user) {
-    redirect('/auth/login');
+export default function SettingsPage() {
+  const { data: session, isPending } = useSession();
+  const router = useRouter();
+  const [organization, setOrganization] = useState<Organization | null>(null);
+  const [preferences, setPreferences] = useState<UserPreferences | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [editedOrg, setEditedOrg] = useState<Partial<Organization>>({});
+
+  useEffect(() => {
+    if (isPending) return;
+    
+    if (!session?.user) {
+      router.push('/auth/login');
+      return;
+    }
+
+    fetchUserData();
+  }, [session, isPending, router]);
+
+  const fetchUserData = async () => {
+    try {
+      const [orgResponse, prefResponse] = await Promise.all([
+        fetch('/api/user/business'),
+        fetch('/api/onboarding/preferences')
+      ]);
+
+      if (orgResponse.ok) {
+        const orgData = await orgResponse.json();
+        setOrganization(orgData.organization);
+        setEditedOrg(orgData.organization);
+      }
+
+      if (prefResponse.ok) {
+        const prefData = await prefResponse.json();
+        setPreferences(prefData.preferences);
+      }
+    } catch (error) {
+      console.error('Error fetching user data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSaveBusinessDetails = async () => {
+    if (!editedOrg) return;
+
+    setSaving(true);
+    try {
+      const response = await fetch('/api/user/business', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(editedOrg),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setOrganization(data.organization);
+        setEditedOrg(data.organization);
+        alert('Business details updated successfully!');
+      } else {
+        const errorData = await response.json();
+        alert(`Failed to update: ${errorData.error}`);
+      }
+    } catch (error) {
+      console.error('Error updating business details:', error);
+      alert('An error occurred while updating business details');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (isPending || loading) {
+    return (
+      <div className="p-6 flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+      </div>
+    );
   }
 
-  // Fetch user's organization and preferences data
-  const [organization, preferences] = await Promise.all([
-    prisma.organization.findFirst({
-      where: { userId: session.user.id }
-    }),
-    prisma.userPreferences.findFirst({
-      where: { userId: session.user.id }
-    })
-  ]);
+  if (!session?.user) {
+    return null;
+  }
 
   return (
     <div className="p-6">
@@ -103,54 +191,119 @@ export default async function SettingsPage() {
         {organization && (
           <Card>
             <CardHeader>
-              <div className="flex items-center space-x-2">
-                <Building2 className="h-5 w-5" />
-                <CardTitle>Business Details</CardTitle>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <Building2 className="h-5 w-5" />
+                  <CardTitle>Business Details</CardTitle>
+                </div>
+                <Badge variant="outline">Editable</Badge>
               </div>
-              <p className="text-sm text-gray-600">Information from your onboarding</p>
+              <p className="text-sm text-gray-600">Update your organization information</p>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Organization Name
+                    Organization Name *
                   </label>
-                  <Input defaultValue={organization.name} />
+                  <Input 
+                    value={editedOrg.name || ''} 
+                    onChange={(e) => setEditedOrg({...editedOrg, name: e.target.value})}
+                    placeholder="Enter organization name"
+                  />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Industry Type
+                    Website (Optional)
                   </label>
-                  <div className="flex items-center space-x-2">
-                    <Input defaultValue={organization.orgType} />
-                    <Badge variant="outline" className="capitalize">
-                      {organization.orgType}
-                    </Badge>
-                  </div>
+                  <Input 
+                    value={editedOrg.website || ''} 
+                    onChange={(e) => setEditedOrg({...editedOrg, website: e.target.value})}
+                    placeholder="https://example.com"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Organization Type
+                  </label>
+                  <Select 
+                    value={editedOrg.orgType} 
+                    onValueChange={(value) => setEditedOrg({...editedOrg, orgType: value})}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select organization type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="BUSINESS">Business</SelectItem>
+                      <SelectItem value="NONPROFIT">Nonprofit / NGO</SelectItem>
+                      <SelectItem value="GOVERNMENT">Government</SelectItem>
+                      <SelectItem value="SOCIAL_ENTERPRISE">Social Enterprise</SelectItem>
+                      <SelectItem value="RESEARCH_ACADEMIC">Research / Academic</SelectItem>
+                      <SelectItem value="OTHER">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Organization Size
+                  </label>
+                  <Select 
+                    value={editedOrg.orgSize} 
+                    onValueChange={(value) => setEditedOrg({...editedOrg, orgSize: value})}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select organization size" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="SOLO_1">Solo (1 person)</SelectItem>
+                      <SelectItem value="MICRO_2_10">Micro (2-10 people)</SelectItem>
+                      <SelectItem value="SMALL_11_50">Small (11-50 people)</SelectItem>
+                      <SelectItem value="MEDIUM_51_250">Medium (51-250 people)</SelectItem>
+                      <SelectItem value="LARGE_250_PLUS">Large (250+ people)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Country
+                  </label>
+                  <Select 
+                    value={editedOrg.country} 
+                    onValueChange={(value) => setEditedOrg({...editedOrg, country: value})}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select country" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="United States">United States</SelectItem>
+                      <SelectItem value="Canada">Canada</SelectItem>
+                      <SelectItem value="United Kingdom">United Kingdom</SelectItem>
+                      <SelectItem value="Germany">Germany</SelectItem>
+                      <SelectItem value="France">France</SelectItem>
+                      <SelectItem value="Australia">Australia</SelectItem>
+                      <SelectItem value="Kenya">Kenya</SelectItem>
+                      <SelectItem value="Nigeria">Nigeria</SelectItem>
+                      <SelectItem value="South Africa">South Africa</SelectItem>
+                      <SelectItem value="India">India</SelectItem>
+                      <SelectItem value="Brazil">Brazil</SelectItem>
+                      <SelectItem value="Mexico">Mexico</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Industries
                   </label>
-                  <div className="flex items-center space-x-2">
-                    <Users className="h-4 w-4 text-gray-400" />
-                    <div className="flex flex-wrap gap-2">
-                      {organization.industries.map((industry) => (
-                        <Badge key={industry} variant="outline" className="capitalize">
-                          {industry.replace('_', ' ').toLowerCase()}
-                        </Badge>
-                      ))}
-                    </div>
+                  <div className="flex flex-wrap gap-2 p-3 border border-gray-300 rounded-md bg-gray-50">
+                    {organization.industries.map((industry) => (
+                      <Badge key={industry} variant="outline" className="capitalize">
+                        {industry.replace('_', ' ').toLowerCase()}
+                      </Badge>
+                    ))}
                   </div>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Location
-                  </label>
-                  <div className="flex items-center space-x-2">
-                    <MapPin className="h-4 w-4 text-gray-400" />
-                    <Input defaultValue={organization.country} />
-                  </div>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Industries are set during onboarding and cannot be changed here
+                  </p>
                 </div>
               </div>
 
@@ -163,7 +316,27 @@ export default async function SettingsPage() {
                 </p>
               </div>
 
-              <Button>Update Business Details</Button>
+              <div className="flex items-center space-x-3">
+                <Button 
+                  onClick={handleSaveBusinessDetails}
+                  disabled={saving || !editedOrg.name}
+                  className="flex items-center space-x-2"
+                >
+                  {saving ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Save className="h-4 w-4" />
+                  )}
+                  <span>{saving ? 'Saving...' : 'Save Changes'}</span>
+                </Button>
+                <Button 
+                  variant="outline"
+                  onClick={() => setEditedOrg(organization)}
+                  disabled={saving}
+                >
+                  Reset
+                </Button>
+              </div>
             </CardContent>
           </Card>
         )}

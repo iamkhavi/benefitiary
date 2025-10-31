@@ -2,6 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
+import { useEffect, useState } from "react"
 import { cn } from "@/lib/utils"
 import { 
   LayoutDashboard, 
@@ -19,7 +20,14 @@ import {
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 
-const mainMenuItems = [
+interface UserStats {
+  applications: number;
+  matches: number;
+  savedMatches: number;
+  analytics: number;
+}
+
+const getMainMenuItems = (stats: UserStats | null) => [
   {
     title: "Dashboard",
     href: "/",
@@ -35,17 +43,17 @@ const mainMenuItems = [
     title: "Applications",
     href: "/applications",
     icon: FileText,
-    count: 12
+    count: stats?.applications || 0
   },
   {
     title: "Matches",
     href: "/matches",
     icon: Target,
-    count: 8
+    count: stats?.matches || 0
   }
 ]
 
-const featureItems = [
+const getFeatureItems = (stats: UserStats | null) => [
   {
     title: "AI Assistant",
     href: "/ai-assistant",
@@ -56,7 +64,7 @@ const featureItems = [
     title: "Analytics",
     href: "/analytics",
     icon: BarChart3,
-    count: 20
+    count: stats?.analytics || 0
   },
   {
     title: "Billing",
@@ -90,6 +98,26 @@ const generalItems = [
 
 export function AppSidebar() {
   const pathname = usePathname()
+  const [stats, setStats] = useState<UserStats | null>(null)
+
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const response = await fetch('/api/user/stats')
+        if (response.ok) {
+          const data = await response.json()
+          setStats(data.stats)
+        }
+      } catch (error) {
+        console.error('Error fetching user stats:', error)
+      }
+    }
+
+    fetchStats()
+    // Refresh stats every 30 seconds
+    const interval = setInterval(fetchStats, 30000)
+    return () => clearInterval(interval)
+  }, [])
 
   return (
     <div className="flex h-screen w-64 flex-col bg-white border-r border-gray-200">
@@ -111,7 +139,7 @@ export function AppSidebar() {
             Main Menu
           </h3>
           <nav className="space-y-1">
-            {mainMenuItems.map((item) => {
+            {getMainMenuItems(stats).map((item) => {
               const isActive = pathname === item.href
               return (
                 <Link
@@ -148,7 +176,7 @@ export function AppSidebar() {
             Features
           </h3>
           <nav className="space-y-1">
-            {featureItems.map((item) => {
+            {getFeatureItems(stats).map((item) => {
               const isActive = pathname === item.href
               return (
                 <Link

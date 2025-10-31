@@ -3,6 +3,37 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { headers } from "next/headers";
 
+export async function GET(request: NextRequest) {
+  try {
+    const session = await auth.api.getSession({
+      headers: await headers(),
+    });
+
+    if (!session?.user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const preferences = await prisma.userPreferences.findUnique({
+      where: { userId: session.user.id }
+    });
+
+    if (!preferences) {
+      return NextResponse.json({ error: "Preferences not found" }, { status: 404 });
+    }
+
+    return NextResponse.json({ 
+      success: true,
+      preferences
+    });
+  } catch (error) {
+    console.error("Preferences fetch error:", error);
+    return NextResponse.json(
+      { error: "Failed to fetch preferences" },
+      { status: 500 }
+    );
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const session = await auth.api.getSession({
