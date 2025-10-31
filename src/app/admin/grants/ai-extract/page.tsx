@@ -196,7 +196,11 @@ export default function AIGrantExtractionPage() {
         regionFocus: Array.isArray(extractedData.locationEligibility) 
           ? (extractedData.locationEligibility[0] || 'Global')
           : (extractedData.locationEligibility || 'Global'),
-        source: 'AI Extraction'
+        source: 'AI Extraction',
+        // PRESERVE ORIGINAL RAW CONTENT
+        rawContent: originalContent,
+        contentSource: inputMethod === 'pdf' ? 'pdf' : 'text',
+        originalFileName: inputMethod === 'pdf' && selectedFile ? selectedFile.name : null
       };
 
       console.log('📤 Sending payload:', payload);

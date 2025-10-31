@@ -1,10 +1,15 @@
 "use client";
 
 import { useState, useEffect, useRef } from 'react';
-import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import {
+  PromptInput,
+  PromptInputAction,
+  PromptInputActions,
+  PromptInputTextarea,
+} from '@/components/ui/prompt-input';
 import { 
   ArrowRight,
   Sparkles,
@@ -18,7 +23,8 @@ import {
   Send,
   User,
   Bot,
-  Loader2
+  Loader2,
+  Paperclip
 } from 'lucide-react';
 
 interface Message {
@@ -68,15 +74,17 @@ export default function Dashboard() {
     setIsLoading(true);
 
     try {
-      // Call Global Maya API
-      const response = await fetch('/api/maya/global', {
+      // Call REAL Maya API with a dummy grant ID for general chat
+      const response = await fetch('/api/maya', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           userMessage: currentQuery,
-          conversationHistory: []
+          grantId: 'general-chat', // Use a special ID for general dashboard chat
+          history: [],
+          stream: false
         }),
       });
 
@@ -126,15 +134,20 @@ export default function Dashboard() {
     setIsLoading(true);
 
     try {
-      // Call Global Maya API
-      const response = await fetch('/api/maya/global', {
+      // Call REAL Maya API with conversation history
+      const response = await fetch('/api/maya', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           userMessage: messageText,
-          conversationHistory: messages
+          grantId: 'general-chat',
+          history: messages.map(msg => ({
+            role: msg.role === 'user' ? 'user' : 'assistant',
+            content: msg.content
+          })),
+          stream: false
         }),
       });
 
@@ -296,7 +309,22 @@ export default function Dashboard() {
                                 key={index}
                                 size="sm"
                                 className="text-xs bg-purple-600 hover:bg-purple-700 text-white"
-                                onClick={() => window.location.href = action.target}
+                                onClick={() => {
+                                  // Handle different action types without page reload
+                                  if (action.type === 'navigate') {
+                                    if (action.target.startsWith('/')) {
+                                      // Use Next.js router for internal navigation
+                                      window.history.pushState({}, '', action.target);
+                                      window.dispatchEvent(new PopStateEvent('popstate'));
+                                    } else {
+                                      window.open(action.target, '_blank');
+                                    }
+                                  } else if (action.type === 'search') {
+                                    handleSendMessage(action.target);
+                                  } else {
+                                    handleSendMessage(action.label);
+                                  }
+                                }}
                               >
                                 {action.label}
                               </Button>
@@ -329,31 +357,34 @@ export default function Dashboard() {
 
               {/* Input */}
               <div className="border-t p-4">
-                <div className="flex items-end space-x-3">
-                  <div className="flex-1">
-                    <textarea
-                      placeholder="Ask Maya anything about grants, proposals, or funding opportunities..."
-                      className="w-full min-h-[60px] resize-none border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
-                      value={query}
-                      onChange={(e) => setQuery(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' && !e.shiftKey) {
-                          e.preventDefault();
-                          handleSendMessage();
-                        }
-                      }}
-                      disabled={isLoading}
-                    />
-                  </div>
-                  <Button 
-                    onClick={() => handleSendMessage()}
-                    disabled={isLoading || !query.trim()}
-                    className="bg-purple-600 hover:bg-purple-700"
-                    size="sm"
-                  >
-                    <Send className="h-4 w-4" />
-                  </Button>
-                </div>
+                <PromptInput
+                  value={query}
+                  onValueChange={setQuery}
+                  onSubmit={() => handleSendMessage()}
+                  isLoading={isLoading}
+                >
+                  <PromptInputTextarea
+                    placeholder="Ask Maya anything about grants, proposals, or funding opportunities..."
+                    className="min-h-[60px]"
+                  />
+                  <PromptInputActions className="px-3 pb-3">
+                    <PromptInputAction tooltip="Attach file">
+                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                        <Paperclip className="h-4 w-4" />
+                      </Button>
+                    </PromptInputAction>
+                    <PromptInputAction tooltip="Send message">
+                      <Button 
+                        onClick={() => handleSendMessage()}
+                        disabled={isLoading || !query.trim()}
+                        className="bg-purple-600 hover:bg-purple-700"
+                        size="sm"
+                      >
+                        <Send className="h-4 w-4" />
+                      </Button>
+                    </PromptInputAction>
+                  </PromptInputActions>
+                </PromptInput>
                 <div className="flex items-center justify-between mt-2 text-xs text-gray-500">
                   <span>Press Shift + Enter for new line</span>
                   <span>Powered by Maya AI</span>
@@ -422,26 +453,34 @@ export default function Dashboard() {
 
           {/* Main AI Input */}
           <div className="max-w-2xl mx-auto mb-8">
-            <div className="relative">
-              <Input
+            <PromptInput
+              value={query}
+              onValueChange={setQuery}
+              onSubmit={handleSubmit}
+              className="border-2 border-gray-200 focus-within:border-purple-500"
+            >
+              <PromptInputTextarea
                 placeholder="Enter an idea or app name to get started"
-                className="w-full py-4 px-6 text-lg border-2 border-gray-200 rounded-lg focus:border-purple-500 focus:ring-purple-500 pr-16"
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    handleSubmit();
-                  }
-                }}
+                className="text-lg py-4 px-6 min-h-[60px]"
               />
-              <Button 
-                size="sm"
-                className="absolute right-3 top-1/2 transform -translate-y-1/2 bg-purple-600 hover:bg-purple-700"
-                onClick={handleSubmit}
-              >
-                <ArrowRight className="h-4 w-4" />
-              </Button>
-            </div>
+              <PromptInputActions className="px-3 pb-3">
+                <PromptInputAction tooltip="Attach file">
+                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                    <Paperclip className="h-4 w-4" />
+                  </Button>
+                </PromptInputAction>
+                <PromptInputAction tooltip="Send message">
+                  <Button 
+                    size="sm"
+                    onClick={handleSubmit}
+                    disabled={!query.trim()}
+                    className="bg-purple-600 hover:bg-purple-700"
+                  >
+                    <ArrowRight className="h-4 w-4" />
+                  </Button>
+                </PromptInputAction>
+              </PromptInputActions>
+            </PromptInput>
           </div>
 
           {/* Quick Suggestion Pills */}

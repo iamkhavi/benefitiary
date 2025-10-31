@@ -300,7 +300,38 @@ async function loadContextWithCache(userId: string, grantId: string, userOverrid
   const cached = contextCache.get(cacheKey);
 
   try {
-    // Always load fresh data to check versions
+    // Handle general chat case
+    if (grantId === 'general-chat') {
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        include: {
+          organization: true
+        }
+      });
+
+      if (!user) {
+        throw new Error('User not found');
+      }
+
+      const org = user.organization;
+      return {
+        // Organization Details only for general chat
+        orgName: org?.name || 'Organization',
+        orgType: org?.orgType?.replace(/_/g, ' ') || 'Not specified',
+        orgSize: org?.orgSize?.replace(/_/g, ' ') || 'Not specified',
+        orgCountry: org?.country || 'Not specified',
+        orgIndustries: org?.industries?.join(', ') || 'Not specified',
+        orgWebsite: org?.website || 'Not specified',
+        
+        // General context
+        grantTitle: 'General Grant Consultation',
+        grantDescription: 'General funding and grant guidance',
+        funderName: 'Various Funders',
+        ...userOverrides
+      };
+    }
+
+    // Always load fresh data to check versions for specific grants
     const [user, grant] = await Promise.all([
       prisma.user.findUnique({
         where: { id: userId },

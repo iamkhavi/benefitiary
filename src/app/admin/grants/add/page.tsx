@@ -294,10 +294,11 @@ export default function AddGrantPage() {
           contactEmail: formData.contactEmail,
           locationEligibility: formData.locationEligibility.split(',').map(s => s.trim()).filter(s => s),
           requiredDocuments: formData.requiredDocuments.split(',').map(s => s.trim()).filter(s => s),
-          // Include extracted data if available
-          rawContent: extractedData ? (uploadMethod === 'text' ? aiText : 'PDF content') : null,
+          // Include extracted data if available - PRESERVE ORIGINAL CONTENT
+          rawContent: extractedData ? (uploadMethod === 'text' ? aiText : `PDF: ${selectedFile?.name || 'Unknown file'}`) : null,
           contentSource: extractedData ? (uploadMethod === 'text' ? 'text' : 'pdf') : 'manual',
-          source: 'admin_input'
+          originalFileName: extractedData && uploadMethod === 'pdf' ? selectedFile?.name : null,
+          source: 'AI Extraction'
         }),
       });
 

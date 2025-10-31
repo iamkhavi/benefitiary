@@ -47,6 +47,10 @@ interface Grant {
   expectedOutcomes?: string[];
   contactEmail?: string;
   status: string;
+  rawContent?: string;
+  contentSource?: string;
+  originalFileName?: string;
+  updatedAt?: string;
   funder?: {
     id: string;
     name: string;
@@ -132,6 +136,20 @@ export default function GrantDetailPage() {
     return new Date(deadline).getTime() < Date.now();
   };
 
+  const formatUrl = (url: string) => {
+    if (!url) return '';
+    // If it already has a protocol, return as is
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      return url;
+    }
+    // If it starts with www. or looks like a domain, add https://
+    if (url.startsWith('www.') || url.includes('.')) {
+      return `https://${url}`;
+    }
+    // Otherwise, assume it needs https://
+    return `https://${url}`;
+  };
+
   if (loading) {
     return (
       <div className="container mx-auto py-8">
@@ -155,296 +173,21 @@ export default function GrantDetailPage() {
   }
 
   return (
-    <div className="container mx-auto py-8 space-y-6">
+    <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <Button 
-          variant="ghost" 
-          onClick={() => router.back()}
-          className="flex items-center space-x-2"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          <span>Back</span>
-        </Button>
-        
-        <div className="flex items-center space-x-3">
-          <Button 
-            variant="outline"
-            onClick={() => setIsSaved(!isSaved)}
-            className="flex items-center space-x-2"
-          >
-            {isSaved ? (
-              <BookmarkCheck className="h-4 w-4 text-primary" />
-            ) : (
-              <Bookmark className="h-4 w-4" />
-            )}
-            <span>{isSaved ? 'Saved' : 'Save Grant'}</span>
-          </Button>
-          
-          <Link href={`/grants/${grant.id}/ai-workspace`}>
-            <Button className="flex items-center space-x-2">
-              <Sparkles className="h-4 w-4" />
-              <span>AI Workspace</span>
+      <div className="bg-white border-b border-gray-200">
+        <div className="container mx-auto px-6 py-4">
+          <div className="flex items-center justify-between">
+            <Button 
+              variant="ghost" 
+              onClick={() => router.back()}
+              className="flex items-center space-x-2 text-gray-600 hover:text-gray-900"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              <span>Back to Grants</span>
             </Button>
-          </Link>
-        </div>
-      </div>
-
-      {/* Main Grant Information */}
-      <Card className="border-l-4 border-l-primary">
-        <CardHeader className="pb-6">
-          <div className="flex items-start justify-between">
-            <div className="flex items-center space-x-4 flex-1">
-              {/* Funder Logo */}
-              <Avatar className="h-16 w-16 border-2 border-gray-100">
-                <AvatarImage 
-                  src={grant.funder?.logoUrl} 
-                  alt={grant.funder?.name || 'Funder'} 
-                />
-                <AvatarFallback className="bg-primary/10 text-primary font-semibold text-lg">
-                  {grant.funder?.name?.charAt(0) || 'F'}
-                </AvatarFallback>
-              </Avatar>
-              
-              <div className="flex-1 min-w-0">
-                <CardTitle className="text-2xl leading-tight mb-2">
-                  {grant.title}
-                </CardTitle>
-                <CardDescription className="flex items-center space-x-3 text-base">
-                  <div className="flex items-center space-x-2">
-                    <Building className="h-5 w-5" />
-                    <span className="font-medium">{grant.funder?.name || 'Unknown Funder'}</span>
-                  </div>
-                  <Badge variant="outline" className="text-sm">
-                    {grant.funder?.type?.replace('_', ' ') || 'Foundation'}
-                  </Badge>
-                </CardDescription>
-              </div>
-            </div>
             
-            {/* Category Badge */}
-            <Badge className={cn("text-sm font-medium px-3 py-1", getCategoryColor(grant.category))}>
-              {formatCategory(grant.category)}
-            </Badge>
-          </div>
-        </CardHeader>
-
-        <CardContent className="space-y-6">
-          {/* Key Details Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {/* Funding Amount */}
-            <div className="flex items-center space-x-3 p-4 bg-green-50 rounded-lg border border-green-200">
-              <DollarSign className="h-8 w-8 text-green-600" />
-              <div>
-                <p className="text-sm text-green-600 font-medium">Funding Amount</p>
-                <p className="text-xl font-bold text-green-700">
-                  {formatAmount(grant.fundingAmountMin, grant.fundingAmountMax)}
-                </p>
-              </div>
-            </div>
-
-            {/* Deadline */}
-            <div className={cn(
-              "flex items-center space-x-3 p-4 rounded-lg border",
-              isDeadlinePassed(grant.deadline) ? "bg-red-50 border-red-200" :
-              isDeadlineSoon(grant.deadline) ? "bg-orange-50 border-orange-200" : "bg-blue-50 border-blue-200"
-            )}>
-              <Calendar className={cn(
-                "h-8 w-8",
-                isDeadlinePassed(grant.deadline) ? "text-red-600" :
-                isDeadlineSoon(grant.deadline) ? "text-orange-600" : "text-blue-600"
-              )} />
-              <div>
-                <p className={cn(
-                  "text-sm font-medium",
-                  isDeadlinePassed(grant.deadline) ? "text-red-600" :
-                  isDeadlineSoon(grant.deadline) ? "text-orange-600" : "text-blue-600"
-                )}>
-                  Application Deadline
-                </p>
-                <p className={cn(
-                  "text-xl font-bold",
-                  isDeadlinePassed(grant.deadline) ? "text-red-700" :
-                  isDeadlineSoon(grant.deadline) ? "text-orange-700" : "text-blue-700"
-                )}>
-                  {grant.deadline ? 
-                    new Date(grant.deadline).toLocaleDateString('en-US', { 
-                      year: 'numeric', 
-                      month: 'long', 
-                      day: 'numeric' 
-                    }) : 
-                    'Rolling Deadline'
-                  }
-                </p>
-              </div>
-            </div>
-
-            {/* Duration */}
-            <div className="flex items-center space-x-3 p-4 bg-purple-50 rounded-lg border border-purple-200">
-              <Clock className="h-8 w-8 text-purple-600" />
-              <div>
-                <p className="text-sm text-purple-600 font-medium">Project Duration</p>
-                <p className="text-xl font-bold text-purple-700">
-                  {grant.durationMonths ? `${grant.durationMonths} months` : 'Not specified'}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {/* Description */}
-          {grant.description && (
-            <div>
-              <h3 className="text-lg font-semibold mb-3 flex items-center space-x-2">
-                <FileText className="h-5 w-5 text-primary" />
-                <span>Grant Description</span>
-              </h3>
-              <div className="prose max-w-none">
-                <p className="text-gray-700 leading-relaxed">{grant.description}</p>
-              </div>
-            </div>
-          )}
-
-          {/* Eligibility Criteria */}
-          {grant.eligibilityCriteria && (
-            <div>
-              <h3 className="text-lg font-semibold mb-3 flex items-center space-x-2">
-                <Users className="h-5 w-5 text-primary" />
-                <span>Eligibility Criteria</span>
-              </h3>
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <p className="text-gray-700 leading-relaxed">{grant.eligibilityCriteria}</p>
-              </div>
-            </div>
-          )}
-
-          {/* Location Eligibility */}
-          {grant.locationEligibility && grant.locationEligibility.length > 0 && (
-            <div>
-              <h3 className="text-lg font-semibold mb-3 flex items-center space-x-2">
-                <MapPin className="h-5 w-5 text-primary" />
-                <span>Geographic Eligibility</span>
-              </h3>
-              <div className="flex flex-wrap gap-2">
-                {grant.locationEligibility.map((location, index) => (
-                  <Badge key={index} variant="secondary" className="text-sm px-3 py-1">
-                    {location}
-                  </Badge>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Program Goals */}
-          {grant.programGoals && grant.programGoals.length > 0 && (
-            <div>
-              <h3 className="text-lg font-semibold mb-3 flex items-center space-x-2">
-                <Target className="h-5 w-5 text-primary" />
-                <span>Program Goals</span>
-              </h3>
-              <ul className="space-y-2">
-                {grant.programGoals.map((goal, index) => (
-                  <li key={index} className="flex items-start space-x-2">
-                    <CheckCircle className="h-5 w-5 text-green-600 mt-0.5 flex-shrink-0" />
-                    <span className="text-gray-700">{goal}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          {/* Expected Outcomes */}
-          {grant.expectedOutcomes && grant.expectedOutcomes.length > 0 && (
-            <div>
-              <h3 className="text-lg font-semibold mb-3 flex items-center space-x-2">
-                <Award className="h-5 w-5 text-primary" />
-                <span>Expected Outcomes</span>
-              </h3>
-              <ul className="space-y-2">
-                {grant.expectedOutcomes.map((outcome, index) => (
-                  <li key={index} className="flex items-start space-x-2">
-                    <CheckCircle className="h-5 w-5 text-blue-600 mt-0.5 flex-shrink-0" />
-                    <span className="text-gray-700">{outcome}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          {/* Required Documents */}
-          {grant.requiredDocuments && grant.requiredDocuments.length > 0 && (
-            <div>
-              <h3 className="text-lg font-semibold mb-3 flex items-center space-x-2">
-                <FileText className="h-5 w-5 text-primary" />
-                <span>Required Documents</span>
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                {grant.requiredDocuments.map((doc, index) => (
-                  <div key={index} className="flex items-center space-x-2 p-2 bg-gray-50 rounded">
-                    <FileText className="h-4 w-4 text-gray-600" />
-                    <span className="text-sm text-gray-700">{doc}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Evaluation Criteria */}
-          {grant.evaluationCriteria && grant.evaluationCriteria.length > 0 && (
-            <div>
-              <h3 className="text-lg font-semibold mb-3 flex items-center space-x-2">
-                <Award className="h-5 w-5 text-primary" />
-                <span>Evaluation Criteria</span>
-              </h3>
-              <ul className="space-y-2">
-                {grant.evaluationCriteria.map((criteria, index) => (
-                  <li key={index} className="flex items-start space-x-2">
-                    <div className="w-6 h-6 bg-primary text-white rounded-full flex items-center justify-center text-xs font-bold mt-0.5 flex-shrink-0">
-                      {index + 1}
-                    </div>
-                    <span className="text-gray-700">{criteria}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-
-          {/* Contact Information */}
-          <div className="bg-gray-50 rounded-lg p-6 border">
-            <h3 className="text-lg font-semibold mb-4">Contact Information</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {grant.funder?.website && (
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Funder Website</p>
-                  <a 
-                    href={grant.funder.website} 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="text-primary hover:underline flex items-center space-x-1"
-                  >
-                    <span>{grant.funder.website}</span>
-                    <ExternalLink className="h-4 w-4" />
-                  </a>
-                </div>
-              )}
-              {(grant.contactEmail || grant.funder?.contactEmail) && (
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Contact Email</p>
-                  <p className="text-gray-900">{grant.contactEmail || grant.funder?.contactEmail}</p>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Action Buttons */}
-          <div className="flex items-center justify-between pt-6 border-t">
-            <div className="flex space-x-3">
-              <Link href={`/grants/${grant.id}/ai-workspace`}>
-                <Button className="flex items-center space-x-2">
-                  <Sparkles className="h-4 w-4" />
-                  <span>AI Workspace</span>
-                </Button>
-              </Link>
-              
+            <div className="flex items-center space-x-3">
               <Button 
                 variant="outline"
                 onClick={() => setIsSaved(!isSaved)}
@@ -457,23 +200,341 @@ export default function GrantDetailPage() {
                 )}
                 <span>{isSaved ? 'Saved' : 'Save Grant'}</span>
               </Button>
+              
+              <Link href={`/grants/${grant.id}/ai-workspace`}>
+                <Button className="flex items-center space-x-2 bg-primary hover:bg-primary/90">
+                  <Sparkles className="h-4 w-4" />
+                  <span>AI Workspace</span>
+                </Button>
+              </Link>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="container mx-auto px-6 py-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Main Content */}
+          <div className="lg:col-span-2 space-y-6">
+
+            {/* Grant Title and Basic Info */}
+            <div className="bg-white rounded-lg border border-gray-200 p-6">
+              <div className="flex items-start justify-between mb-4">
+                <div className="flex items-center space-x-4 flex-1">
+                  <Avatar className="h-12 w-12 border border-gray-200">
+                    <AvatarImage 
+                      src={grant.funder?.logoUrl} 
+                      alt={grant.funder?.name || 'Funder'} 
+                    />
+                    <AvatarFallback className="bg-blue-50 text-blue-600 font-semibold">
+                      {grant.funder?.name?.charAt(0) || 'F'}
+                    </AvatarFallback>
+                  </Avatar>
+                  
+                  <div className="flex-1 min-w-0">
+                    <h1 className="text-2xl font-bold text-gray-900 mb-1">
+                      {grant.title}
+                    </h1>
+                    <div className="flex items-center space-x-3 text-sm text-gray-600">
+                      <div className="flex items-center space-x-1">
+                        <Building className="h-4 w-4" />
+                        <span className="font-medium">{grant.funder?.name || 'Unknown Funder'}</span>
+                      </div>
+                      <span>•</span>
+                      <span>Last updated: {new Date(grant.updatedAt || Date.now()).toLocaleDateString()}</span>
+                    </div>
+                  </div>
+                </div>
+                
+                <Badge className={cn("text-sm font-medium px-3 py-1", getCategoryColor(grant.category))}>
+                  {formatCategory(grant.category)}
+                </Badge>
+              </div>
+
+              {/* Quick Actions */}
+              <div className="flex items-center space-x-3 pt-4 border-t border-gray-100">
+                {grant.applicationUrl && (
+                  <a 
+                    href={formatUrl(grant.applicationUrl)} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                  >
+                    <Button className="flex items-center space-x-2">
+                      <ExternalLink className="h-4 w-4" />
+                      <span>View Application</span>
+                    </Button>
+                  </a>
+                )}
+                
+                <Link href={`/grants/${grant.id}/ai-workspace`}>
+                  <Button variant="outline" className="flex items-center space-x-2">
+                    <Sparkles className="h-4 w-4" />
+                    <span>AI Workspace</span>
+                  </Button>
+                </Link>
+              </div>
             </div>
 
-            {grant.applicationUrl && (
-              <a 
-                href={grant.applicationUrl} 
-                target="_blank" 
-                rel="noopener noreferrer"
-              >
-                <Button size="lg" className="flex items-center space-x-2">
-                  <ExternalLink className="h-5 w-5" />
-                  <span>More Information</span>
-                </Button>
-              </a>
-            )}
+            {/* Tabbed Content */}
+            <div className="bg-white rounded-lg border border-gray-200">
+              <div className="border-b border-gray-200">
+                <nav className="flex space-x-8 px-6">
+                  <button className="py-4 px-1 border-b-2 border-blue-500 font-medium text-sm text-blue-600">
+                    Grant details
+                  </button>
+                  <button className="py-4 px-1 border-b-2 border-transparent font-medium text-sm text-gray-500 hover:text-gray-700">
+                    Funder details
+                  </button>
+                </nav>
+              </div>
+
+              <div className="p-6 space-y-8">
+
+                {/* Overview Section */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold text-gray-900">Overview</h3>
+                  {grant.description && (
+                    <div className="text-gray-700 leading-relaxed">
+                      {grant.description}
+                    </div>
+                  )}
+                  
+                  {grant.rawContent && (
+                    <details className="group">
+                      <summary className="flex items-center justify-between cursor-pointer py-2 text-sm font-medium text-blue-600 hover:text-blue-700">
+                        <span>View complete grant information</span>
+                        <span className="ml-2 group-open:rotate-180 transition-transform">▼</span>
+                      </summary>
+                      <div className="mt-3 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                        <div className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">
+                          {grant.rawContent}
+                        </div>
+                        {grant.originalFileName && (
+                          <div className="mt-3 pt-3 border-t border-gray-300">
+                            <Badge variant="outline" className="text-xs">
+                              Source: {grant.originalFileName}
+                            </Badge>
+                          </div>
+                        )}
+                      </div>
+                    </details>
+                  )}
+                </div>
+
+                {/* Eligibility Section */}
+                {grant.eligibilityCriteria && (
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-semibold text-gray-900">Eligibility</h3>
+                    <div className="space-y-3">
+                      <p className="text-sm text-gray-600">
+                        You can learn more about this opportunity by visiting the funder's website.
+                      </p>
+                      <div className="text-gray-700 leading-relaxed">
+                        {grant.eligibilityCriteria.split('\n').map((line, index) => (
+                          <div key={index} className="flex items-start space-x-2 mb-2">
+                            <span className="text-blue-600 mt-1">•</span>
+                            <span>{line.trim()}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Ineligibility Section */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold text-gray-900">Ineligibility</h3>
+                  <div className="space-y-2 text-gray-700">
+                    <div className="flex items-start space-x-2">
+                      <span className="text-blue-600 mt-1">•</span>
+                      <span>This grant does not make grants directly to individuals.</span>
+                    </div>
+                    <div className="flex items-start space-x-2">
+                      <span className="text-blue-600 mt-1">•</span>
+                      <span>Geographic restrictions may apply.</span>
+                    </div>
+                    {grant.locationEligibility && grant.locationEligibility.length > 0 && (
+                      <div className="mt-3">
+                        <p className="text-sm font-medium text-gray-900 mb-2">Geographic Eligibility:</p>
+                        <div className="flex flex-wrap gap-2">
+                          {grant.locationEligibility.map((location, index) => (
+                            <Badge key={index} variant="secondary" className="text-xs">
+                              {location}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
-        </CardContent>
-      </Card>
+
+          {/* Sidebar */}
+          <div className="space-y-6">
+            {/* Key Information Card */}
+            <div className="bg-white rounded-lg border border-gray-200 p-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Key Information</h3>
+              
+              <div className="space-y-4">
+                {/* Funder */}
+                <div>
+                  <dt className="text-sm font-medium text-gray-500 mb-1">Funder</dt>
+                  <dd className="text-sm text-gray-900">{grant.funder?.name || 'Unknown Funder'}</dd>
+                </div>
+
+                {/* Grant Amount */}
+                <div>
+                  <dt className="text-sm font-medium text-gray-500 mb-1">Grant Amount</dt>
+                  <dd className="text-sm text-gray-900 font-semibold">
+                    {formatAmount(grant.fundingAmountMin, grant.fundingAmountMax)}
+                  </dd>
+                </div>
+
+                {/* Deadline */}
+                <div>
+                  <dt className="text-sm font-medium text-gray-500 mb-1">Deadline</dt>
+                  <dd className={cn(
+                    "text-sm font-medium",
+                    isDeadlinePassed(grant.deadline) ? "text-red-600" :
+                    isDeadlineSoon(grant.deadline) ? "text-orange-600" : "text-gray-900"
+                  )}>
+                    {grant.deadline ? 
+                      new Date(grant.deadline).toLocaleDateString('en-US', { 
+                        year: 'numeric', 
+                        month: 'long', 
+                        day: 'numeric' 
+                      }) : 
+                      'Rolling deadline'
+                    }
+                  </dd>
+                </div>
+
+                {/* Focus Areas */}
+                <div>
+                  <dt className="text-sm font-medium text-gray-500 mb-1">Focus areas</dt>
+                  <dd className="text-sm text-gray-900">{formatCategory(grant.category)}</dd>
+                </div>
+
+                {/* Applicant Type */}
+                {grant.applicantType && (
+                  <div>
+                    <dt className="text-sm font-medium text-gray-500 mb-1">Applicant type</dt>
+                    <dd className="text-sm text-gray-900">{grant.applicantType}</dd>
+                  </div>
+                )}
+
+                {/* Funding Type */}
+                <div>
+                  <dt className="text-sm font-medium text-gray-500 mb-1">Funding type</dt>
+                  <dd className="text-sm text-gray-900">{grant.fundingType || 'Grant'}</dd>
+                </div>
+
+                {/* Location of Project */}
+                {grant.locationEligibility && grant.locationEligibility.length > 0 && (
+                  <div>
+                    <dt className="text-sm font-medium text-gray-500 mb-1">Location of project</dt>
+                    <dd className="text-sm text-gray-900">
+                      {grant.locationEligibility.slice(0, 2).join(', ')}
+                      {grant.locationEligibility.length > 2 && ` +${grant.locationEligibility.length - 2} more`}
+                    </dd>
+                  </div>
+                )}
+
+                {/* Duration */}
+                {grant.durationMonths && (
+                  <div>
+                    <dt className="text-sm font-medium text-gray-500 mb-1">Project duration</dt>
+                    <dd className="text-sm text-gray-900">{grant.durationMonths} months</dd>
+                  </div>
+                )}
+              </div>
+
+              {/* Action Button */}
+              {grant.applicationUrl && (
+                <div className="mt-6 pt-6 border-t border-gray-200">
+                  <a 
+                    href={formatUrl(grant.applicationUrl)} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="w-full"
+                  >
+                    <Button className="w-full flex items-center justify-center space-x-2">
+                      <ExternalLink className="h-4 w-4" />
+                      <span>View website</span>
+                    </Button>
+                  </a>
+                </div>
+              )}
+            </div>
+
+            {/* Additional Information Card */}
+            <div className="bg-white rounded-lg border border-gray-200 p-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Additional Information</h3>
+              
+              {/* Program Goals */}
+              {grant.programGoals && grant.programGoals.length > 0 && (
+                <div className="mb-6">
+                  <h4 className="text-sm font-medium text-gray-900 mb-2">Program Goals</h4>
+                  <ul className="space-y-1">
+                    {grant.programGoals.map((goal, index) => (
+                      <li key={index} className="flex items-start space-x-2 text-sm text-gray-700">
+                        <span className="text-blue-600 mt-1">•</span>
+                        <span>{goal}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Required Documents */}
+              {grant.requiredDocuments && grant.requiredDocuments.length > 0 && (
+                <div className="mb-6">
+                  <h4 className="text-sm font-medium text-gray-900 mb-2">Required Documents</h4>
+                  <ul className="space-y-1">
+                    {grant.requiredDocuments.map((doc, index) => (
+                      <li key={index} className="flex items-start space-x-2 text-sm text-gray-700">
+                        <FileText className="h-3 w-3 text-gray-400 mt-1 flex-shrink-0" />
+                        <span>{doc}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Contact Information */}
+              {(grant.contactEmail || grant.funder?.contactEmail || grant.funder?.website) && (
+                <div>
+                  <h4 className="text-sm font-medium text-gray-900 mb-2">Contact Information</h4>
+                  <div className="space-y-2">
+                    {grant.funder?.website && (
+                      <div>
+                        <p className="text-xs text-gray-500">Website</p>
+                        <a 
+                          href={formatUrl(grant.funder.website)} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="text-sm text-blue-600 hover:underline flex items-center space-x-1"
+                        >
+                          <span>{grant.funder.website}</span>
+                          <ExternalLink className="h-3 w-3" />
+                        </a>
+                      </div>
+                    )}
+                    {(grant.contactEmail || grant.funder?.contactEmail) && (
+                      <div>
+                        <p className="text-xs text-gray-500">Email</p>
+                        <p className="text-sm text-gray-900">{grant.contactEmail || grant.funder?.contactEmail}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

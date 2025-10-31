@@ -154,7 +154,11 @@ export async function POST(request: NextRequest) {
       // Add additional fields that might be useful
       applicantType: data.applicantType?.trim() || null,
       fundingType: data.fundingType || 'GRANT',
-      durationMonths: data.durationMonths ? Number(data.durationMonths) : null
+      durationMonths: data.durationMonths ? Number(data.durationMonths) : null,
+      // PRESERVE ORIGINAL RAW CONTENT
+      rawContent: data.rawContent?.trim() || null,
+      contentSource: data.contentSource?.trim() || null,
+      originalFileName: data.originalFileName?.trim() || null
     };
 
     console.log('💾 Creating grant with data:', grantData);
