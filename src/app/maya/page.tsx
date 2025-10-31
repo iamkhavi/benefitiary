@@ -156,11 +156,14 @@ export default function GlobalMayaPage() {
       <div className="max-w-4xl mx-auto p-6">
         {/* Header */}
         <div className="mb-6">
-          <nav className="flex items-center space-x-2 text-sm text-gray-600 mb-4">
-            <span>Home</span>
-            <ArrowRight className="h-4 w-4" />
-            <span className="text-purple-600 font-medium">Build with Maya</span>
-          </nav>
+          {/* Only show breadcrumb when there are messages (like Zapier) */}
+          {messages.length > 0 && (
+            <nav className="flex items-center space-x-2 text-sm text-gray-600 mb-4">
+              <span>Home</span>
+              <ArrowRight className="h-4 w-4" />
+              <span className="text-purple-600 font-medium">Build with Maya</span>
+            </nav>
+          )}
           
           <div className="flex items-center space-x-3">
             <div className="w-10 h-10 bg-gradient-to-r from-purple-600 to-blue-600 rounded-full flex items-center justify-center">
@@ -253,26 +256,34 @@ export default function GlobalMayaPage() {
 
             {/* Input */}
             <div className="border-t p-4">
-              <div className="flex space-x-2">
-                <Input
-                  placeholder="Ask Maya anything about grants or the platform..."
-                  value={inputValue}
-                  onChange={(e) => setInputValue(e.target.value)}
-                  onKeyPress={(e) => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
-                      e.preventDefault();
-                      handleSendMessage();
-                    }
-                  }}
-                  disabled={isLoading}
-                />
+              <div className="flex items-end space-x-3">
+                <div className="flex-1">
+                  <textarea
+                    placeholder="Ask Maya anything about grants, proposals, or funding opportunities..."
+                    className="w-full min-h-[60px] resize-none border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                    value={inputValue}
+                    onChange={(e) => setInputValue(e.target.value)}
+                    onKeyPress={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        handleSendMessage();
+                      }
+                    }}
+                    disabled={isLoading}
+                  />
+                </div>
                 <Button 
                   onClick={() => handleSendMessage()}
                   disabled={isLoading || !inputValue.trim()}
                   className="bg-purple-600 hover:bg-purple-700"
+                  size="sm"
                 >
                   <Send className="h-4 w-4" />
                 </Button>
+              </div>
+              <div className="flex items-center justify-between mt-2 text-xs text-gray-500">
+                <span>Press Shift + Enter for new line</span>
+                <span>Powered by Maya AI</span>
               </div>
             </div>
           </CardContent>
