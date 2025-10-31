@@ -1,3 +1,5 @@
+'use client';
+
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -15,62 +17,100 @@ import {
   TrendingUp,
   MapPin,
   Award,
-  Zap
+  Zap,
+
 } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
+import { useState, useEffect } from 'react';
+
+interface Match {
+  id: string;
+  title: string;
+  funder: string;
+  amount: string;
+  deadline: string;
+  location: string;
+  category: string;
+  match: number;
+  reasons: string[];
+  description: string;
+  saved: boolean;
+  daysLeft: number | null;
+}
+
+interface MatchStats {
+  perfectMatches: number;
+  goodMatches: number;
+  savedMatches: number;
+}
 
 export default function MatchesPage() {
-  const matches = [
-    {
-      title: "Health Innovation Grant",
-      funder: "Gates Foundation",
-      amount: "$50,000 - $250,000",
-      deadline: "Dec 15, 2024",
-      location: "Global",
-      category: "Healthcare",
-      match: 95,
-      reasons: ["Healthcare focus", "Global eligibility", "SME friendly", "Innovation emphasis"],
-      description: "Supporting innovative healthcare solutions for underserved communities worldwide.",
-      saved: false
-    },
-    {
-      title: "Digital Health Accelerator",
-      funder: "WHO Innovation Hub",
-      amount: "$25,000 - $100,000",
-      deadline: "Jan 20, 2025",
-      location: "Africa, Asia",
-      category: "Healthcare",
-      match: 92,
-      reasons: ["Digital health focus", "Regional match", "Accelerator program", "Tech innovation"],
-      description: "Accelerating digital health solutions in emerging markets.",
-      saved: true
-    },
-    {
-      title: "Small Business Development Fund",
-      funder: "SBA",
-      amount: "$10,000 - $100,000",
-      deadline: "Jan 30, 2025",
-      location: "United States",
-      category: "Business",
-      match: 88,
-      reasons: ["SME focus", "Business development", "Funding range match", "Growth stage"],
-      description: "Funding for small businesses to expand operations and create jobs.",
-      saved: false
-    },
-    {
-      title: "Community Health Initiative",
-      funder: "Local Health Foundation",
-      amount: "$15,000 - $75,000",
-      deadline: "Feb 15, 2025",
-      location: "Regional",
-      category: "Public Health",
-      match: 85,
-      reasons: ["Community focus", "Health sector", "Local presence", "Impact driven"],
-      description: "Supporting community-based health programs and initiatives.",
-      saved: true
+  const [matches, setMatches] = useState<Match[]>([]);
+  const [stats, setStats] = useState<MatchStats>({
+    perfectMatches: 0,
+    goodMatches: 0,
+    savedMatches: 0
+  });
+  const [loading, setLoading] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [minMatch, setMinMatch] = useState(70);
+
+  useEffect(() => {
+    fetchMatches();
+  }, [searchTerm, minMatch]);
+
+  const fetchMatches = async () => {
+    try {
+      const params = new URLSearchParams();
+      if (searchTerm) params.append('search', searchTerm);
+      params.append('minMatch', minMatch.toString());
+      
+      const response = await fetch(`/api/matches?${params}`);
+      const data = await response.json();
+      
+      if (data.success) {
+        setMatches(data.matches);
+        setStats(data.stats);
+      } else {
+        console.error('Failed to fetch matches:', data.error);
+      }
+    } catch (error) {
+      console.error('Error fetching matches:', error);
     }
-  ];
+  };
+
+  const handleSaveMatch = async (matchId: string, currentlySaved: boolean) => {
+    try {
+      const response = await fetch('/api/matches/save', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          grantId: matchId,
+          action: currentlySaved ? 'unsave' : 'save'
+        }),
+      });
+
+      if (response.ok) {
+        // Update the local state
+        setMatches(matches.map(match => 
+          match.id === matchId 
+            ? { ...match, saved: !currentlySaved }
+            : match
+        ));
+        
+        // Update stats
+        setStats(prev => ({
+          ...prev,
+          savedMatches: currentlySaved ? prev.savedMatches - 1 : prev.savedMatches + 1
+        }));
+      }
+    } catch (error) {
+      console.error('Error saving match:', error);
+    }
+  };
 
   return (
     <div className="p-6 space-y-6">
@@ -89,7 +129,7 @@ export default function MatchesPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">Perfect Matches</p>
-                <p className="text-2xl font-bold text-green-600">3</p>
+                <p className="text-2xl font-bold text-green-600">{stats.perfectMatches}</p>
                 <p className="text-xs text-gray-500">90%+ compatibility</p>
               </div>
               <Star className="h-8 w-8 text-green-600" />
@@ -101,7 +141,7 @@ export default function MatchesPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">Good Matches</p>
-                <p className="text-2xl font-bold text-yellow-600">5</p>
+                <p className="text-2xl font-bold text-yellow-600">{stats.goodMatches}</p>
                 <p className="text-xs text-gray-500">70-89% compatibility</p>
               </div>
               <TrendingUp className="h-8 w-8 text-yellow-600" />
@@ -113,7 +153,7 @@ export default function MatchesPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">Saved Matches</p>
-                <p className="text-2xl font-bold text-blue-600">12</p>
+                <p className="text-2xl font-bold text-blue-600">{stats.savedMatches}</p>
                 <p className="text-xs text-gray-500">For later review</p>
               </div>
               <Heart className="h-8 w-8 text-blue-600" />
@@ -130,21 +170,42 @@ export default function MatchesPage() {
             <Input
               placeholder="Search matches..."
               className="pl-10 w-80"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-          <Button variant="outline" size="sm">
-            <Filter className="h-4 w-4 mr-2" />
-            Filter by Match %
-          </Button>
+          <select
+            value={minMatch}
+            onChange={(e) => setMinMatch(parseInt(e.target.value))}
+            className="px-3 py-2 border border-gray-300 rounded-md text-sm"
+          >
+            <option value={50}>50%+ Match</option>
+            <option value={70}>70%+ Match</option>
+            <option value={80}>80%+ Match</option>
+            <option value={90}>90%+ Match</option>
+          </select>
         </div>
         <div className="text-sm text-gray-500">
-          Showing 8 matches
+          Showing {matches.length} matches
         </div>
       </div>
 
       {/* Matches List */}
-      <div className="space-y-6">
-        {matches.map((match, index) => (
+      {matches.length === 0 ? (
+        <div className="text-center py-12">
+          <Star className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-gray-900 mb-2">No matches found</h3>
+          <p className="text-gray-600 mb-4">
+            Complete your profile to get personalized grant recommendations.
+          </p>
+          <Button>
+            <Building2 className="h-4 w-4 mr-2" />
+            Complete Profile
+          </Button>
+        </div>
+      ) : (
+        <div className="space-y-6">
+          {matches.map((match, index) => (
           <Card key={index} className="hover:shadow-lg transition-shadow border-l-4 border-l-primary">
             <CardHeader>
               <div className="flex items-start justify-between">
@@ -217,19 +278,33 @@ export default function MatchesPage() {
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2">
                   <Clock className="h-4 w-4 text-gray-400" />
-                  <span className="text-sm text-gray-500">
-                    {Math.floor(Math.random() * 30) + 1} days left to apply
+                  <span className={cn(
+                    "text-sm",
+                    match.daysLeft && match.daysLeft <= 7 
+                      ? "text-red-600 font-medium" 
+                      : match.daysLeft && match.daysLeft <= 14
+                      ? "text-orange-600 font-medium"
+                      : "text-gray-500"
+                  )}>
+                    {match.daysLeft 
+                      ? `${match.daysLeft} days left to apply${match.daysLeft <= 7 ? ' ⚠️' : ''}` 
+                      : 'No deadline specified'
+                    }
                   </span>
                 </div>
                 <div className="flex items-center space-x-2">
-                  <Button variant="outline" size="sm">
-                    <Heart className="h-4 w-4 mr-2" />
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => handleSaveMatch(match.id, match.saved)}
+                  >
+                    <Heart className={cn("h-4 w-4 mr-2", match.saved && "fill-current text-red-500")} />
                     {match.saved ? 'Saved' : 'Save'}
                   </Button>
                   <Button variant="outline" size="sm">
                     View Details
                   </Button>
-                  <Link href={`/grants/grant_${index + 1}/ai-workspace`}>
+                  <Link href={`/grants/${match.id}/ai-workspace`}>
                     <Button size="sm" className="bg-purple-600 hover:bg-purple-700">
                       <Zap className="h-4 w-4 mr-2" />
                       AI Workspace
@@ -239,8 +314,9 @@ export default function MatchesPage() {
               </div>
             </CardContent>
           </Card>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

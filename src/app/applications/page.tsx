@@ -1,3 +1,5 @@
+'use client';
+
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -15,49 +17,71 @@ import {
   Eye,
   MoreHorizontal,
   CheckCircle,
-  BarChart3
+  BarChart3,
+  Loader2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useState, useEffect } from 'react';
+
+interface Application {
+  id: string;
+  title: string;
+  funder: string;
+  amount: string;
+  status: string;
+  progress: number;
+  deadline: string;
+  lastUpdated: string;
+  grantId: string;
+}
+
+interface ApplicationStats {
+  total: number;
+  inProgress: number;
+  submitted: number;
+  approved: number;
+  successRate: number;
+}
 
 export default function ApplicationsPage() {
-  const applications = [
-    {
-      title: "Health Innovation Grant",
-      funder: "Gates Foundation",
-      amount: "$150,000",
-      status: "draft",
-      progress: 65,
-      deadline: "Dec 15, 2024",
-      lastUpdated: "2 hours ago"
-    },
-    {
-      title: "Small Business Development Fund",
-      funder: "SBA",
-      amount: "$75,000",
-      status: "submitted",
-      progress: 100,
-      deadline: "Jan 30, 2025",
-      lastUpdated: "1 day ago"
-    },
-    {
-      title: "Education Access Initiative",
-      funder: "Ford Foundation",
-      amount: "$100,000",
-      status: "review",
-      progress: 100,
-      deadline: "Feb 28, 2025",
-      lastUpdated: "3 days ago"
-    },
-    {
-      title: "Community Development Grant",
-      funder: "Local Foundation",
-      amount: "$25,000",
-      status: "approved",
-      progress: 100,
-      deadline: "Mar 15, 2025",
-      lastUpdated: "1 week ago"
+  const [applications, setApplications] = useState<Application[]>([]);
+  const [stats, setStats] = useState<ApplicationStats>({
+    total: 0,
+    inProgress: 0,
+    submitted: 0,
+    approved: 0,
+    successRate: 0
+  });
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+
+  useEffect(() => {
+    fetchApplications();
+  }, [searchTerm, statusFilter]);
+
+  const fetchApplications = async () => {
+    try {
+      setLoading(true);
+      const params = new URLSearchParams();
+      if (searchTerm) params.append('search', searchTerm);
+      if (statusFilter) params.append('status', statusFilter);
+      
+      const response = await fetch(`/api/applications?${params}`);
+      const data = await response.json();
+      
+      if (data.success) {
+        setApplications(data.applications);
+        setStats(data.stats);
+      } else {
+        console.error('Failed to fetch applications:', data.error);
+      }
+    } catch (error) {
+      console.error('Error fetching applications:', error);
+    } finally {
+      setLoading(false);
     }
-  ];
+  };
 
   return (
     <div className="p-6 space-y-6">
@@ -76,7 +100,7 @@ export default function ApplicationsPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">Total Applications</p>
-                <p className="text-2xl font-bold text-gray-900">24</p>
+                <p className="text-2xl font-bold text-gray-900">{stats.total}</p>
               </div>
               <FileText className="h-8 w-8 text-blue-600" />
             </div>
@@ -87,7 +111,7 @@ export default function ApplicationsPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">In Progress</p>
-                <p className="text-2xl font-bold text-gray-900">12</p>
+                <p className="text-2xl font-bold text-gray-900">{stats.inProgress}</p>
               </div>
               <Clock className="h-8 w-8 text-yellow-600" />
             </div>
@@ -98,7 +122,7 @@ export default function ApplicationsPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">Submitted</p>
-                <p className="text-2xl font-bold text-gray-900">8</p>
+                <p className="text-2xl font-bold text-gray-900">{stats.submitted}</p>
               </div>
               <CheckCircle className="h-8 w-8 text-green-600" />
             </div>
@@ -109,7 +133,7 @@ export default function ApplicationsPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-600">Success Rate</p>
-                <p className="text-2xl font-bold text-gray-900">75%</p>
+                <p className="text-2xl font-bold text-gray-900">{stats.successRate}%</p>
               </div>
               <BarChart3 className="h-8 w-8 text-primary" />
             </div>
@@ -125,12 +149,21 @@ export default function ApplicationsPage() {
             <Input
               placeholder="Search applications..."
               className="pl-10 w-80"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-          <Button variant="outline" size="sm">
-            <Filter className="h-4 w-4 mr-2" />
-            Filter
-          </Button>
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="px-3 py-2 border border-gray-300 rounded-md text-sm"
+          >
+            <option value="">All Status</option>
+            <option value="draft">Draft</option>
+            <option value="submitted">Submitted</option>
+            <option value="won">Approved</option>
+            <option value="lost">Rejected</option>
+          </select>
         </div>
         <Button>
           <FileText className="h-4 w-4 mr-2" />
@@ -139,8 +172,24 @@ export default function ApplicationsPage() {
       </div>
 
       {/* Applications List */}
-      <div className="space-y-4">
-        {applications.map((app, index) => (
+      {loading ? (
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+          <span className="ml-2 text-gray-600">Loading applications...</span>
+        </div>
+      ) : applications.length === 0 ? (
+        <div className="text-center py-12">
+          <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-gray-900 mb-2">No applications found</h3>
+          <p className="text-gray-600 mb-4">You haven't submitted any grant applications yet.</p>
+          <Button>
+            <FileText className="h-4 w-4 mr-2" />
+            Browse Grants
+          </Button>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {applications.map((app, index) => (
           <Card key={index} className="hover:shadow-md transition-shadow">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
@@ -208,8 +257,9 @@ export default function ApplicationsPage() {
               </div>
             </CardContent>
           </Card>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

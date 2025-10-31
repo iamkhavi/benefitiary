@@ -32,6 +32,7 @@ export default function AdminGrantsPage() {
   const [userRole, setUserRole] = useState<string | null>(null);
   const [grants, setGrants] = useState([]);
   const [filteredGrants, setFilteredGrants] = useState([]);
+  const [categoryStats, setCategoryStats] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -161,6 +162,13 @@ export default function AdminGrantsPage() {
         if (grantsResponse.ok) {
           const grantsData = await grantsResponse.json();
           setGrants(grantsData.grants || []);
+        }
+
+        // Fetch category statistics
+        const statsResponse = await fetch('/api/admin/grants/stats');
+        if (statsResponse.ok) {
+          const statsData = await statsResponse.json();
+          setCategoryStats(statsData.stats.categoryStats || []);
         }
 
       } catch (error) {
@@ -405,6 +413,63 @@ export default function AdminGrantsPage() {
           </CardContent>
         </Card>
       )}
+
+      {/* Category Statistics */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2">
+            <Database className="h-5 w-5" />
+            <span>Grant Distribution by Category</span>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+            {categoryStats.map((stat: any) => (
+              <div 
+                key={stat.category}
+                className={`p-4 rounded-lg border ${
+                  stat.count === 0 
+                    ? 'bg-red-50 border-red-200' 
+                    : stat.count < 5 
+                    ? 'bg-yellow-50 border-yellow-200' 
+                    : 'bg-green-50 border-green-200'
+                }`}
+              >
+                <div className="text-center">
+                  <p className="text-2xl font-bold mb-1 text-gray-900">{stat.count}</p>
+                  <p className="text-sm font-medium text-gray-700 mb-1">{stat.categoryName}</p>
+                  <p className="text-xs text-gray-500">{stat.percentage}% of total</p>
+                  {stat.count === 0 && (
+                    <Badge className="mt-2 bg-red-100 text-red-800 text-xs">
+                      No Grants
+                    </Badge>
+                  )}
+                  {stat.count > 0 && stat.count < 5 && (
+                    <Badge className="mt-2 bg-yellow-100 text-yellow-800 text-xs">
+                      Limited Data
+                    </Badge>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="flex items-start space-x-3">
+              <div className="flex-shrink-0">
+                <CheckCircle className="h-5 w-5 text-blue-600 mt-0.5" />
+              </div>
+              <div>
+                <h4 className="text-sm font-medium text-blue-800 mb-1">Category Management Tips</h4>
+                <ul className="text-sm text-blue-700 space-y-1">
+                  <li>• <strong>Red categories</strong> have no grants - prioritize adding grants in these areas</li>
+                  <li>• <strong>Yellow categories</strong> have limited data (&lt;5 grants) - consider expanding these</li>
+                  <li>• <strong>Green categories</strong> have good coverage - maintain quality and freshness</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Grants Table */}
       <Card>

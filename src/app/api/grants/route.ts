@@ -16,7 +16,17 @@ export async function GET(request: NextRequest) {
 
       // Build where clause
       const where: any = {
-        status: 'ACTIVE'
+        status: 'ACTIVE',
+        OR: [
+          {
+            deadline: {
+              gte: new Date() // Future deadlines
+            }
+          },
+          {
+            deadline: null // No deadline specified
+          }
+        ]
       };
 
       if (category) {
